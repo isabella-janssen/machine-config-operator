@@ -29,12 +29,7 @@ func init() {
 // Execute runs the command
 func Execute(_ *cobra.Command, _ []string) {
 	fmt.Println(`
-	ERROR: pivot no longer forces a system upgrade. It will be fully removed in a later y release. 
-	If you are attempting a manual OS upgrade, please try the following steps:
-	-delete the currentconfig(rm /etc/machine-config-daemon/currentconfig)
-	-create a forcefile(touch /run/machine-config-daemon-force) to retry the OS upgrade.
-
-	More instructions can be found here: https://access.redhat.com/solutions/5598401
+	Testing!!
 	`)
 	os.Exit(1)
 }
