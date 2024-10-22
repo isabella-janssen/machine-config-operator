@@ -1,3 +1,4 @@
+// TODO: remove if dependancy in update.go can be removed?
 package utils
 
 import (

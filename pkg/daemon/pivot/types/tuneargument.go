@@ -1,3 +1,4 @@
+// TODO: remove if dependancies in /pkg/daemon/kernelargs.go are removed
 package types
 
 // TuneArgument represents a single tuning argument

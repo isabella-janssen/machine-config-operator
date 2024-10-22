@@ -38,6 +38,8 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
+
+	// TODO: remove imports if dependancy is removed.
 	pivottypes "github.com/openshift/machine-config-operator/pkg/daemon/pivot/types"
 	pivotutils "github.com/openshift/machine-config-operator/pkg/daemon/pivot/utils"
 	"github.com/openshift/machine-config-operator/pkg/daemon/runtimeassets"
@@ -429,6 +431,7 @@ func isImagePresent(imgURL string) (bool, error) {
 	return true, nil
 }
 
+// TODO: check on dependancy on /pkg/daemon/types/imageinspection.go
 func podmanCopy(imgURL, osImageContentDir string) (err error) {
 	// arguments used in external commands
 	var args []string
@@ -451,6 +454,7 @@ func podmanCopy(imgURL, osImageContentDir string) (err error) {
 		args = []string{"pull", "-q"}
 		args = append(args, authArgs...)
 		args = append(args, imgURL)
+		// TODO: check on dependancy on /pkg/daemon/utils/run.go
 		_, err = pivotutils.RunExtBackground(numRetriesNetCommands, "podman", args...)
 		if err != nil {
 			return
@@ -459,7 +463,8 @@ func podmanCopy(imgURL, osImageContentDir string) (err error) {
 
 	// create a container
 	var cidBuf []byte
-	// TODO: The `PivotNamePrefix` type is a string equal to "ostree-container-pivot-". Should be fine to remove?
+	// TODO: The `PivotNamePrefix` type is a string equal to "ostree-container-pivot-". can it be removed?
+	// TODO: understand if the name here should be removed or if accompanying functionality also needs to be removed.
 	containerName := pivottypes.PivotNamePrefix + string(uuid.NewUUID())
 	cidBuf, err = runGetOut("podman", "create", "--net=none", "--annotation=org.openshift.machineconfigoperator.pivot=true", "--name", containerName, imgURL)
 	if err != nil {
@@ -2804,6 +2809,7 @@ func (dn *Daemon) reboot(rationale string) error {
 	return nil
 }
 
+// NOTE: has pivot reference
 func (dn *CoreOSDaemon) applyLayeredOSChanges(mcDiff machineConfigDiff, oldConfig, newConfig *mcfgv1.MachineConfig) (retErr error) {
 	// Override the computed diff if the booted state differs from the oldConfig
 	// https://issues.redhat.com/browse/OCPBUGS-2757

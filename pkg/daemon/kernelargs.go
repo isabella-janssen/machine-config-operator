@@ -60,6 +60,7 @@ func isArgInUse(arg, cmdLinePath string) (bool, error) {
 	return false, nil
 }
 
+// TODO: check on dependancy on /pkg/daemon/types/tuneargument
 func parseTuningFile(tuningFilePath, cmdLinePath string) ([]types.TuneArgument, []types.TuneArgument, error) {
 	addArguments := []types.TuneArgument{}
 	deleteArguments := []types.TuneArgument{}
