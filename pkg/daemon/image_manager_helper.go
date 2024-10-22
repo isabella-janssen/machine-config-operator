@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/opencontainers/go-digest"
-	pivotutils "github.com/openshift/machine-config-operator/pkg/daemon/pivot/utils"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
@@ -53,38 +52,6 @@ type BootedImageInfo struct {
 	OSImageURL   string
 	ImageVersion string
 	BaseChecksum string
-}
-
-func podmanInspect(imgURL string) (imgdata *imageInspection, err error) {
-	// Pull the container image if not already available
-	var authArgs []string
-	if _, err := os.Stat(kubeletAuthFile); err == nil {
-		authArgs = append(authArgs, "--authfile", kubeletAuthFile)
-	}
-	args := []string{"pull", "-q"}
-	args = append(args, authArgs...)
-	args = append(args, imgURL)
-	_, err = pivotutils.RunExt(numRetriesNetCommands, "podman", args...)
-	if err != nil {
-		return
-	}
-
-	inspectArgs := []string{"inspect", "--type=image"}
-	inspectArgs = append(inspectArgs, fmt.Sprintf("%s", imgURL))
-	var output []byte
-	output, err = runGetOut("podman", inspectArgs...)
-	if err != nil {
-		return
-	}
-	var imagedataArray []imageInspection
-	err = json.Unmarshal(output, &imagedataArray)
-	if err != nil {
-		err = fmt.Errorf("unmarshaling podman inspect: %w", err)
-		return
-	}
-	imgdata = &imagedataArray[0]
-	return
-
 }
 
 // runGetOut executes a command, logging it, and return the stdout output.
