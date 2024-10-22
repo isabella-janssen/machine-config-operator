@@ -77,6 +77,7 @@ implementation detail.
 
 MachineConfigDaemon only supports updating Red Hat CoreOS, which uses rpm-ostree.
 The `OSImageURL` refers to a container image that carries inside it an OSTree payload.  When
+<!-- TODO: check on this instruction -->
 the `OSImageURL` changes, it will be passed to the [pivot](https://github.com/openshift/pivot)
 command which is included in Red Hat CoreOS, and in turn takes care of passing it
 to rpm-ostree.
