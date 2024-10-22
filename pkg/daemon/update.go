@@ -459,13 +459,14 @@ func podmanCopy(imgURL, osImageContentDir string) (err error) {
 
 	// create a container
 	var cidBuf []byte
+	// TODO: The `PivotNamePrefix` type is a string equal to "ostree-container-pivot-". Should be fine to remove?
 	containerName := pivottypes.PivotNamePrefix + string(uuid.NewUUID())
 	cidBuf, err = runGetOut("podman", "create", "--net=none", "--annotation=org.openshift.machineconfigoperator.pivot=true", "--name", containerName, imgURL)
 	if err != nil {
 		return
 	}
 
-	// only delete created container, we will delete container image later as we may need it for podmanInspect()
+	// only delete created container, we will delete container image later
 	defer podmanRemove(containerName)
 
 	// copy the content from create container locally into a temp directory under /run/
@@ -2854,19 +2855,15 @@ func (dn *CoreOSDaemon) applyLayeredOSChanges(mcDiff machineConfigDiff, oldConfi
 
 	// If we have an OS update *or* a kernel type change, then we must undo the kernel swap
 	// enablement.
+	// TODO: check if conditional is needed or if it directly relates to pivot.
 	if mcDiff.osUpdate || mcDiff.kernelType {
 		if err := dn.queueRevertKernelSwap(); err != nil {
-			mcdPivotErr.Inc()
 			return err
 		}
 	}
 
 	// Update OS
 	if mcDiff.osUpdate {
-		if err := dn.updateLayeredOS(newConfig); err != nil {
-			mcdPivotErr.Inc()
-			return err
-		}
 		if dn.nodeWriter != nil {
 			dn.nodeWriter.Eventf(corev1.EventTypeNormal, "OSUpgradeApplied", "OS upgrade applied; new MachineConfig (%s) has new OS image (%s)", newConfig.Name, newConfig.Spec.OSImageURL)
 		}
@@ -2876,9 +2873,6 @@ func (dn *CoreOSDaemon) applyLayeredOSChanges(mcDiff machineConfigDiff, oldConfi
 			dn.nodeWriter.Eventf(corev1.EventTypeNormal, "OSUpgradeSkipped", "OS upgrade skipped; new MachineConfig (%s) has same OS image (%s) as old MachineConfig (%s)", newConfig.Name, newConfig.Spec.OSImageURL, oldConfig.Name)
 		}
 	}
-
-	// if we're here, we've successfully pivoted, or pivoting wasn't necessary, so we reset the error gauge
-	mcdPivotErr.Set(0)
 
 	if mcDiff.kargs {
 		if err := dn.updateKernelArguments(oldConfig.Spec.KernelArguments, newConfig.Spec.KernelArguments); err != nil {
