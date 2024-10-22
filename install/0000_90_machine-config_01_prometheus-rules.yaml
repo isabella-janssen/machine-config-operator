@@ -88,18 +88,6 @@ spec:
           annotations:
             summary: "Alerts the user that a node failed to reboot one or more times over a span of 5 minutes."
             description: "Reboot failed on {{ $labels.node }} , update may be blocked. For more details:  oc logs -f -n {{ $labels.namespace }} {{ $labels.pod }} -c machine-config-daemon "
-    - name: mcd-pivot-error
-      rules:
-        - alert: MCDPivotError
-          expr: |
-            mcd_pivot_errors_total > 0
-          for: 2m
-          labels:
-            namespace: openshift-machine-config-operator
-            severity: warning
-          annotations:
-            summary: "Alerts the user when an error is detected upon pivot. This triggers if the pivot errors are above zero for 2 minutes."
-            description: "Error detected in pivot logs on {{ $labels.node }} , upgrade may be blocked. For more details:  oc logs -f -n {{ $labels.namespace }} {{ $labels.pod }} -c machine-config-daemon "
     - name: mcd-kubelet-health-state-error
       rules:
         - alert: KubeletHealthState

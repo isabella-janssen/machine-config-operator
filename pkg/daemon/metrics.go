@@ -16,13 +16,6 @@ var (
 			Help: "os that MCD is running on and version if RHCOS",
 		}, []string{"os", "version"})
 
-	// mcdPivotErr flags error encountered during pivot
-	mcdPivotErr = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "mcd_pivot_errors_total",
-			Help: "Total number of errors encountered during pivot.",
-		})
-
 	// mcdState is state of mcd for indicated node (ex: degraded)
 	mcdState = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -78,7 +71,6 @@ func UpdateStateMetric(metric *prometheus.GaugeVec, labels ...string) {
 func RegisterMCDMetrics() error {
 	err := ctrlcommon.RegisterMetrics([]prometheus.Collector{
 		hostOS,
-		mcdPivotErr,
 		mcdState,
 		kubeletHealthState,
 		mcdRebootErr,
