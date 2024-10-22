@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	rpmostreeclient "github.com/coreos/rpmostree-client-go/pkg/client"
 	"gopkg.in/yaml.v2"
@@ -103,6 +102,7 @@ func (r *RpmOstreeClient) GetStatus() (string, error) {
 }
 
 // GetBootedOSImageURL returns the image URL as well as the OSTree version(for logging) and the ostree commit (for comparisons)
+// TODO: check on comment here with removal of lines after 115.
 // Returns the empty string if the host doesn't have a custom origin that matches pivot://
 // (This could be the case for e.g. FCOS, or a future RHCOS which comes not-pivoted by default)
 func (r *RpmOstreeClient) GetBootedOSImageURL() (string, string, string, error) {
@@ -113,11 +113,6 @@ func (r *RpmOstreeClient) GetBootedOSImageURL() (string, string, string, error) 
 
 	// the canonical image URL is stored in the custom origin field.
 	osImageURL := ""
-	if len(bootedDeployment.CustomOrigin) > 0 {
-		if strings.HasPrefix(bootedDeployment.CustomOrigin[0], "pivot://") {
-			osImageURL = bootedDeployment.CustomOrigin[0][len("pivot://"):]
-		}
-	}
 
 	// we have container images now, make sure we can parse those too
 	if bootedDeployment.ContainerImageReference != "" {
