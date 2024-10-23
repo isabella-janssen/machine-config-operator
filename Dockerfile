@@ -1,5 +1,5 @@
 # Use RHEL 9 as the primary builder base for the Machine Config Operator
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18 AS rhel9-builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18.art-arm64 AS rhel9-builder
 ARG TAGS=""
 WORKDIR /go/src/github.com/openshift/machine-config-operator
 COPY . .
@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/go/rhel9/.cache,z \
     make install DESTDIR=./instroot-rhel9 && tar -C instroot-rhel9 -cf instroot-rhel9.tar .
 
 # Add a RHEL 8 builder to compile the RHEL 8 compatible binaries
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18 AS rhel8-builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.18.art-arm64 AS rhel8-builder
 ARG TAGS=""
 WORKDIR /go/src/github.com/openshift/machine-config-operator
 # Copy the RHEL 8 machine-config-daemon binary and rename
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/go/rhel8/.cache,z \
     --mount=type=cache,target=/go/rhel8/pkg/mod,z \
     make install DESTDIR=./instroot-rhel8 && tar -C instroot-rhel8 -cf instroot-rhel8.tar .
 
-FROM registry.ci.openshift.org/ocp/4.18:base-rhel9
+FROM registry.ci.openshift.org/ocp-arm64/4.18-art-latest-arm64:machine-config-operator
 ARG TAGS=""
 COPY install /manifests
 RUN --mount=type=cache,target=/var/cache/dnf,z \
@@ -44,7 +44,7 @@ RUN --mount=type=cache,target=/var/cache/dnf,z \
     # Create the build user which will be used for doing OS image builds. We
     # use the username "build" and the uid 1000 since this matches what is in
     # the official Buildah image.
-    useradd --uid 1000 build
+    if ! id -u "build" >/dev/null 2>&1; then useradd --uid 1000 build; fi
 # Copy the binaries *after* we install nmstate so we don't invalidate our cache for local builds.
 COPY --from=rhel9-builder /go/src/github.com/openshift/machine-config-operator/instroot-rhel9.tar /tmp/instroot-rhel9.tar
 RUN cd / && tar xf /tmp/instroot-rhel9.tar && rm -f /tmp/instroot-rhel9.tar
