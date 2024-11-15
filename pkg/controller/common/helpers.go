@@ -39,6 +39,7 @@ import (
 	ign3_2types "github.com/coreos/ignition/v2/config/v3_2/types"
 	translate3_3 "github.com/coreos/ignition/v2/config/v3_3/translate"
 	ign3_3types "github.com/coreos/ignition/v2/config/v3_3/types"
+	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 
 	ign3 "github.com/coreos/ignition/v2/config/v3_4"
 	ign3_4 "github.com/coreos/ignition/v2/config/v3_4"
@@ -94,7 +95,7 @@ func MergeMachineConfigs(configs []*mcfgv1.MachineConfig, cconfig *mcfgv1.Contro
 			// This shouldn't really be possible
 			return nil, fmt.Errorf("Cannot find label in MachineConfig %s", config.ObjectMeta.Name)
 		}
-		if config.ObjectMeta.Labels[MachineConfigRoleLabel] == MachineConfigPoolWorker {
+		if config.ObjectMeta.Labels[commonconsts.MachineConfigRoleLabel] == commonconsts.MachineConfigPoolWorker {
 			workerConfigs = append(workerConfigs, config)
 		} else {
 			otherConfigs = append(otherConfigs, config)
@@ -152,14 +153,14 @@ func MergeMachineConfigs(configs []*mcfgv1.MachineConfig, cconfig *mcfgv1.Contro
 		if cfg.Spec.FIPS {
 			fips = true
 		}
-		if cfg.Spec.KernelType == KernelTypeRealtime || cfg.Spec.KernelType == KernelType64kPages {
+		if cfg.Spec.KernelType == commonconsts.KernelTypeRealtime || cfg.Spec.KernelType == commonconsts.KernelType64kPages {
 			kernelType = cfg.Spec.KernelType
 		}
 	}
 
 	// If no MC sets kernelType, then set it to 'default' since that's what it is using
 	if kernelType == "" {
-		kernelType = KernelTypeDefault
+		kernelType = commonconsts.KernelTypeDefault
 	}
 
 	kargs := []string{}
@@ -173,7 +174,7 @@ func MergeMachineConfigs(configs []*mcfgv1.MachineConfig, cconfig *mcfgv1.Contro
 	}
 
 	// Ensure that kernel-devel extension is applied only with default kernel.
-	if kernelType != KernelTypeDefault {
+	if kernelType != commonconsts.KernelTypeDefault {
 		if InSlice("kernel-devel", extensions) {
 			return nil, fmt.Errorf("installing kernel-devel extension is not supported with kernelType: %s", kernelType)
 		}
@@ -596,7 +597,7 @@ func InSlice(elem string, slice []string) bool {
 
 // ValidateMachineConfig validates that given MachineConfig Spec is valid.
 func ValidateMachineConfig(cfg mcfgv1.MachineConfigSpec) error {
-	if !(cfg.KernelType == "" || cfg.KernelType == KernelTypeDefault || cfg.KernelType == KernelTypeRealtime || cfg.KernelType == KernelType64kPages) {
+	if !(cfg.KernelType == "" || cfg.KernelType == commonconsts.KernelTypeDefault || cfg.KernelType == commonconsts.KernelTypeRealtime || cfg.KernelType == commonconsts.KernelType64kPages) {
 		return fmt.Errorf("kernelType=%s is invalid", cfg.KernelType)
 	}
 
@@ -1244,7 +1245,7 @@ func ensureEventNamespace(object runtime.Object) runtime.Object {
 		// the ref must set a namespace to avoid going into default.
 		// cluster operators are clusterscoped and "" becomes default.  Even though the clusteroperator
 		// is not in this namespace, the logical namespace of this operator is the openshift-machine-config-operator.
-		ret.Namespace = MCONamespace
+		ret.Namespace = commonconsts.MCONamespace
 	}
 
 	return ret
@@ -1265,7 +1266,7 @@ func (n namespacedEventRecorder) AnnotatedEventf(object runtime.Object, annotati
 }
 
 func DoARebuild(pool *mcfgv1.MachineConfigPool) bool {
-	_, ok := pool.Labels[RebuildPoolLabel]
+	_, ok := pool.Labels[commonconsts.RebuildPoolLabel]
 	return ok
 
 }
@@ -1360,7 +1361,7 @@ func GetGoTLSConfig(tlsMinVersion string, tlscipherSuites []string) *tls.Config 
 }
 
 func GetBootstrapAPIServer() (*configv1.APIServer, error) {
-	apiserverData, err := os.ReadFile(APIServerBootstrapFileLocation)
+	apiserverData, err := os.ReadFile(commonconsts.APIServerBootstrapFileLocation)
 	if os.IsNotExist(err) {
 		// This is not an error; it just means that an APIServer manifest was not provided at install time
 		klog.Infof("No bootstrap apiserver manifest found, bootstrap MCS will use defaults")

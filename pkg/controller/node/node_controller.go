@@ -30,6 +30,8 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	"github.com/openshift/machine-config-operator/pkg/constants"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
+	state "github.com/openshift/machine-config-operator/pkg/controller/common/state"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -257,7 +259,7 @@ func (ctrl *Controller) Run(workers int, stopCh <-chan struct{}) {
 }
 
 func (ctrl *Controller) getCurrentMasters() ([]*corev1.Node, error) {
-	nodeList, err := ctrl.nodeLister.List(labels.SelectorFromSet(labels.Set{ctrlcommon.MasterLabel: ""}))
+	nodeList, err := ctrl.nodeLister.List(labels.SelectorFromSet(labels.Set{commonconsts.MasterLabel: ""}))
 	if err != nil {
 		return nil, fmt.Errorf("error while listing master nodes %w", err)
 	}
@@ -339,13 +341,13 @@ func (ctrl *Controller) makeMasterNodeUnSchedulable(node *corev1.Node) error {
 		// Add master taint
 		hasMasterTaint := false
 		for _, taint := range node.Spec.Taints {
-			if taint.Key == ctrlcommon.MasterLabel && taint.Effect == corev1.TaintEffectNoSchedule {
+			if taint.Key == commonconsts.MasterLabel && taint.Effect == corev1.TaintEffectNoSchedule {
 				hasMasterTaint = true
 			}
 		}
 		if !hasMasterTaint {
 			newTaints := node.Spec.Taints
-			masterUnSchedulableTaint := corev1.Taint{Key: ctrlcommon.MasterLabel, Effect: corev1.TaintEffectNoSchedule}
+			masterUnSchedulableTaint := corev1.Taint{Key: commonconsts.MasterLabel, Effect: corev1.TaintEffectNoSchedule}
 			newTaints = append(newTaints, masterUnSchedulableTaint)
 			node.Spec.Taints = newTaints
 		}
@@ -369,7 +371,7 @@ func (ctrl *Controller) makeMasterNodeSchedulable(node *corev1.Node) error {
 		// Remove master taint
 		newTaints := []corev1.Taint{}
 		for _, t := range node.Spec.Taints {
-			if t.Key == ctrlcommon.MasterLabel && t.Effect == corev1.TaintEffectNoSchedule {
+			if t.Key == commonconsts.MasterLabel && t.Effect == corev1.TaintEffectNoSchedule {
 				continue
 			}
 			newTaints = append(newTaints, t)
@@ -501,7 +503,7 @@ func (ctrl *Controller) getMastersSchedulable() (bool, error) {
 
 // Determine if a given Node is a master
 func (ctrl *Controller) isMaster(node *corev1.Node) bool {
-	_, master := node.ObjectMeta.Labels[ctrlcommon.MasterLabel]
+	_, master := node.ObjectMeta.Labels[commonconsts.MasterLabel]
 	return master
 }
 
@@ -686,7 +688,7 @@ func (ctrl *Controller) updateNode(old, cur interface{}) {
 			ctrl.logPoolNode(pool, curNode, "%s", changedMsg)
 			changed = true
 			// For the control plane, emit events for these since they're important
-			if pool.Name == ctrlcommon.MachineConfigPoolMaster {
+			if pool.Name == commonconsts.MachineConfigPoolMaster {
 				ctrl.eventRecorder.Eventf(pool, corev1.EventTypeNormal, "AnnotationChange", controlPlaneChangedMsg)
 			}
 		}
@@ -938,8 +940,8 @@ func (ctrl *Controller) canLayeredPoolContinue(pool *mcfgv1.MachineConfigPool) (
 		return "No MachineOSConfig or Build for this pool", false, nil
 	}
 
-	cs := ctrlcommon.NewMachineOSConfigState(mosc)
-	bs := ctrlcommon.NewMachineOSBuildState(mosb)
+	cs := state.NewMachineOSConfigState(mosc)
+	bs := state.NewMachineOSBuildState(mosb)
 
 	hasImage := cs.HasOSImage()
 	pullspec := cs.GetOSImage()
@@ -1071,7 +1073,7 @@ func (ctrl *Controller) syncMachineConfigPool(key string) error {
 		// to be chosen during the scheduling cycle.
 		hasInProgressTaint := checkIfNodeHasInProgressTaint(node)
 
-		lns := ctrlcommon.NewLayeredNodeState(node)
+		lns := state.NewLayeredNodeState(node)
 
 		if lns.IsDesiredEqualToPool(pool, layered) {
 			if hasInProgressTaint {
@@ -1154,7 +1156,7 @@ func (ctrl *Controller) getNodesForPool(pool *mcfgv1.MachineConfigPool) ([]*core
 // and add/updates required annotation to node such as ControlPlaneTopology
 // from infrastructure object.
 func (ctrl *Controller) setClusterConfigAnnotation(nodes []*corev1.Node) error {
-	cc, err := ctrl.ccLister.Get(ctrlcommon.ControllerConfigName)
+	cc, err := ctrl.ccLister.Get(commonconsts.ControllerConfigName)
 	if err != nil {
 		return err
 	}
@@ -1187,7 +1189,7 @@ func (ctrl *Controller) updateCandidateNode(mosc *mcfgv1alpha1.MachineOSConfig, 
 			return err
 		}
 
-		lns := ctrlcommon.NewLayeredNodeState(oldNode)
+		lns := state.NewLayeredNodeState(oldNode)
 		layered, err := ctrl.IsLayeredPool(mosc, mosb)
 		if err != nil {
 			return fmt.Errorf("Failed to determine whether pool %s opts in to OCL due to an error: %s", pool.Name, err)
@@ -1244,7 +1246,7 @@ func getAllCandidateMachines(layered bool, config *mcfgv1alpha1.MachineOSConfig,
 	// We only look at nodes which aren't already targeting our desired config
 	var nodes []*corev1.Node
 	for _, node := range nodesInPool {
-		lns := ctrlcommon.NewLayeredNodeState(node)
+		lns := state.NewLayeredNodeState(node)
 		if !layered {
 			if lns.IsDesiredEqualToPool(pool, layered) {
 				if isNodeMCDFailing(node) {
@@ -1330,7 +1332,7 @@ func (ctrl *Controller) filterControlPlaneCandidateNodes(pool *mcfgv1.MachineCon
 // we still need to base this whole things on pools but IsLayeredPool == does mosb exist
 // updateCandidateMachines sets the desiredConfig annotation the candidate machines
 func (ctrl *Controller) updateCandidateMachines(pool *mcfgv1.MachineConfigPool, candidates []*corev1.Node, capacity uint) error {
-	if pool.Name == ctrlcommon.MachineConfigPoolMaster {
+	if pool.Name == commonconsts.MachineConfigPoolMaster {
 		var err error
 		candidates, capacity, err = ctrl.filterControlPlaneCandidateNodes(pool, candidates, capacity)
 		if err != nil {
@@ -1362,7 +1364,7 @@ func (ctrl *Controller) setDesiredAnnotations(pool *mcfgv1.MachineConfigPool, ca
 	}
 	if layered {
 		eventName = "SetDesiredConfigAndOSImage"
-		updateName = fmt.Sprintf("%s / Image: %s", updateName, ctrlcommon.NewMachineOSConfigState(config).GetOSImage())
+		updateName = fmt.Sprintf("%s / Image: %s", updateName, state.NewMachineOSConfigState(config).GetOSImage())
 		klog.Infof("Continuing to sync layered MachineConfigPool %s", pool.Name)
 	}
 	for _, node := range candidates {

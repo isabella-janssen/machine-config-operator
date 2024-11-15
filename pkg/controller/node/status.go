@@ -16,7 +16,8 @@ import (
 	mcfgv1alpha1 "github.com/openshift/api/machineconfiguration/v1alpha1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
+	state "github.com/openshift/machine-config-operator/pkg/controller/common/state"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	helpers "github.com/openshift/machine-config-operator/pkg/helpers"
@@ -24,7 +25,7 @@ import (
 
 // syncStatusOnly for MachineConfigNode
 func (ctrl *Controller) syncStatusOnly(pool *mcfgv1.MachineConfigPool) error {
-	cc, err := ctrl.ccLister.Get(ctrlcommon.ControllerConfigName)
+	cc, err := ctrl.ccLister.Get(commonconsts.ControllerConfigName)
 	if err != nil {
 		return err
 	}
@@ -397,6 +398,10 @@ func isNodeDone(node *corev1.Node, layered bool) bool {
 	return cconfig == dconfig && isNodeMCDState(node, daemonconsts.MachineConfigDaemonStateDone)
 }
 
+func IsNodeDoneAt(node *corev1.Node, pool *mcfgv1.MachineConfigPool, layered bool) bool {
+	return isNodeDoneAt(node, pool, layered)
+}
+
 // isNodeDoneAt checks whether a node is fully updated to a targetConfig
 func isNodeDoneAt(node *corev1.Node, pool *mcfgv1.MachineConfigPool, layered bool) bool {
 	return isNodeDone(node, layered) && node.Annotations[daemonconsts.CurrentMachineConfigAnnotationKey] == pool.Spec.Configuration.Name
@@ -427,9 +432,9 @@ func isNodeMCDFailing(node *corev1.Node) bool {
 func getUpdatedMachines(pool *mcfgv1.MachineConfigPool, nodes []*corev1.Node, mosc *mcfgv1alpha1.MachineOSConfig, mosb *mcfgv1alpha1.MachineOSBuild, layered bool) []*corev1.Node {
 	var updated []*corev1.Node
 	for _, node := range nodes {
-		lns := ctrlcommon.NewLayeredNodeState(node)
+		lns := state.NewLayeredNodeState(node)
 		if mosb != nil && mosc != nil {
-			mosbState := ctrlcommon.NewMachineOSBuildState(mosb)
+			mosbState := state.NewMachineOSBuildState(mosb)
 			// It seems like pool image annotations are no longer being used, so node specific checks were required here
 			if layered && mosbState.IsBuildSuccess() && mosb.Spec.DesiredConfig.Name == pool.Spec.Configuration.Name && isNodeDoneAt(node, pool, layered) && lns.IsCurrentImageEqualToBuild(mosc) {
 				updated = append(updated, node)
@@ -511,7 +516,7 @@ func getUnavailableMachines(nodes []*corev1.Node, pool *mcfgv1.MachineConfigPool
 	var unavail []*corev1.Node
 	for _, node := range nodes {
 		if mosb != nil {
-			mosbState := ctrlcommon.NewMachineOSBuildState(mosb)
+			mosbState := state.NewMachineOSBuildState(mosb)
 			// if node is unavail, desiredConfigs match, and the build is a success, then we are unavail.
 			// not sure on this one honestly
 			if layered && isNodeUnavailable(node, layered) && mosb.Spec.DesiredConfig.Name == pool.Spec.Configuration.Name && mosbState.IsBuildSuccess() {
