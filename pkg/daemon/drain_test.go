@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
@@ -20,7 +21,7 @@ func TestIsDrainRequired(t *testing.T) {
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -48,7 +49,7 @@ unqualified-search-registries = ["example.com", "foo.com"]
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -80,7 +81,7 @@ location = "example.com/repo1/test-img1"
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -100,7 +101,7 @@ unqualified-search-registries = ["example.com", "foo.com"]
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com", "bar.com"]
 
 [[registry]]
@@ -121,7 +122,7 @@ unqualified-search-registries = ["example.com", "foo.com", "bar.com"]
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -142,7 +143,7 @@ unqualified-search-registries = ["example.com", "foo.com"]
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -167,7 +168,7 @@ location = "example.com/repo1/test-img1"
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -195,7 +196,7 @@ location = "mirror.com/repo1/test-img1"
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -211,7 +212,7 @@ location = "example.com/repo/test-img"
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -228,7 +229,7 @@ blocked = true
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -244,7 +245,7 @@ location = "example.com/repo/test-img"
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -269,7 +270,7 @@ blocked = true
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -289,7 +290,7 @@ location = "mirror.com/repo/test-img"
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]
@@ -311,7 +312,7 @@ location = "mirror.com/repo/test-img-13"
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte(`
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte(`
 unqualified-search-registries = ["example.com", "foo.com"]
 
 [[registry]]

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign2types "github.com/coreos/ignition/config/v2_2/types"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
@@ -70,7 +71,7 @@ func TestValidateFiles(t *testing.T) {
 			},
 			FileEmbedded1: ign3types.FileEmbedded1{
 				Contents: ign3types.Resource{
-					Source: helpers.StrToPtr(dataurl.EncodeBytes([]byte("hello world\n"))),
+					Source: coreosutils.StrToPtr(dataurl.EncodeBytes([]byte("hello world\n"))),
 				},
 				Mode: &fileMode,
 			},

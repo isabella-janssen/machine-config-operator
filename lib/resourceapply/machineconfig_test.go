@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	"github.com/davecgh/go-spew/spew"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
@@ -180,7 +181,7 @@ func TestApplyMachineConfig(t *testing.T) {
 					Raw: helpers.MarshalOrDie(&ign3types.Config{
 						Passwd: ign3types.Passwd{
 							Users: []ign3types.PasswdUser{{
-								HomeDir: helpers.StrToPtr("/home/dummy"),
+								HomeDir: coreosutils.StrToPtr("/home/dummy"),
 							}},
 						},
 					}),
@@ -206,7 +207,7 @@ func TestApplyMachineConfig(t *testing.T) {
 						Raw: helpers.MarshalOrDie(&ign3types.Config{
 							Passwd: ign3types.Passwd{
 								Users: []ign3types.PasswdUser{{
-									HomeDir: helpers.StrToPtr("/home/dummy"),
+									HomeDir: coreosutils.StrToPtr("/home/dummy"),
 								}},
 							},
 						}),
@@ -227,7 +228,7 @@ func TestApplyMachineConfig(t *testing.T) {
 						Raw: helpers.MarshalOrDie(&ign3types.Config{
 							Passwd: ign3types.Passwd{
 								Users: []ign3types.PasswdUser{{
-									HomeDir: helpers.StrToPtr("/home/dummy-prev"),
+									HomeDir: coreosutils.StrToPtr("/home/dummy-prev"),
 								}},
 							},
 						}),
@@ -242,7 +243,7 @@ func TestApplyMachineConfig(t *testing.T) {
 					Raw: helpers.MarshalOrDie(&ign3types.Config{
 						Passwd: ign3types.Passwd{
 							Users: []ign3types.PasswdUser{{
-								HomeDir: helpers.StrToPtr("/home/dummy"),
+								HomeDir: coreosutils.StrToPtr("/home/dummy"),
 							}},
 						},
 					}),
@@ -268,7 +269,7 @@ func TestApplyMachineConfig(t *testing.T) {
 						Raw: helpers.MarshalOrDie(&ign3types.Config{
 							Passwd: ign3types.Passwd{
 								Users: []ign3types.PasswdUser{{
-									HomeDir: helpers.StrToPtr("/home/dummy"),
+									HomeDir: coreosutils.StrToPtr("/home/dummy"),
 								}},
 							},
 						}),

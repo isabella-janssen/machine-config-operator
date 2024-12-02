@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/clarketm/json"
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/stretchr/testify/assert"
@@ -335,12 +336,12 @@ func TestUpdatesGeneratedMachineConfig(t *testing.T) {
 	files := []ign3types.File{{
 		Node: ign3types.Node{
 			Path:      "/dummy/0",
-			Overwrite: helpers.BoolToPtr(false),
+			Overwrite: coreosutils.BoolToPtr(false),
 		},
 	}, {
 		Node: ign3types.Node{
 			Path:      "/dummy/1",
-			Overwrite: helpers.BoolToPtr(false),
+			Overwrite: coreosutils.BoolToPtr(false),
 		},
 	}}
 	mcs := []*mcfgv1.MachineConfig{
@@ -449,12 +450,12 @@ func TestDoNothing(t *testing.T) {
 	files := []ign3types.File{{
 		Node: ign3types.Node{
 			Path:      "/dummy/0",
-			Overwrite: helpers.BoolToPtr(false),
+			Overwrite: coreosutils.BoolToPtr(false),
 		},
 	}, {
 		Node: ign3types.Node{
 			Path:      "/dummy/1",
-			Overwrite: helpers.BoolToPtr(false),
+			Overwrite: coreosutils.BoolToPtr(false),
 		},
 	}}
 	mcs := []*mcfgv1.MachineConfig{

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/machine-config-operator/test/helpers"
@@ -370,8 +371,8 @@ func (tc configDriftMonitorTestCase) run(t *testing.T) {
 func setDefaultUIDandGID(file ign3types.File) ign3types.File {
 	file.Node.User.Name = nil
 	file.Node.Group.Name = nil
-	file.User.ID = helpers.IntToPtr(-1)
-	file.Group.ID = helpers.IntToPtr(-1)
+	file.User.ID = coreosutils.IntToPtr(-1)
+	file.Group.ID = coreosutils.IntToPtr(-1)
 	return file
 }
 
@@ -394,10 +395,10 @@ func (tc configDriftMonitorTestCase) getIgnConfig(t *testing.T) ign3types.Config
 			Units: []ign3types.Unit{
 				{
 					Name:     "unittest.service",
-					Contents: helpers.StrToPtr("unittest-unit-contents"),
+					Contents: coreosutils.StrToPtr("unittest-unit-contents"),
 					Dropins: []ign3types.Dropin{
 						{
-							Contents: helpers.StrToPtr("unittest-service-contents"),
+							Contents: coreosutils.StrToPtr("unittest-service-contents"),
 							Name:     "10-unittest-service.conf",
 						},
 						{
@@ -409,8 +410,8 @@ func (tc configDriftMonitorTestCase) getIgnConfig(t *testing.T) ign3types.Config
 				// See: https://issues.redhat.com/browse/OCPBUGS-3909
 				{
 					Name:     "mask-and-contents.service",
-					Contents: helpers.StrToPtr("[Unit]\nDescription=Just random content"),
-					Mask:     helpers.BoolToPtr(true),
+					Contents: coreosutils.StrToPtr("[Unit]\nDescription=Just random content"),
+					Mask:     coreosutils.BoolToPtr(true),
 				},
 			},
 		},

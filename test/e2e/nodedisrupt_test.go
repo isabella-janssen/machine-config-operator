@@ -20,6 +20,7 @@ import (
 	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/require"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,7 +106,7 @@ func testUnitPolicy(t *testing.T, nodeUnderTest corev1.Node, testActions []opv1.
 		serviceName := string(action.Type) + "-test.service"
 		serviceApplyConfiguration := mcoac.NodeDisruptionPolicySpecUnit().WithName(opv1.NodeDisruptionPolicyServiceName(serviceName)).WithActions(helpers.GetActionApplyConfiguration(action))
 		applyConfiguration := mcoac.MachineConfiguration("cluster").WithSpec(mcoac.MachineConfigurationSpec().WithManagementState("Managed").WithNodeDisruptionPolicy(mcoac.NodeDisruptionPolicyConfig().WithUnits(serviceApplyConfiguration)))
-		testMC := helpers.NewMachineConfigExtended("01-test-unit", helpers.MCLabelForRole(testMCPUnitName), nil, nil, []ign3types.Unit{{Name: serviceName, Contents: helpers.StrToPtr("test")}}, nil, nil, false, nil, "", "")
+		testMC := helpers.NewMachineConfigExtended("01-test-unit", helpers.MCLabelForRole(testMCPUnitName), nil, nil, []ign3types.Unit{{Name: serviceName, Contents: coreosutils.StrToPtr("test")}}, nil, nil, false, nil, "", "")
 		checkNodeDisruptionAction(t, cs, testMC, testMCPUnitName, *applyConfiguration, nodeUnderTest, action.Type)
 	}
 }

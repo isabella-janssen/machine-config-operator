@@ -6,18 +6,19 @@ import (
 	"testing"
 
 	"github.com/clarketm/json"
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign2types "github.com/coreos/ignition/config/v2_2/types"
 	ign3 "github.com/coreos/ignition/v2/config/v3_4"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	validate3 "github.com/coreos/ignition/v2/config/validate"
+	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
+	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
+	"github.com/openshift/machine-config-operator/pkg/controller/common/fixtures"
+	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
-	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	"github.com/openshift/machine-config-operator/pkg/controller/common/fixtures"
-	"github.com/openshift/machine-config-operator/test/helpers"
 )
 
 func TestTranspileCoreOSConfig(t *testing.T) {
@@ -358,7 +359,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 		},
 		Passwd: ign3types.Passwd{
 			Users: []ign3types.PasswdUser{
-				{Name: "core", PasswordHash: helpers.StrToPtr("testpass")},
+				{Name: "core", PasswordHash: coreosutils.StrToPtr("testpass")},
 			},
 		},
 	}, "passwd", commonconsts.MachineConfigPoolWorker)
@@ -408,7 +409,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 					},
 					Passwd: ign3types.Passwd{
 						Users: []ign3types.PasswdUser{
-							{Name: "core", SSHAuthorizedKeys: []ign3types.SSHAuthorizedKey{"5678", "1234"}, PasswordHash: helpers.StrToPtr("testpass")},
+							{Name: "core", SSHAuthorizedKeys: []ign3types.SSHAuthorizedKey{"5678", "1234"}, PasswordHash: coreosutils.StrToPtr("testpass")},
 						},
 					},
 				}),
@@ -502,7 +503,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 									Path:      filePath1,
 									Overwrite: boolToPtr(true),
 									User: ign3types.NodeUser{
-										Name: helpers.StrToPtr("root"),
+										Name: coreosutils.StrToPtr("root"),
 									},
 								},
 							},
@@ -517,7 +518,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 									Path:      filePath2,
 									Overwrite: boolToPtr(true),
 									User: ign3types.NodeUser{
-										Name: helpers.StrToPtr("root"),
+										Name: coreosutils.StrToPtr("root"),
 									},
 								},
 							},

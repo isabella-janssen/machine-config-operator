@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
@@ -151,10 +152,10 @@ func (c configDriftTest) getMachineConfig(t *testing.T) *mcfgv1.MachineConfig {
 		[]ign3types.Unit{
 			{
 				Name:     "e2etest.service",
-				Contents: helpers.StrToPtr(configDriftSystemdUnitFileContents),
+				Contents: coreosutils.StrToPtr(configDriftSystemdUnitFileContents),
 				Dropins: []ign3types.Dropin{
 					{
-						Contents: helpers.StrToPtr(configDriftSystemdDropinFileContents),
+						Contents: coreosutils.StrToPtr(configDriftSystemdDropinFileContents),
 						Name:     "10-e2etest-service.conf",
 					},
 					{
@@ -166,8 +167,8 @@ func (c configDriftTest) getMachineConfig(t *testing.T) *mcfgv1.MachineConfig {
 			// See: https://issues.redhat.com/browse/OCPBUGS-3909
 			{
 				Name:     "mask-and-contents.service",
-				Contents: helpers.StrToPtr("[Unit]\nDescription=Just random content"),
-				Mask:     helpers.BoolToPtr(true),
+				Contents: coreosutils.StrToPtr("[Unit]\nDescription=Just random content"),
+				Mask:     coreosutils.BoolToPtr(true),
 			},
 		},
 		[]ign3types.SSHAuthorizedKey{},

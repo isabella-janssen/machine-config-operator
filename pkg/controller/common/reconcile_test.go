@@ -3,6 +3,7 @@ package common
 import (
 	"testing"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/test/helpers"
@@ -50,8 +51,8 @@ func TestIsRenderedConfigReconcilable(t *testing.T) {
 	oldIgnCfg.Storage.Filesystems = []ign3types.Filesystem{
 		{
 			Device: "/dev/sda1",
-			Format: helpers.StrToPtr("ext4"),
-			Path:   helpers.StrToPtr("/foo/bar"),
+			Format: coreosutils.StrToPtr("ext4"),
+			Path:   coreosutils.StrToPtr("/foo/bar"),
 		},
 	}
 	oldConfig = helpers.CreateMachineConfigFromIgnition(oldIgnCfg)
@@ -120,12 +121,12 @@ func TestIsRenderedConfigReconcilable(t *testing.T) {
 				Tang: []ign3types.Tang{
 					{
 						URL:           "https://tang.example.com",
-						Advertisement: helpers.StrToPtr(`{"payload": "...", "protected": "...", "signature": "..."}`),
-						Thumbprint:    helpers.StrToPtr("TREPLACE-THIS-WITH-YOUR-TANG-THUMBPRINT"),
+						Advertisement: coreosutils.StrToPtr(`{"payload": "...", "protected": "...", "signature": "..."}`),
+						Thumbprint:    coreosutils.StrToPtr("TREPLACE-THIS-WITH-YOUR-TANG-THUMBPRINT"),
 					},
 				},
 			},
-			Device: helpers.StrToPtr("/dev/sdb"),
+			Device: coreosutils.StrToPtr("/dev/sdb"),
 			Name:   "luks-tang",
 		},
 	}
@@ -177,7 +178,7 @@ func TestReconcilableSSH(t *testing.T) {
 	checkIrreconcilableResults(t, "SSH", errMsg)
 
 	// check that we cannot make updates if any other Passwd.User field is changed.
-	tempUser4 := ign3types.PasswdUser{Name: "core", SSHAuthorizedKeys: []ign3types.SSHAuthorizedKey{"5678"}, HomeDir: helpers.StrToPtr("somedir")}
+	tempUser4 := ign3types.PasswdUser{Name: "core", SSHAuthorizedKeys: []ign3types.SSHAuthorizedKey{"5678"}, HomeDir: coreosutils.StrToPtr("somedir")}
 	newIgnCfg.Passwd.Users[0] = tempUser4
 	newMcfg = helpers.CreateMachineConfigFromIgnition(newIgnCfg)
 	errMsg = IsRenderedConfigReconcilable(oldMcfg, newMcfg)

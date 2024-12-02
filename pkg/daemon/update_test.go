@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	opv1 "github.com/openshift/api/operator/v1"
@@ -137,14 +138,14 @@ func TestMachineConfigDiff(t *testing.T) {
 		{
 			name: "PasswordHash changes recognized - Empty MC",
 			passwdUsers: []ign3types.PasswdUser{
-				{Name: "core", PasswordHash: helpers.StrToPtr("testpass")},
+				{Name: "core", PasswordHash: coreosutils.StrToPtr("testpass")},
 			},
 			baseMC: canonicalizeEmptyMC(nil),
 		},
 		{
 			name: "PasswordHash changes recognized - Password Change",
 			passwdUsers: []ign3types.PasswdUser{
-				{Name: "core", PasswordHash: helpers.StrToPtr("testpass")},
+				{Name: "core", PasswordHash: coreosutils.StrToPtr("testpass")},
 			},
 			baseMC: helpers.CreateMachineConfigFromIgnition(ign3types.Config{
 				Ignition: ign3types.Ignition{
@@ -152,7 +153,7 @@ func TestMachineConfigDiff(t *testing.T) {
 				},
 				Passwd: ign3types.Passwd{
 					Users: []ign3types.PasswdUser{
-						{Name: "core", PasswordHash: helpers.StrToPtr("newtestpass")},
+						{Name: "core", PasswordHash: coreosutils.StrToPtr("newtestpass")},
 					},
 				},
 			}),
@@ -176,7 +177,7 @@ func TestMachineConfigDiff(t *testing.T) {
 func newTestIgnitionFile(i uint) ign3types.File {
 	mode := 0644
 	return ign3types.File{Node: ign3types.Node{Path: fmt.Sprintf("/etc/config%d", i)},
-		FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: helpers.StrToPtr(fmt.Sprintf("data:,config%d", i))}, Mode: &mode}}
+		FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: coreosutils.StrToPtr(fmt.Sprintf("data:,config%d", i))}, Mode: &mode}}
 }
 
 func newMachineConfigFromFiles(files []ign3types.File) *mcfgv1.MachineConfig {
@@ -326,7 +327,7 @@ func TestWriteFiles(t *testing.T) {
 			name: "write file with compressed contents",
 			files: []ign3types.File{{
 				Node:          node,
-				FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: &gzippedContents, Compression: helpers.StrToPtr("gzip")}, Mode: &mode},
+				FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: &gzippedContents, Compression: coreosutils.StrToPtr("gzip")}, Mode: &mode},
 			}},
 			expectedContents: contents,
 		},
@@ -334,7 +335,7 @@ func TestWriteFiles(t *testing.T) {
 			name: "try to write file with unsupported compression type",
 			files: []ign3types.File{{
 				Node:          node,
-				FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: &encodedContents, Compression: helpers.StrToPtr("xz")}, Mode: &mode},
+				FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: &encodedContents, Compression: coreosutils.StrToPtr("xz")}, Mode: &mode},
 			}},
 			expectedErr: fmt.Errorf("could not decode file %q: %w", filePath, fmt.Errorf("unsupported compression type %q", "xz")),
 		},
@@ -387,7 +388,7 @@ func TestInvalidIgnConfig(t *testing.T) {
 	oldMcfg := helpers.CreateMachineConfigFromIgnition(oldIgnConfig)
 
 	// create file to write that contains an impermissable relative path
-	tempFileContents := ign3types.Resource{Source: helpers.StrToPtr("data:,hello%20world%0A")}
+	tempFileContents := ign3types.Resource{Source: coreosutils.StrToPtr("data:,hello%20world%0A")}
 	tempMode := 420
 	newIgnConfig := ctrlcommon.NewIgnConfig()
 	newIgnFile := ign3types.File{
@@ -450,11 +451,11 @@ func TestDropinCheck(t *testing.T) {
 					Dropins: []ign3types.Dropin{
 						{
 							Name:     test.dropin,
-							Contents: helpers.StrToPtr("[Unit]"),
+							Contents: coreosutils.StrToPtr("[Unit]"),
 						},
 						{
 							Name:     "99-other.conf",
-							Contents: helpers.StrToPtr("[Unit]"),
+							Contents: coreosutils.StrToPtr("[Unit]"),
 						},
 					},
 				},
