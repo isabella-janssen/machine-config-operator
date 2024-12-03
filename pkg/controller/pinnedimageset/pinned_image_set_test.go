@@ -13,7 +13,7 @@ import (
 	mcfgv1alpha1 "github.com/openshift/api/machineconfiguration/v1alpha1"
 	fakemco "github.com/openshift/client-go/machineconfiguration/clientset/versioned/fake"
 	mcfginformers "github.com/openshift/client-go/machineconfiguration/informers/externalversions"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/stretchr/testify/require"
 )
 
@@ -116,9 +116,9 @@ var (
 	masterPis          = fakePinnedImageSet("master-set", "image1", map[string]string{"machineconfiguration.openshift.io/role": "master"})
 	infraPis           = fakePinnedImageSet("infra-set", "image1", map[string]string{"machineconfiguration.openshift.io/role": "infra"})
 	workerPis          = fakePinnedImageSet("worker-set", "image1", map[string]string{"machineconfiguration.openshift.io/role": "worker"})
-	masterPool         = helpers.NewMachineConfigPool("master", masterPoolSelector, helpers.MasterSelector, "")
-	workerPool         = helpers.NewMachineConfigPool("worker", workerPoolSelector, helpers.WorkerSelector, "")
-	infraPool          = helpers.NewMachineConfigPool("infra", infraPoolSelector, helpers.InfraSelector, "")
+	masterPool         = fixtures.NewMachineConfigPool("master", masterPoolSelector, fixtures.MasterSelector, "")
+	workerPool         = fixtures.NewMachineConfigPool("worker", workerPoolSelector, fixtures.WorkerSelector, "")
+	infraPool          = fixtures.NewMachineConfigPool("infra", infraPoolSelector, fixtures.InfraSelector, "")
 	infraPoolSelector  = &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{

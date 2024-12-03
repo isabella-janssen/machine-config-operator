@@ -1,8 +1,9 @@
-package helpers
+package fixtures
 
 import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
+	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -58,19 +59,15 @@ func (m *MachineConfigPoolBuilder) WithMachineConfig(mc string) *MachineConfigPo
 }
 
 func (m *MachineConfigPoolBuilder) WithLayeringEnabled() *MachineConfigPoolBuilder {
-	// TODO(zzlotnik): Fix circular import which will not allow us to import the
-	// annotation / label key constants from pkg/controller/common/constants.go.
 	return m.WithLabels(map[string]string{
-		"machineconfiguration.openshift.io/layering-enabled": "",
+		commonconsts.LayeringEnabledPoolLabel: "",
 	})
 }
 
 func (m *MachineConfigPoolBuilder) WithImage(image string) *MachineConfigPoolBuilder {
 	if image != "" {
-		// TODO(zzlotnik): Fix circular import which will not allow us to import the
-		// annotation / label key constants from pkg/controller/common/constants.go.
 		m.WithAnnotations(map[string]string{
-			"machineconfiguration.openshift.io/newestImageEquivalentConfig": image,
+			commonconsts.ExperimentalNewestLayeredImageEquivalentConfigAnnotationKey: image,
 		})
 	}
 
@@ -146,12 +143,12 @@ func (m *MachineConfigPoolBuilder) WithCondition(condType mcfgv1.MachineConfigPo
 func (m *MachineConfigPoolBuilder) WithNodeSelector(ns *metav1.LabelSelector) *MachineConfigPoolBuilder {
 	m.nodeSelector = ns
 	return m
-}
+} // duplicate of vendor: in multiple
 
 func (m *MachineConfigPoolBuilder) WithMachineConfigSelector(mcs *metav1.LabelSelector) *MachineConfigPoolBuilder {
 	m.mcSelector = mcs
 	return m
-}
+} // duplicate of vendor: in /machineconfigpoolspec.go // not used??
 
 func (m *MachineConfigPoolBuilder) MachineConfigPool() *mcfgv1.MachineConfigPool {
 	mcp := NewMachineConfigPool(m.name, m.mcSelector, m.nodeSelector, m.currentConfig)
@@ -191,4 +188,4 @@ func (m *MachineConfigPoolBuilder) MachineConfigPool() *mcfgv1.MachineConfigPool
 	}
 
 	return mcp
-}
+} // duplicate: in /pkg/controller/build/buildrequest/builder.go and duplicate of vendor

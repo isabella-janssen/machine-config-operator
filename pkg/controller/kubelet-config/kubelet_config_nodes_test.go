@@ -17,7 +17,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 )
 
 func TestOriginalKubeletConfigDefaultNodeConfig(t *testing.T) {
@@ -54,11 +54,11 @@ func TestNodeConfigDefault(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			kc := newKubeletConfig("smaller-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/worker", ""))
 			kubeletConfigKey, err := getManagedKubeletConfigKey(mcp, f.client, kc)
 			require.NoError(t, err)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = fmt.Sprintf("97-%s-%s-kubelet", mcp.Name, mcp.ObjectMeta.UID)
 
@@ -110,8 +110,8 @@ func TestBootstrapNodeConfigDefault(t *testing.T) {
 	for _, platform := range []configv1.PlatformType{configv1.AWSPlatformType, configv1.NonePlatformType, "unrecognized"} {
 		t.Run(string(platform), func(t *testing.T) {
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp1 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp1 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			mcps := []*mcfgv1.MachineConfigPool{mcp}
 			mcps = append(mcps, mcp1)
 			fgAccess := featuregates.NewHardcodedFeatureGateAccess([]osev1.FeatureGateName{"Example"}, nil)
@@ -138,7 +138,7 @@ func TestBootstrapNoNodeConfig(t *testing.T) {
 	for _, platform := range []configv1.PlatformType{configv1.AWSPlatformType, configv1.NonePlatformType, "unrecognized"} {
 		t.Run(string(platform), func(t *testing.T) {
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			mcps := []*mcfgv1.MachineConfigPool{mcp}
 
 			mcs, err := RunNodeConfigBootstrap("../../../templates", nil, cc, nil, mcps, nil)
@@ -173,8 +173,8 @@ func TestNodeConfigCustom(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
-			mcp1 := helpers.NewMachineConfigPool("custom", nil, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "node-role/custom", ""), "v0")
+			mcp := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
+			mcp1 := fixtures.NewMachineConfigPool("custom", nil, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "node-role/custom", ""), "v0")
 
 			kc := newKubeletConfig("smaller-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/worker", ""))
 			kubeletConfigKey, err := getManagedKubeletConfigKey(mcp, f.client, kc)
@@ -183,8 +183,8 @@ func TestNodeConfigCustom(t *testing.T) {
 			nodeKeyCustom, err := getManagedNodeConfigKey(mcp1, f.client)
 			require.NoError(t, err)
 
-			mcs := helpers.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
-			mcs1 := helpers.NewMachineConfig(nodeKeyCustom, map[string]string{}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(nodeKeyCustom, map[string]string{}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = fmt.Sprintf("97-%s-%s-kubelet", mcp.Name, mcp.ObjectMeta.UID)
 

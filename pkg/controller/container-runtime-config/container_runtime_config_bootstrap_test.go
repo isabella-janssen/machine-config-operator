@@ -6,7 +6,7 @@ import (
 	apicfgv1 "github.com/openshift/api/config/v1"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -19,7 +19,7 @@ func TestAddKubeletCfgAfterBootstrapKubeletCfg(t *testing.T) {
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
 			pools := []*mcfgv1.MachineConfigPool{
-				helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0"),
+				fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0"),
 			}
 			// ctrcfg for bootstrap mode
 			ctrcfg := newContainerRuntimeConfig("log-level", &mcfgv1.ContainerRuntimeConfiguration{LogLevel: "debug"}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))

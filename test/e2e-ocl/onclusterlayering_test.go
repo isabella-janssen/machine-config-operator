@@ -19,6 +19,7 @@ import (
 	mcfgv1alpha1 "github.com/openshift/api/machineconfiguration/v1alpha1"
 
 	"github.com/openshift/machine-config-operator/pkg/daemon/runtimeassets"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/assert"
@@ -450,7 +451,7 @@ func TestDeletedPodDoesNotInterruptMachineOSBuild(t *testing.T) {
 	require.NoError(t, err)
 
 	// Delete the pod
-	err = cs.CoreV1Interface.Pods(ctrlcommon.MCONamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	err = cs.CoreV1Interface.Pods(commonconsts.MCONamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 	require.NoError(t, err)
 
 	// Wait a few seconds to ensure that a new pod is created
@@ -1032,7 +1033,7 @@ func prepareForOnClusterLayeringTest(t *testing.T, cs *framework.ClientSet, test
 			},
 			Spec: mcfgv1.MachineConfigSpec{
 				Config: runtime.RawExtension{
-					Raw: helpers.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
 				},
 				Extensions: []string{"usbguard"},
 			},
@@ -1132,7 +1133,7 @@ func TestSSHKeyAndPasswordForOSBuilder(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(testIgnConfig),
+				Raw: fixtures.MarshalOrDie(testIgnConfig),
 			},
 		},
 	}

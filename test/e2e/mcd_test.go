@@ -30,6 +30,7 @@ import (
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/openshift/machine-config-operator/test/helpers"
 )
@@ -143,7 +144,7 @@ func TestKernelArguments(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
 			},
 			KernelArguments: []string{"nosmt", "foo=bar", "foo=baz", " baz=test bar=hello world"},
 		},
@@ -233,7 +234,7 @@ func TestKernelType(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
 			},
 			KernelType: "realtime",
 		},
@@ -331,7 +332,7 @@ func TestExtensions(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
 			},
 			Extensions: []string{"wasm", "ipsec", "usbguard", "kerberos", "kernel-devel", "sandboxed-containers", "sysstat"},
 		},
@@ -493,7 +494,7 @@ func TestNoReboot(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(testIgnConfig),
+				Raw: fixtures.MarshalOrDie(testIgnConfig),
 			},
 		},
 	}
@@ -625,7 +626,7 @@ func TestPoolDegradedOnFailToRender(t *testing.T) {
 	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mcadd.Spec.Config.Raw)
 	require.Nil(t, err, "failed to parse ignition config")
 	ignCfg.Ignition.Version = "" // invalid, won't render
-	rawIgnCfg := helpers.MarshalOrDie(ignCfg)
+	rawIgnCfg := fixtures.MarshalOrDie(ignCfg)
 	mcadd.Spec.Config.Raw = rawIgnCfg
 
 	// create the dummy MC now
@@ -776,7 +777,7 @@ func TestIgn3Cfg(t *testing.T) {
 	tempFile := ign3types.File{Node: ign3types.Node{Path: "/etc/testfileconfig"},
 		FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: &testfiledata}, Mode: &mode}}
 	testIgn3Config.Storage.Files = append(testIgn3Config.Storage.Files, tempFile)
-	rawIgnConfig := helpers.MarshalOrDie(testIgn3Config)
+	rawIgnConfig := fixtures.MarshalOrDie(testIgn3Config)
 	mcadd.Spec.Config.Raw = rawIgnConfig
 
 	_, err := cs.MachineConfigs().Create(context.TODO(), mcadd, metav1.CreateOptions{})
@@ -957,9 +958,9 @@ func createMCToAddFileForRole(name, role, filename, data string) *mcfgv1.Machine
 	mcadd := helpers.CreateMC(fmt.Sprintf("%s-%s", name, uuid.NewUUID()), role)
 
 	ignConfig := ctrlcommon.NewIgnConfig()
-	ignFile := helpers.CreateIgn3File(filename, "data:,"+data, 420)
+	ignFile := fixtures.CreateIgn3File(filename, "data:,"+data, 420)
 	ignConfig.Storage.Files = append(ignConfig.Storage.Files, ignFile)
-	rawIgnConfig := helpers.MarshalOrDie(ignConfig)
+	rawIgnConfig := fixtures.MarshalOrDie(ignConfig)
 	mcadd.Spec.Config.Raw = rawIgnConfig
 	return mcadd
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/controller/build/constants"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
+	testfixtures "github.com/openshift/machine-config-operator/test/fixtures"
 	testhelpers "github.com/openshift/machine-config-operator/test/helpers"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,7 @@ type ObjectsForTest struct {
 // Provides the builders to create consistently instantiated objects for use in
 // a given test. These are intended to be mutated for a specific test case.
 type ObjectBuildersForTest struct {
-	MachineConfigPoolBuilder *testhelpers.MachineConfigPoolBuilder
+	MachineConfigPoolBuilder *testfixtures.MachineConfigPoolBuilder
 	MachineOSBuildBuilder    *testhelpers.MachineOSBuildBuilder
 	MachineOSConfigBuilder   *testhelpers.MachineOSConfigBuilder
 }
@@ -95,7 +96,7 @@ func NewObjectBuildersForTest(poolName string) ObjectBuildersForTest {
 		WithRenderedImagePushspec("registry.hostname.com/org/repo:latest").
 		WithContainerfile(mcfgv1alpha1.NoArch, "FROM configs AS final\n\nRUN echo 'hi' > /etc/hi")
 
-	mcpBuilder := testhelpers.NewMachineConfigPoolBuilder(poolName).
+	mcpBuilder := testfixtures.NewMachineConfigPoolBuilder(poolName).
 		WithChildConfigs(getChildConfigs(poolName, 5)).
 		WithMachineConfig(renderedConfigName)
 
@@ -178,7 +179,7 @@ func newMachineConfigsFromPool(mcp *mcfgv1.MachineConfigPool) []*mcfgv1.MachineC
 		file := ctrlcommon.NewIgnFile(filename, childConfig.Name)
 		files = append(files, file)
 
-		out = append(out, testhelpers.NewMachineConfig(
+		out = append(out, testfixtures.NewMachineConfig(
 			childConfig.Name,
 			map[string]string{
 				"machineconfiguration.openshift.io/role": mcp.Name,
@@ -188,7 +189,7 @@ func newMachineConfigsFromPool(mcp *mcfgv1.MachineConfigPool) []*mcfgv1.MachineC
 	}
 
 	// Create a rendered MachineConfig to accompany our MachineConfigPool.
-	out = append(out, testhelpers.NewMachineConfig(
+	out = append(out, testfixtures.NewMachineConfig(
 		mcp.Spec.Configuration.Name,
 		map[string]string{
 			commonconsts.GeneratedByControllerVersionAnnotationKey: "version-number",

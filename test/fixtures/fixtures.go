@@ -1,16 +1,20 @@
-package helpers
+package fixtures
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 
 	"github.com/clarketm/json"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
+	"github.com/vincent-petithory/dataurl"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 )
 
@@ -23,23 +27,8 @@ var (
 	InfraSelector = metav1.AddLabelToSelector(&metav1.LabelSelector{}, "node-role/infra", "")
 )
 
-// StrToPtr returns a pointer to a string
-func StrToPtr(s string) *string {
-	return &s
-}
-
-// BoolToPtr returns a pointer to a bool
-func BoolToPtr(b bool) *bool {
-	return &b
-}
-
-// IntToPtr returns a pointer to an int
-func IntToPtr(i int) *int {
-	return &i
-}
-
 // NewMachineConfig returns a basic machine config with supplied labels, osurl & files added
-func NewMachineConfig(name string, labels map[string]string, osurl string, files []ign3types.File) *mcfgv1.MachineConfig {
+func NewMachineConfig(name string, labels map[string]string, osurl string, files []ign3types.File) *mcfgv1.MachineConfig { //also in /controller/builder/fixtures/objects.go
 	return NewMachineConfigExtended(
 		name,
 		labels,
@@ -56,7 +45,7 @@ func NewMachineConfig(name string, labels map[string]string, osurl string, files
 }
 
 // NewMachineConfig returns a basic machine config with supplied labels, osurl & files added
-func NewMachineConfigWithAnnotation(name string, labels, annotations map[string]string, osurl string, files []ign3types.File) *mcfgv1.MachineConfig {
+func NewMachineConfigWithAnnotation(name string, labels, annotations map[string]string, osurl string, files []ign3types.File) *mcfgv1.MachineConfig { //all tests
 	return NewMachineConfigExtended(
 		name,
 		labels,
@@ -84,7 +73,7 @@ func NewMachineConfigExtended(
 	fips bool,
 	kernelArguments []string,
 	kernelType, osurl string,
-) *mcfgv1.MachineConfig {
+) *mcfgv1.MachineConfig { //all tests
 	if labels == nil {
 		labels = map[string]string{}
 	}
@@ -140,7 +129,7 @@ func NewMachineConfigExtended(
 }
 
 // NewMachineConfigPool returns a MCP with supplied mcSelector, nodeSelector and machineconfig
-func NewMachineConfigPool(name string, mcSelector, nodeSelector *metav1.LabelSelector, currentMachineConfig string) *mcfgv1.MachineConfigPool {
+func NewMachineConfigPool(name string, mcSelector, nodeSelector *metav1.LabelSelector, currentMachineConfig string) *mcfgv1.MachineConfigPool { //all tests
 	return &mcfgv1.MachineConfigPool{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: mcfgv1.SchemeGroupVersion.String(),
@@ -188,7 +177,7 @@ func NewMachineConfigPool(name string, mcSelector, nodeSelector *metav1.LabelSel
 	}
 }
 
-func NewOpaqueSecret(name, namespace, content string) *corev1.Secret {
+func NewOpaqueSecret(name, namespace, content string) *corev1.Secret { //all tests
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -203,7 +192,7 @@ func NewOpaqueSecret(name, namespace, content string) *corev1.Secret {
 }
 
 // CreateMachineConfigFromIgnitionWithMetadata returns a MachineConfig object from an Ignition config, name, and role label
-func CreateMachineConfigFromIgnitionWithMetadata(ignCfg interface{}, name, role string) *mcfgv1.MachineConfig {
+func CreateMachineConfigFromIgnitionWithMetadata(ignCfg interface{}, name, role string) *mcfgv1.MachineConfig { //all tests
 	return &mcfgv1.MachineConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
@@ -218,7 +207,7 @@ func CreateMachineConfigFromIgnitionWithMetadata(ignCfg interface{}, name, role 
 }
 
 // CreateMachineConfigFromIgnition returns a MachineConfig object from an Ignition config passed to it
-func CreateMachineConfigFromIgnition(ignCfg interface{}) *mcfgv1.MachineConfig {
+func CreateMachineConfigFromIgnition(ignCfg interface{}) *mcfgv1.MachineConfig { //all tests
 	return &mcfgv1.MachineConfig{
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
@@ -229,10 +218,57 @@ func CreateMachineConfigFromIgnition(ignCfg interface{}) *mcfgv1.MachineConfig {
 }
 
 // MarshalOrDie returns a marshalled interface or panics
-func MarshalOrDie(input interface{}) []byte {
+func MarshalOrDie(input interface{}) []byte { //all tests
 	bytes, err := json.Marshal(input)
 	if err != nil {
 		panic(err)
 	}
 	return bytes
+}
+
+// Creates an Ign3 file whose contents are gzipped and encoded according to
+// https://datatracker.ietf.org/doc/html/rfc2397
+func CreateGzippedIgn3File(path, content string, mode int) (ign3types.File, error) {
+	ign3File := ign3types.File{}
+
+	buf := bytes.NewBuffer([]byte{})
+
+	gzipWriter := gzip.NewWriter(buf)
+	if _, err := gzipWriter.Write([]byte(content)); err != nil {
+		return ign3File, err
+	}
+
+	if err := gzipWriter.Close(); err != nil {
+		return ign3File, err
+	}
+
+	ign3File = CreateEncodedIgn3File(path, buf.String(), mode)
+	ign3File.Contents.Compression = coreosutils.StrToPtr("gzip")
+
+	return ign3File, nil
+}
+
+// Creates an Ign3 file whose contents are encoded according to
+// https://datatracker.ietf.org/doc/html/rfc2397
+func CreateEncodedIgn3File(path, content string, mode int) ign3types.File {
+	encoded := dataurl.EncodeBytes([]byte(content))
+
+	return CreateIgn3File(path, encoded, mode)
+}
+
+func CreateIgn3File(path, content string, mode int) ign3types.File {
+	return ign3types.File{
+		FileEmbedded1: ign3types.FileEmbedded1{
+			Contents: ign3types.Resource{
+				Source: &content,
+			},
+			Mode: &mode,
+		},
+		Node: ign3types.Node{
+			Path: path,
+			User: ign3types.NodeUser{
+				Name: coreosutils.StrToPtr("root"),
+			},
+		},
+	}
 }

@@ -12,6 +12,7 @@ import (
 	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -378,7 +379,7 @@ func setDefaultUIDandGID(file ign3types.File) ign3types.File {
 
 // Creates the Ignition Config test fixture
 func (tc configDriftMonitorTestCase) getIgnConfig(t *testing.T) ign3types.Config {
-	compressedFile, err := helpers.CreateGzippedIgn3File("/etc/a-compressed-file", "thefilecontents", int(defaultFilePermissions))
+	compressedFile, err := fixtures.CreateGzippedIgn3File("/etc/a-compressed-file", "thefilecontents", int(defaultFilePermissions))
 	require.Nil(t, err)
 
 	return ign3types.Config{
@@ -387,7 +388,7 @@ func (tc configDriftMonitorTestCase) getIgnConfig(t *testing.T) ign3types.Config
 		},
 		Storage: ign3types.Storage{
 			Files: []ign3types.File{
-				setDefaultUIDandGID(helpers.CreateEncodedIgn3File("/etc/a-config-file", "thefilecontents", int(defaultFilePermissions))),
+				setDefaultUIDandGID(fixtures.CreateEncodedIgn3File("/etc/a-config-file", "thefilecontents", int(defaultFilePermissions))),
 				setDefaultUIDandGID(compressedFile),
 			},
 		},
@@ -459,7 +460,7 @@ func (tc configDriftMonitorTestCase) getFixtures(t *testing.T) (ign3types.Config
 	require.NoError(t, tc.writeIgnitionConfig(t, ignConfig))
 
 	// Create a MachineConfig from our Ignition Config
-	mc := helpers.CreateMachineConfigFromIgnition(ignConfig)
+	mc := fixtures.CreateMachineConfigFromIgnition(ignConfig)
 	mc.Name = "config-drift-monitor" + string(uuid.NewUUID())
 
 	return ignConfig, mc

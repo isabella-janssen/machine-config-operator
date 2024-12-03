@@ -11,6 +11,7 @@ import (
 
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	e2eShared "github.com/openshift/machine-config-operator/test/e2e-shared-tests"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/assert"
@@ -24,6 +25,7 @@ import (
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -36,7 +38,7 @@ func TestMCDToken(t *testing.T) {
 		LabelSelector: labels.SelectorFromSet(labels.Set{"k8s-app": "machine-config-daemon"}).String(),
 	}
 
-	mcdList, err := cs.Pods(ctrlcommon.MCONamespace).List(context.TODO(), listOptions)
+	mcdList, err := cs.Pods(commonconsts.MCONamespace).List(context.TODO(), listOptions)
 	require.Nil(t, err)
 
 	for _, pod := range mcdList.Items {
@@ -68,7 +70,7 @@ func TestKernelArguments(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
 			},
 			KernelArguments: []string{"foo=bar", "foo=baz", " baz=test bar=hello world"},
 		},
@@ -132,7 +134,7 @@ func TestKernelType(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
 			},
 			KernelType: "realtime",
 		},
@@ -194,7 +196,7 @@ func TestExtensions(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
 			},
 			Extensions: []string{"wasm", "ipsec", "usbguard", "kernel-devel", "kerberos", "sysstat"},
 		},
@@ -293,7 +295,7 @@ func TestNoReboot(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(testIgnConfig),
+				Raw: fixtures.MarshalOrDie(testIgnConfig),
 			},
 		},
 	}

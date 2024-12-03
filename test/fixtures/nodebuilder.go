@@ -1,4 +1,4 @@
-package helpers
+package fixtures
 
 import (
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"

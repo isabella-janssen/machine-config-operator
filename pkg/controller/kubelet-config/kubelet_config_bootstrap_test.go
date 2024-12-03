@@ -15,7 +15,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 )
 
 func TestRunKubeletBootstrap(t *testing.T) {
@@ -25,9 +25,9 @@ func TestRunKubeletBootstrap(t *testing.T) {
 		t.Run(string(platform), func(t *testing.T) {
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
 			pools := []*mcfgv1.MachineConfigPool{
-				helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0"),
-				helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0"),
-				helpers.NewMachineConfigPool("custom", nil, customSelector, "v0"),
+				fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0"),
+				fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0"),
+				fixtures.NewMachineConfigPool("custom", nil, customSelector, "v0"),
 			}
 
 			kcRaw, err := EncodeKubeletConfig(&kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, kubeletconfigv1beta1.SchemeGroupVersion, runtime.ContentTypeJSON)
@@ -101,8 +101,8 @@ func verifyKubeletConfigYAMLContents(t *testing.T, mc *mcfgv1.MachineConfig, mcN
 }
 
 func TestGenerateDefaultManagedKeyKubelet(t *testing.T) {
-	workerPool := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
-	masterPool := helpers.NewMachineConfigPool("master", nil, helpers.WorkerSelector, "v0")
+	workerPool := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
+	masterPool := fixtures.NewMachineConfigPool("master", nil, fixtures.WorkerSelector, "v0")
 	kcRaw, err := EncodeKubeletConfig(&kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, kubeletconfigv1beta1.SchemeGroupVersion, runtime.ContentTypeJSON)
 	if err != nil {
 		panic(err)
@@ -208,7 +208,7 @@ func TestAddKubeletCfgAfterBootstrapKubeletCfg(t *testing.T) {
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
 			pools := []*mcfgv1.MachineConfigPool{
-				helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0"),
+				fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0"),
 			}
 			// kc for bootstrap mode
 			kc := newKubeletConfig("kcfg-master", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))

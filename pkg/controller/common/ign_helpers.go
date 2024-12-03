@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 )
 
@@ -832,8 +833,8 @@ func NewIgnFileBytes(path string, contents []byte) ign3types.File {
 		FileEmbedded1: ign3types.FileEmbedded1{
 			Mode: &mode,
 			Contents: ign3types.Resource{
-				Source:      strToPtr(dataurl.EncodeBytes(contents)),
-				Compression: strToPtr(""),
+				Source:      coreosutils.StrToPtr(dataurl.EncodeBytes(contents)),
+				Compression: coreosutils.StrToPtr(""),
 			},
 		},
 	}
@@ -851,8 +852,8 @@ func NewIgnFileBytesOverwriting(path string, contents []byte) ign3types.File {
 		FileEmbedded1: ign3types.FileEmbedded1{
 			Mode: &mode,
 			Contents: ign3types.Resource{
-				Source:      strToPtr(dataurl.EncodeBytes(contents)),
-				Compression: strToPtr(""), // See https://github.com/coreos/butane/issues/332
+				Source:      coreosutils.StrToPtr(dataurl.EncodeBytes(contents)),
+				Compression: coreosutils.StrToPtr(""), // See https://github.com/coreos/butane/issues/332
 			},
 		},
 	}

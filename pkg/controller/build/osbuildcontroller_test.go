@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/controller/build/utils"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
+	testfixtures "github.com/openshift/machine-config-operator/test/fixtures"
 	testhelpers "github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -590,7 +591,7 @@ func insertNewRenderedMachineConfig(ctx context.Context, t *testing.T, mcfgclien
 	filename := filepath.Join("/etc", poolName, renderedName)
 
 	file := ctrlcommon.NewIgnFile(filename, renderedName)
-	mc := testhelpers.NewMachineConfig(
+	mc := testfixtures.NewMachineConfig(
 		renderedName,
 		map[string]string{
 			commonconsts.GeneratedByControllerVersionAnnotationKey: "version-number",

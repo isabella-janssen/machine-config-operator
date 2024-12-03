@@ -36,7 +36,7 @@ import (
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 )
 
 var alwaysReady = func() bool { return true }
@@ -424,11 +424,11 @@ func TestKubeletConfigCreate(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			kc1 := newKubeletConfig("smaller-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kubeletConfigKey, _ := getManagedKubeletConfigKey(mcp, f.client, kc1)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedKubeletConfigKeyDeprecated(mcp)
 
@@ -469,7 +469,7 @@ func TestKubeletConfigMultiCreate(t *testing.T) {
 				poolLabelName := fmt.Sprintf("pools.operator.machineconfiguration.openshift.io/%s", poolName)
 				labelSelector := metav1.AddLabelToSelector(&metav1.LabelSelector{}, poolLabelName, "")
 
-				mcp := helpers.NewMachineConfigPool(poolName, nil, labelSelector, "v0")
+				mcp := fixtures.NewMachineConfigPool(poolName, nil, labelSelector, "v0")
 				mcp.ObjectMeta.Labels[poolLabelName] = ""
 
 				kc := newKubeletConfig(poolName, &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, labelSelector)
@@ -478,7 +478,7 @@ func TestKubeletConfigMultiCreate(t *testing.T) {
 				f.mckLister = append(f.mckLister, kc)
 				f.objects = append(f.objects, kc)
 
-				mcs := helpers.NewMachineConfig(generateManagedKey(kc, 1), labelSelector.MatchLabels, "dummy://", []ign3types.File{{}})
+				mcs := fixtures.NewMachineConfig(generateManagedKey(kc, 1), labelSelector.MatchLabels, "dummy://", []ign3types.File{{}})
 				mcsDeprecated := mcs.DeepCopy()
 				mcsDeprecated.Name = getManagedKubeletConfigKeyDeprecated(mcp)
 
@@ -509,8 +509,8 @@ func TestKubeletConfigAutoSizingReserved(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			autoSizingReservedEnabled := true
 			kc1 := &mcfgv1.KubeletConfig{
 				TypeMeta:   metav1.TypeMeta{APIVersion: mcfgv1.SchemeGroupVersion.String()},
@@ -522,7 +522,7 @@ func TestKubeletConfigAutoSizingReserved(t *testing.T) {
 				Status: mcfgv1.KubeletConfigStatus{},
 			}
 			kubeletConfigKey, _ := getManagedKubeletConfigKey(mcp, f.client, kc1)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedKubeletConfigKeyDeprecated(mcp)
 
@@ -553,8 +553,8 @@ func TestKubeletConfiglogFile(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			kc1 := &mcfgv1.KubeletConfig{
 				TypeMeta:   metav1.TypeMeta{APIVersion: mcfgv1.SchemeGroupVersion.String()},
 				ObjectMeta: metav1.ObjectMeta{Name: "kubulet-log", UID: types.UID(utilrand.String(5)), Generation: 1},
@@ -565,7 +565,7 @@ func TestKubeletConfiglogFile(t *testing.T) {
 				Status: mcfgv1.KubeletConfigStatus{},
 			}
 			kubeletConfigKey, _ := getManagedKubeletConfigKey(mcp, f.client, kc1)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedKubeletConfigKeyDeprecated(mcp)
 
@@ -596,11 +596,11 @@ func TestKubeletConfigUpdates(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			kc1 := newKubeletConfig("smaller-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kubeletConfigKey, _ := getManagedKubeletConfigKey(mcp, f.client, kc1)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedKubeletConfigKeyDeprecated(mcp)
 
@@ -753,11 +753,11 @@ func TestKubeletFeatureExists(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			kc1 := newKubeletConfig("smaller-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kubeletConfigKey, _ := getManagedKubeletConfigKey(mcp, f.client, kc1)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedKubeletConfigKeyDeprecated(mcp)
 
@@ -897,13 +897,13 @@ func TestKubeletConfigResync(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			kc1 := newKubeletConfig("smaller-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kc2 := newKubeletConfig("smaller-max-pods-2", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 200}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 
 			kubeletConfigKey, _ := getManagedKubeletConfigKey(mcp, f.client, kc1)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedKubeletConfigKeyDeprecated(mcp)
 
@@ -962,8 +962,8 @@ func TestAddAnnotationExistingKubeletConfig(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 
 			kcMCKey := "99-master-generated-kubelet"
 			kc1MCKey := "99-master-generated-kubelet-1"
@@ -972,7 +972,7 @@ func TestAddAnnotationExistingKubeletConfig(t *testing.T) {
 			kc1 := newKubeletConfig("smaller-max-pods-1", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 200}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kc1.SetAnnotations(map[string]string{commonconsts.MCNameSuffixAnnotationKey: "1"})
 			kc1.Finalizers = []string{kc1MCKey}
-			kcMC := helpers.NewMachineConfig(kcMCKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			kcMC := fixtures.NewMachineConfig(kcMCKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
 
 			f.ccLister = append(f.ccLister, cc)
 			f.mcpLister = append(f.mcpLister, mcp)
@@ -1028,7 +1028,7 @@ func TestCleanUpDuplicatedMC(t *testing.T) {
 			fgAccess := featuregates.NewHardcodedFeatureGateAccess([]osev1.FeatureGateName{"Example"}, nil)
 			f.newController(fgAccess)
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
 			f.ccLister = append(f.ccLister, cc)
 			f.mcpLister = append(f.mcpLister, mcp)
 
@@ -1196,7 +1196,7 @@ func TestKubeletConfigTLSOverride(t *testing.T) {
 	fgAccess := featuregates.NewHardcodedFeatureGateAccess([]osev1.FeatureGateName{"Example"}, nil)
 	f.newController(fgAccess)
 	cc := newControllerConfig(commonconsts.ControllerConfigName, osev1.AWSPlatformType)
-	mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
+	mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
 	f.apiserverLister = []*osev1.APIServer{
 		{
 			ObjectMeta: metav1.ObjectMeta{

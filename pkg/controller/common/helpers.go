@@ -8,11 +8,12 @@ import (
 	"os"
 	"sort"
 
-	"github.com/clarketm/json"
-	kerr "k8s.io/apimachinery/pkg/api/errors"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/clarketm/json"
+	kerr "k8s.io/apimachinery/pkg/api/errors"
 
 	ign3 "github.com/coreos/ignition/v2/config/v3_4"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
@@ -24,6 +25,7 @@ import (
 	k8sapiflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	configv1 "github.com/openshift/api/config/v1"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	opv1 "github.com/openshift/api/operator/v1"
@@ -32,16 +34,6 @@ import (
 	"github.com/openshift/library-go/pkg/crypto"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 )
-
-// strToPtr converts the input string to a pointer to itself
-func strToPtr(s string) *string {
-	return &s
-}
-
-// bootToPtr converts the input boolean to a pointer to itself
-func boolToPtr(b bool) *bool {
-	return &b
-}
 
 // MergeMachineConfigs combines multiple machineconfig objects into one object.
 // It sorts all the configs in increasing order of their name.
@@ -108,7 +100,7 @@ func MergeMachineConfigs(configs []*mcfgv1.MachineConfig, cconfig *mcfgv1.Contro
 	// This was a default change from ign spec2->spec3 which users don't often specify.
 	for idx := range outIgn.Storage.Files {
 		if outIgn.Storage.Files[idx].Overwrite == nil {
-			outIgn.Storage.Files[idx].Overwrite = boolToPtr(true)
+			outIgn.Storage.Files[idx].Overwrite = coreosutils.BoolToPtr(true)
 		}
 	}
 

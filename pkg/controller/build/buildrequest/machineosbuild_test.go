@@ -11,6 +11,7 @@ import (
 	mcfgv1alpha1 "github.com/openshift/api/machineconfiguration/v1alpha1"
 	"github.com/openshift/machine-config-operator/pkg/controller/build/fixtures"
 	"github.com/openshift/machine-config-operator/pkg/controller/build/utils"
+	testfixtures "github.com/openshift/machine-config-operator/test/fixtures"
 	testhelpers "github.com/openshift/machine-config-operator/test/helpers"
 )
 
@@ -25,7 +26,7 @@ func TestMachineOSBuild(t *testing.T) {
 	}
 
 	getMachineConfigPool := func() *mcfgv1.MachineConfigPool {
-		return testhelpers.NewMachineConfigPoolBuilder(poolName).MachineConfigPool()
+		return testfixtures.NewMachineConfigPoolBuilder(poolName).MachineConfigPool()
 	}
 
 	// Some of the test cases expect the hash name to be the same. This is that hash value.
@@ -199,7 +200,7 @@ func TestMachineOSBuild(t *testing.T) {
 			expectedName: expectedCommonHashName,
 			opts: MachineOSBuildOpts{
 				MachineOSConfig:   getMachineOSConfig(),
-				MachineConfigPool: testhelpers.NewMachineConfigPoolBuilder(poolName).WithPaused().MachineConfigPool(),
+				MachineConfigPool: testfixtures.NewMachineConfigPoolBuilder(poolName).WithPaused().MachineConfigPool(),
 				OSImageURLConfig:  fixtures.OSImageURLConfig(),
 			},
 		},

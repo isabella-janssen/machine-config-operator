@@ -16,6 +16,7 @@ import (
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	constants "github.com/openshift/machine-config-operator/pkg/daemon/constants"
 
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/require"
@@ -89,7 +90,7 @@ func testFilePolicy(t *testing.T, node corev1.Node, testActions []opv1.NodeDisru
 		fileApplyConfiguration := mcoac.NodeDisruptionPolicySpecFile().WithPath(fileName).WithActions(helpers.GetActionApplyConfiguration(action))
 		applyConfiguration := mcoac.MachineConfiguration("cluster").WithSpec(mcoac.MachineConfigurationSpec().WithManagementState("Managed").WithNodeDisruptionPolicy(mcoac.NodeDisruptionPolicyConfig().WithFiles(fileApplyConfiguration)))
 		// Create the test MC object, derived from the action under test
-		testMC := helpers.NewMachineConfig("01-test-file", helpers.MCLabelForRole(testMCPFileName), "", []ign3types.File{ctrlcommon.NewIgnFile(fileName, "test\n")})
+		testMC := fixtures.NewMachineConfig("01-test-file", helpers.MCLabelForRole(testMCPFileName), "", []ign3types.File{ctrlcommon.NewIgnFile(fileName, "test\n")})
 		checkNodeDisruptionAction(t, cs, testMC, testMCPFileName, *applyConfiguration, node, action.Type)
 	}
 
@@ -106,7 +107,7 @@ func testUnitPolicy(t *testing.T, nodeUnderTest corev1.Node, testActions []opv1.
 		serviceName := string(action.Type) + "-test.service"
 		serviceApplyConfiguration := mcoac.NodeDisruptionPolicySpecUnit().WithName(opv1.NodeDisruptionPolicyServiceName(serviceName)).WithActions(helpers.GetActionApplyConfiguration(action))
 		applyConfiguration := mcoac.MachineConfiguration("cluster").WithSpec(mcoac.MachineConfigurationSpec().WithManagementState("Managed").WithNodeDisruptionPolicy(mcoac.NodeDisruptionPolicyConfig().WithUnits(serviceApplyConfiguration)))
-		testMC := helpers.NewMachineConfigExtended("01-test-unit", helpers.MCLabelForRole(testMCPUnitName), nil, nil, []ign3types.Unit{{Name: serviceName, Contents: coreosutils.StrToPtr("test")}}, nil, nil, false, nil, "", "")
+		testMC := fixtures.NewMachineConfigExtended("01-test-unit", helpers.MCLabelForRole(testMCPUnitName), nil, nil, []ign3types.Unit{{Name: serviceName, Contents: coreosutils.StrToPtr("test")}}, nil, nil, false, nil, "", "")
 		checkNodeDisruptionAction(t, cs, testMC, testMCPUnitName, *applyConfiguration, nodeUnderTest, action.Type)
 	}
 }
@@ -121,7 +122,7 @@ func testSSHKeyPolicy(t *testing.T, node corev1.Node, testActions []opv1.NodeDis
 	for _, action := range testActions {
 		sshApplyConfiguration := mcoac.NodeDisruptionPolicySpecSSHKey().WithActions(helpers.GetActionApplyConfiguration(action))
 		applyConfiguration := mcoac.MachineConfiguration("cluster").WithSpec(mcoac.MachineConfigurationSpec().WithManagementState("Managed").WithNodeDisruptionPolicy(mcoac.NodeDisruptionPolicyConfig().WithSSHKey(sshApplyConfiguration)))
-		testMC := helpers.NewMachineConfigExtended("01-test-ssh", helpers.MCLabelForRole(testMCPSSHName), nil, nil, nil, []ign3types.SSHAuthorizedKey{"test"}, nil, false, nil, "", "")
+		testMC := fixtures.NewMachineConfigExtended("01-test-ssh", helpers.MCLabelForRole(testMCPSSHName), nil, nil, nil, []ign3types.SSHAuthorizedKey{"test"}, nil, false, nil, "", "")
 		checkNodeDisruptionAction(t, cs, testMC, testMCPSSHName, *applyConfiguration, node, action.Type)
 	}
 
@@ -156,7 +157,7 @@ func TestNodeDisruptionPolicySpecialAction(t *testing.T) {
 	require.Nil(t, err, "failed encoding TOML content into file %s: %w", constants.ContainerRegistryConfPath, err)
 
 	// Create the a test machineconfig from the file in cluster
-	testMC := helpers.NewMachineConfig("01-test", helpers.MCLabelForRole(testMCPSpecialName), "", []ign3types.File{ctrlcommon.NewIgnFile(constants.ContainerRegistryConfPath, newFile.String())})
+	testMC := fixtures.NewMachineConfig("01-test", helpers.MCLabelForRole(testMCPSpecialName), "", []ign3types.File{ctrlcommon.NewIgnFile(constants.ContainerRegistryConfPath, newFile.String())})
 	_, err = cs.MachineconfigurationV1Interface.MachineConfigs().Create(context.TODO(), testMC, metav1.CreateOptions{})
 	require.Nil(t, err, "creating test machine config failed")
 

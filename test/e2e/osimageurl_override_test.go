@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/openshift/machine-config-operator/test/helpers"
 	corev1 "k8s.io/api/core/v1"
@@ -77,7 +78,7 @@ func applyCustomOSToNode(t *testing.T, cs *framework.ClientSet, node corev1.Node
 	// Do a pre-run assertion to ensure that we are not in the new OS image.
 	helpers.AssertNodeNotBootedIntoImage(t, cs, node, osImageURL)
 
-	mc := helpers.NewMachineConfig("custom-os-image", helpers.MCLabelForRole(poolName), osImageURL, []ign3types.File{})
+	mc := fixtures.NewMachineConfig("custom-os-image", helpers.MCLabelForRole(poolName), osImageURL, []ign3types.File{})
 
 	t.Logf("Applying custom OS image %q to node %q", osImageURL, node.Name)
 

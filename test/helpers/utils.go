@@ -1,8 +1,6 @@
 package helpers
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -25,18 +23,16 @@ import (
 
 	mcfgv1alpha1 "github.com/openshift/api/machineconfiguration/v1alpha1"
 
-	coreosutils "github.com/coreos/ignition/config/util"
-	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	"github.com/davecgh/go-spew/spew"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	machineClientv1beta1 "github.com/openshift/client-go/machine/clientset/versioned/typed/machine/v1beta1"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/osrelease"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vincent-petithory/dataurl"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -696,7 +692,7 @@ func MCPNameToRole(mcpName string) string {
 
 // CreateMC creates a machine config object with name and role
 func CreateMC(name, role string) *mcfgv1.MachineConfig {
-	return NewMachineConfig(name, MCLabelForRole(role), "", nil)
+	return fixtures.NewMachineConfig(name, MCLabelForRole(role), "", nil)
 }
 
 // Asserts that a given file is present on the underlying node.
@@ -909,53 +905,6 @@ func MCLabelForRole(role string) map[string]string {
 // 		},
 // 	}
 // }
-
-// Creates an Ign3 file whose contents are gzipped and encoded according to
-// https://datatracker.ietf.org/doc/html/rfc2397
-func CreateGzippedIgn3File(path, content string, mode int) (ign3types.File, error) {
-	ign3File := ign3types.File{}
-
-	buf := bytes.NewBuffer([]byte{})
-
-	gzipWriter := gzip.NewWriter(buf)
-	if _, err := gzipWriter.Write([]byte(content)); err != nil {
-		return ign3File, err
-	}
-
-	if err := gzipWriter.Close(); err != nil {
-		return ign3File, err
-	}
-
-	ign3File = CreateEncodedIgn3File(path, buf.String(), mode)
-	ign3File.Contents.Compression = coreosutils.StrToPtr("gzip")
-
-	return ign3File, nil
-}
-
-// Creates an Ign3 file whose contents are encoded according to
-// https://datatracker.ietf.org/doc/html/rfc2397
-func CreateEncodedIgn3File(path, content string, mode int) ign3types.File {
-	encoded := dataurl.EncodeBytes([]byte(content))
-
-	return CreateIgn3File(path, encoded, mode)
-}
-
-func CreateIgn3File(path, content string, mode int) ign3types.File {
-	return ign3types.File{
-		FileEmbedded1: ign3types.FileEmbedded1{
-			Contents: ign3types.Resource{
-				Source: &content,
-			},
-			Mode: &mode,
-		},
-		Node: ign3types.Node{
-			Path: path,
-			User: ign3types.NodeUser{
-				Name: coreosutils.StrToPtr("root"),
-			},
-		},
-	}
-}
 
 func MCDForNode(cs *framework.ClientSet, node *corev1.Node) (*corev1.Pod, error) {
 	return mcdForNode(cs, node)

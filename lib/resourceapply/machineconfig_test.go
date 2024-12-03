@@ -9,7 +9,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/client-go/machineconfiguration/clientset/versioned/fake"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -178,7 +178,7 @@ func TestApplyMachineConfig(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: mcfgv1.MachineConfigSpec{
 				Config: runtime.RawExtension{
-					Raw: helpers.MarshalOrDie(&ign3types.Config{
+					Raw: fixtures.MarshalOrDie(&ign3types.Config{
 						Passwd: ign3types.Passwd{
 							Users: []ign3types.PasswdUser{{
 								HomeDir: coreosutils.StrToPtr("/home/dummy"),
@@ -204,7 +204,7 @@ func TestApplyMachineConfig(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"extra": "leave-alone"}},
 				Spec: mcfgv1.MachineConfigSpec{
 					Config: runtime.RawExtension{
-						Raw: helpers.MarshalOrDie(&ign3types.Config{
+						Raw: fixtures.MarshalOrDie(&ign3types.Config{
 							Passwd: ign3types.Passwd{
 								Users: []ign3types.PasswdUser{{
 									HomeDir: coreosutils.StrToPtr("/home/dummy"),
@@ -225,7 +225,7 @@ func TestApplyMachineConfig(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"extra": "leave-alone"}},
 				Spec: mcfgv1.MachineConfigSpec{
 					Config: runtime.RawExtension{
-						Raw: helpers.MarshalOrDie(&ign3types.Config{
+						Raw: fixtures.MarshalOrDie(&ign3types.Config{
 							Passwd: ign3types.Passwd{
 								Users: []ign3types.PasswdUser{{
 									HomeDir: coreosutils.StrToPtr("/home/dummy-prev"),
@@ -240,7 +240,7 @@ func TestApplyMachineConfig(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: mcfgv1.MachineConfigSpec{
 				Config: runtime.RawExtension{
-					Raw: helpers.MarshalOrDie(&ign3types.Config{
+					Raw: fixtures.MarshalOrDie(&ign3types.Config{
 						Passwd: ign3types.Passwd{
 							Users: []ign3types.PasswdUser{{
 								HomeDir: coreosutils.StrToPtr("/home/dummy"),
@@ -266,7 +266,7 @@ func TestApplyMachineConfig(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"extra": "leave-alone"}},
 				Spec: mcfgv1.MachineConfigSpec{
 					Config: runtime.RawExtension{
-						Raw: helpers.MarshalOrDie(&ign3types.Config{
+						Raw: fixtures.MarshalOrDie(&ign3types.Config{
 							Passwd: ign3types.Passwd{
 								Users: []ign3types.PasswdUser{{
 									HomeDir: coreosutils.StrToPtr("/home/dummy"),

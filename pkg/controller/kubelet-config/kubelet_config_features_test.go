@@ -18,7 +18,7 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 )
 
 func TestFeatureGateDrift(t *testing.T) {
@@ -70,16 +70,16 @@ func TestFeaturesDefault(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			kc1 := newKubeletConfig("smaller-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kc2 := newKubeletConfig("bigger-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 250}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kubeletConfigKey1, err := getManagedKubeletConfigKey(mcp, f.client, kc1)
 			require.NoError(t, err)
 			kubeletConfigKey2, err := getManagedKubeletConfigKey(mcp2, f.client, kc2)
 			require.NoError(t, err)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey1, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(kubeletConfigKey2, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey1, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(kubeletConfigKey2, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedFeaturesKeyDeprecated(mcp)
 			mcs2Deprecated := mcs2.DeepCopy()
@@ -128,16 +128,16 @@ func TestFeaturesCustomNoUpgrade(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			kc1 := newKubeletConfig("smaller-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kc2 := newKubeletConfig("bigger-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 250}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kubeletConfigKey1, err := getManagedKubeletConfigKey(mcp, f.client, kc1)
 			require.NoError(t, err)
 			kubeletConfigKey2, err := getManagedKubeletConfigKey(mcp2, f.client, kc2)
 			require.NoError(t, err)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey1, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(kubeletConfigKey2, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey1, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(kubeletConfigKey2, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedFeaturesKeyDeprecated(mcp)
 			mcs2Deprecated := mcs2.DeepCopy()
@@ -165,8 +165,8 @@ func TestBootstrapFeaturesDefault(t *testing.T) {
 	for _, platform := range []configv1.PlatformType{configv1.AWSPlatformType, configv1.NonePlatformType, "unrecognized"} {
 		t.Run(string(platform), func(t *testing.T) {
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			mcps := []*mcfgv1.MachineConfigPool{mcp, mcp2}
 
 			fgAccess := featuregates.NewHardcodedFeatureGateAccess(nil, nil)
@@ -186,8 +186,8 @@ func TestBootstrapFeaturesCustomNoUpgrade(t *testing.T) {
 	for _, platform := range []configv1.PlatformType{configv1.AWSPlatformType, configv1.NonePlatformType, "unrecognized"} {
 		t.Run(string(platform), func(t *testing.T) {
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			mcps := []*mcfgv1.MachineConfigPool{mcp, mcp2}
 
 			fgAccess := featuregates.NewHardcodedFeatureGateAccess([]osev1.FeatureGateName{"CSIMigration"}, nil)
@@ -262,9 +262,9 @@ func TestFeaturesCustomNoUpgradeRemoveUnmanagedMC(t *testing.T) {
 			f.newController(fgAccess)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
-			mcp3 := helpers.NewMachineConfigPool("custom", nil, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "node-role/custom", ""), "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
+			mcp3 := fixtures.NewMachineConfigPool("custom", nil, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "node-role/custom", ""), "v0")
 			kc1 := newKubeletConfig("smaller-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 100}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kc2 := newKubeletConfig("bigger-max-pods", &kubeletconfigv1beta1.KubeletConfiguration{MaxPods: 250}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			kubeletConfigKey1, err := getManagedKubeletConfigKey(mcp, f.client, kc1)
@@ -274,9 +274,9 @@ func TestFeaturesCustomNoUpgradeRemoveUnmanagedMC(t *testing.T) {
 
 			featureKeyCustom, err := getManagedFeaturesKey(mcp3, f.client)
 			require.NoError(t, err)
-			mcs := helpers.NewMachineConfig(kubeletConfigKey1, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(kubeletConfigKey2, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
-			mcs3 := helpers.NewMachineConfig(featureKeyCustom, map[string]string{}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(kubeletConfigKey1, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(kubeletConfigKey2, map[string]string{"node-role/worker": ""}, "dummy://", []ign3types.File{{}})
+			mcs3 := fixtures.NewMachineConfig(featureKeyCustom, map[string]string{}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedFeaturesKeyDeprecated(mcp)
 			mcs2Deprecated := mcs2.DeepCopy()

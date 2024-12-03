@@ -13,6 +13,7 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/assert"
@@ -133,20 +134,20 @@ func (c *configDriftTest) Setup(t *testing.T) {
 }
 
 func (c configDriftTest) getMachineConfig(t *testing.T) *mcfgv1.MachineConfig {
-	compressedFile, err := helpers.CreateGzippedIgn3File(configDriftCompressedFilename, configDriftFileContents, 420)
+	compressedFile, err := fixtures.CreateGzippedIgn3File(configDriftCompressedFilename, configDriftFileContents, 420)
 	require.Nil(t, err)
 
-	compressedFileTwo, err := helpers.CreateGzippedIgn3File(configDriftCompressedFilenameTwo, configDriftFileContentsTwo, 420)
+	compressedFileTwo, err := fixtures.CreateGzippedIgn3File(configDriftCompressedFilenameTwo, configDriftFileContentsTwo, 420)
 	require.Nil(t, err)
 
-	return helpers.NewMachineConfigExtended(
+	return fixtures.NewMachineConfigExtended(
 		fmt.Sprintf("%s-%s", configDriftMCPrefix, string(uuid.NewUUID())),
 		helpers.MCLabelForRole(c.MCPName),
 		nil,
 		[]ign3types.File{
-			helpers.CreateEncodedIgn3File(configDriftFilename, configDriftFileContents, 420),
+			fixtures.CreateEncodedIgn3File(configDriftFilename, configDriftFileContents, 420),
 			compressedFile,
-			helpers.CreateEncodedIgn3File(configDriftFilenameTwo, configDriftFileContentsTwo, 420),
+			fixtures.CreateEncodedIgn3File(configDriftFilenameTwo, configDriftFileContentsTwo, 420),
 			compressedFileTwo,
 		},
 		[]ign3types.Unit{

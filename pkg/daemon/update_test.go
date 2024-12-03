@@ -20,7 +20,7 @@ import (
 	opv1 "github.com/openshift/api/operator/v1"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	"github.com/openshift/machine-config-operator/pkg/daemon/osrelease"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vincent-petithory/dataurl"
@@ -84,10 +84,10 @@ func TestRunCmdSync(t *testing.T) {
 
 func TestMachineConfigDiff(t *testing.T) {
 	oldIgnCfg := ctrlcommon.NewIgnConfig()
-	oldConfig := helpers.CreateMachineConfigFromIgnition(oldIgnCfg)
+	oldConfig := fixtures.CreateMachineConfigFromIgnition(oldIgnCfg)
 	oldConfig.ObjectMeta = metav1.ObjectMeta{Name: "oldconfig"}
 	newIgnCfg := ctrlcommon.NewIgnConfig()
-	newConfig := helpers.CreateMachineConfigFromIgnition(newIgnCfg)
+	newConfig := fixtures.CreateMachineConfigFromIgnition(newIgnCfg)
 	newConfig.ObjectMeta = metav1.ObjectMeta{Name: "newconfig"}
 	diff, err := newMachineConfigDiff(oldConfig, newConfig)
 	assert.Nil(t, err)
@@ -124,7 +124,7 @@ func TestMachineConfigDiff(t *testing.T) {
 			passwdUsers: []ign3types.PasswdUser{
 				{Name: "core", SSHAuthorizedKeys: []ign3types.SSHAuthorizedKey{"1234"}},
 			},
-			baseMC: helpers.CreateMachineConfigFromIgnition(ign3types.Config{
+			baseMC: fixtures.CreateMachineConfigFromIgnition(ign3types.Config{
 				Ignition: ign3types.Ignition{
 					Version: ign3types.MaxVersion.String(),
 				},
@@ -147,7 +147,7 @@ func TestMachineConfigDiff(t *testing.T) {
 			passwdUsers: []ign3types.PasswdUser{
 				{Name: "core", PasswordHash: coreosutils.StrToPtr("testpass")},
 			},
-			baseMC: helpers.CreateMachineConfigFromIgnition(ign3types.Config{
+			baseMC: fixtures.CreateMachineConfigFromIgnition(ign3types.Config{
 				Ignition: ign3types.Ignition{
 					Version: ign3types.MaxVersion.String(),
 				},
@@ -164,7 +164,7 @@ func TestMachineConfigDiff(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			newIgnCfg := ctrlcommon.NewIgnConfig()
 			newIgnCfg.Passwd.Users = testCase.passwdUsers
-			newMC := helpers.CreateMachineConfigFromIgnition(newIgnCfg)
+			newMC := fixtures.CreateMachineConfigFromIgnition(newIgnCfg)
 
 			diff, err = newMachineConfigDiff(testCase.baseMC, newMC)
 			assert.Nil(t, err)
@@ -183,7 +183,7 @@ func newTestIgnitionFile(i uint) ign3types.File {
 func newMachineConfigFromFiles(files []ign3types.File) *mcfgv1.MachineConfig {
 	newIgnCfg := ctrlcommon.NewIgnConfig()
 	newIgnCfg.Storage.Files = files
-	newConfig := helpers.CreateMachineConfigFromIgnition(newIgnCfg)
+	newConfig := fixtures.CreateMachineConfigFromIgnition(newIgnCfg)
 	return newConfig
 }
 
@@ -385,7 +385,7 @@ func TestUpdateSSHKeys(t *testing.T) {
 // Ignition validation does not permit writing files to relative paths.
 func TestInvalidIgnConfig(t *testing.T) {
 	oldIgnConfig := ctrlcommon.NewIgnConfig()
-	oldMcfg := helpers.CreateMachineConfigFromIgnition(oldIgnConfig)
+	oldMcfg := fixtures.CreateMachineConfigFromIgnition(oldIgnConfig)
 
 	// create file to write that contains an impermissable relative path
 	tempFileContents := ign3types.Resource{Source: coreosutils.StrToPtr("data:,hello%20world%0A")}
@@ -396,12 +396,12 @@ func TestInvalidIgnConfig(t *testing.T) {
 		FileEmbedded1: ign3types.FileEmbedded1{Contents: tempFileContents, Mode: &tempMode},
 	}
 	newIgnConfig.Storage.Files = append(newIgnConfig.Storage.Files, newIgnFile)
-	newMcfg := helpers.CreateMachineConfigFromIgnition(newIgnConfig)
+	newMcfg := fixtures.CreateMachineConfigFromIgnition(newIgnConfig)
 	_, err := reconcilable(oldMcfg, newMcfg)
 	assert.NotNil(t, err, "Expected error. Relative Paths should fail general ignition validation")
 
 	newIgnConfig.Storage.Files[0].Node.Path = "/home/core/test"
-	newMcfg = helpers.CreateMachineConfigFromIgnition(newIgnConfig)
+	newMcfg = fixtures.CreateMachineConfigFromIgnition(newIgnConfig)
 	diff, err := reconcilable(oldMcfg, newMcfg)
 	assert.Nil(t, err, "Expected no error. Absolute paths should not fail general ignition validation")
 	assert.Equal(t, diff.files, true)
@@ -500,85 +500,85 @@ func TestCalculatePostConfigChangeAction(t *testing.T) {
 	}{
 		{
 			// test that a normal file change is reboot
-			oldConfig:      helpers.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["randomfile1"]}),
-			newConfig:      helpers.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["randomfile2"]}),
+			oldConfig:      fixtures.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["randomfile1"]}),
+			newConfig:      fixtures.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["randomfile2"]}),
 			expectedAction: []string{postConfigChangeActionReboot},
 		},
 		{
 			// test that a pull secret change is none
-			oldConfig:      helpers.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["pullsecret1"]}),
-			newConfig:      helpers.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["pullsecret2"]}),
+			oldConfig:      fixtures.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["pullsecret1"]}),
+			newConfig:      fixtures.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["pullsecret2"]}),
 			expectedAction: []string{postConfigChangeActionNone},
 		},
 		{
 			// test that a SSH key change is none
-			oldConfig:      helpers.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
-			newConfig:      helpers.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key2"}, []string{}, false, []string{}, "default", "dummy://"),
+			oldConfig:      fixtures.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
+			newConfig:      fixtures.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key2"}, []string{}, false, []string{}, "default", "dummy://"),
 			expectedAction: []string{postConfigChangeActionNone},
 		},
 		{
 			// test that a registries change is reload
-			oldConfig:      helpers.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["registries1"]}),
-			newConfig:      helpers.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["registries2"]}),
+			oldConfig:      fixtures.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["registries1"]}),
+			newConfig:      fixtures.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["registries2"]}),
 			expectedAction: []string{postConfigChangeActionReloadCrio},
 		},
 		{
 			// test that a kubelet CA change is none
-			oldConfig:      helpers.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["kubeletCA1"]}),
-			newConfig:      helpers.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["kubeletCA2"]}),
+			oldConfig:      fixtures.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["kubeletCA1"]}),
+			newConfig:      fixtures.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["kubeletCA2"]}),
 			expectedAction: []string{postConfigChangeActionNone},
 		},
 		{
 			// test that a registries change (reload) overwrites pull secret (none)
-			oldConfig:      helpers.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["registries1"], files["pullsecret1"]}),
-			newConfig:      helpers.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["registries2"], files["pullsecret2"]}),
+			oldConfig:      fixtures.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["registries1"], files["pullsecret1"]}),
+			newConfig:      fixtures.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["registries2"], files["pullsecret2"]}),
 			expectedAction: []string{postConfigChangeActionReloadCrio},
 		},
 		{
 			// test that a osImage change (reboot) overwrites registries (reload) and SSH keys (none)
-			oldConfig:      helpers.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{files["registries1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
-			newConfig:      helpers.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{files["registries2"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key2"}, []string{}, false, []string{}, "default", "dummy1://"),
+			oldConfig:      fixtures.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{files["registries1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
+			newConfig:      fixtures.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{files["registries2"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key2"}, []string{}, false, []string{}, "default", "dummy1://"),
 			expectedAction: []string{postConfigChangeActionReboot},
 		},
 		{
 			// test that adding a pull secret is none
-			oldConfig:      helpers.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{files["registries1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
-			newConfig:      helpers.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{files["registries1"], files["pullsecret2"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
+			oldConfig:      fixtures.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{files["registries1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
+			newConfig:      fixtures.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{files["registries1"], files["pullsecret2"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
 			expectedAction: []string{postConfigChangeActionNone},
 		},
 		{
 			// test that removing a registries is crio reload
-			oldConfig:      helpers.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{files["randomfile1"], files["registries1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
-			newConfig:      helpers.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{files["randomfile1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
+			oldConfig:      fixtures.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{files["randomfile1"], files["registries1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
+			newConfig:      fixtures.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{files["randomfile1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
 			expectedAction: []string{postConfigChangeActionReloadCrio},
 		},
 		{
 			// mixed test - final should be reboot due to kargs changes
-			oldConfig:      helpers.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{files["registries1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
-			newConfig:      helpers.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{files["pullsecret2"], files["kubeletCA1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key2"}, []string{}, false, []string{"karg1"}, "default", "dummy://"),
+			oldConfig:      fixtures.NewMachineConfigExtended("00-test", nil, nil, []ign3types.File{files["registries1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key1"}, []string{}, false, []string{}, "default", "dummy://"),
+			newConfig:      fixtures.NewMachineConfigExtended("01-test", nil, nil, []ign3types.File{files["pullsecret2"], files["kubeletCA1"]}, []ign3types.Unit{}, []ign3types.SSHAuthorizedKey{"key2"}, []string{}, false, []string{"karg1"}, "default", "dummy://"),
 			expectedAction: []string{postConfigChangeActionReboot},
 		},
 		{
 			// test that updating policy.json is crio reload
-			oldConfig:      helpers.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["policy1"]}),
-			newConfig:      helpers.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["policy2"]}),
+			oldConfig:      fixtures.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["policy1"]}),
+			newConfig:      fixtures.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["policy2"]}),
 			expectedAction: []string{postConfigChangeActionReloadCrio},
 		},
 		{
 			// test that updating containers-gpg.pub is crio reload
-			oldConfig:      helpers.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["containers-gpg1"]}),
-			newConfig:      helpers.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["containers-gpg2"]}),
+			oldConfig:      fixtures.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["containers-gpg1"]}),
+			newConfig:      fixtures.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["containers-gpg2"]}),
 			expectedAction: []string{postConfigChangeActionReloadCrio},
 		},
 		{
 			// test that updating openshift-config-user-ca-bundle.crt is crio restart
-			oldConfig:      helpers.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["restart-crio1"]}),
-			newConfig:      helpers.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["restart-crio2"]}),
+			oldConfig:      fixtures.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["restart-crio1"]}),
+			newConfig:      fixtures.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["restart-crio2"]}),
 			expectedAction: []string{postConfigChangeActionRestartCrio}},
 		{
 			// test that updating openshift-config-user-ca-bundle.crt is crio restart and that it overrides a following crio reload
-			oldConfig:      helpers.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["restart-crio1"]}),
-			newConfig:      helpers.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["restart-crio2"], files["containers-gpg1"]}),
+			oldConfig:      fixtures.NewMachineConfig("00-test", nil, "dummy://", []ign3types.File{files["restart-crio1"]}),
+			newConfig:      fixtures.NewMachineConfig("01-test", nil, "dummy://", []ign3types.File{files["restart-crio2"], files["containers-gpg1"]}),
 			expectedAction: []string{postConfigChangeActionRestartCrio},
 		},
 	}

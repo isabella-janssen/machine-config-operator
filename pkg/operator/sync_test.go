@@ -6,7 +6,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -162,13 +162,13 @@ func withCABundle(caBundle string) kubeCloudConfigOption {
 }
 
 func TestReconcileSimpleContentAccessSecret(t *testing.T) {
-	masterPool := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-	workerPool := helpers.NewMachineConfigPool("worker", nil, helpers.MasterSelector, "v0")
-	infraPool := helpers.NewMachineConfigPool("infra", nil, helpers.MasterSelector, "v0")
-	entitlementSecret := helpers.NewOpaqueSecret(commonconsts.SimpleContentAccessSecretName, commonconsts.OpenshiftConfigManagedNamespace, "abc")
-	workerEntitlementSecret := helpers.NewOpaqueSecret(commonconsts.SimpleContentAccessSecretName+"-"+workerPool.Name, commonconsts.MCONamespace, "abc")
-	infraEntitlementSecret := helpers.NewOpaqueSecret(commonconsts.SimpleContentAccessSecretName+"-"+infraPool.Name, commonconsts.MCONamespace, "abc")
-	outOfDateInfraEntitlementSecret := helpers.NewOpaqueSecret(commonconsts.SimpleContentAccessSecretName+"-"+infraPool.Name, commonconsts.MCONamespace, "123")
+	masterPool := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+	workerPool := fixtures.NewMachineConfigPool("worker", nil, fixtures.MasterSelector, "v0")
+	infraPool := fixtures.NewMachineConfigPool("infra", nil, fixtures.MasterSelector, "v0")
+	entitlementSecret := fixtures.NewOpaqueSecret(commonconsts.SimpleContentAccessSecretName, commonconsts.OpenshiftConfigManagedNamespace, "abc")
+	workerEntitlementSecret := fixtures.NewOpaqueSecret(commonconsts.SimpleContentAccessSecretName+"-"+workerPool.Name, commonconsts.MCONamespace, "abc")
+	infraEntitlementSecret := fixtures.NewOpaqueSecret(commonconsts.SimpleContentAccessSecretName+"-"+infraPool.Name, commonconsts.MCONamespace, "abc")
+	outOfDateInfraEntitlementSecret := fixtures.NewOpaqueSecret(commonconsts.SimpleContentAccessSecretName+"-"+infraPool.Name, commonconsts.MCONamespace, "123")
 
 	cases := []struct {
 		name               string

@@ -45,7 +45,7 @@ import (
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 )
 
 var (
@@ -640,11 +640,11 @@ func TestContainerRuntimeConfigCreate(t *testing.T) {
 			three := resource.MustParse("3G")
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			ctrcfg1 := newContainerRuntimeConfig("set-log-level", &mcfgv1.ContainerRuntimeConfiguration{LogLevel: "debug", LogSizeMax: &nine, OverlaySize: &three}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			ctrCfgKey, _ := getManagedKeyCtrCfg(mcp, f.client, ctrcfg1)
-			mcs1 := helpers.NewMachineConfig(getManagedKeyCtrCfgDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(getManagedKeyCtrCfgDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
 			mcs2 := mcs1.DeepCopy()
 			mcs2.Name = ctrCfgKey
 
@@ -680,11 +680,11 @@ func TestContainerRuntimeConfigUpdate(t *testing.T) {
 			three := resource.MustParse("3G")
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			ctrcfg1 := newContainerRuntimeConfig("set-log-level", &mcfgv1.ContainerRuntimeConfiguration{LogLevel: "debug", LogSizeMax: &nine, OverlaySize: &three}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			keyCtrCfg, _ := getManagedKeyCtrCfg(mcp, f.client, ctrcfg1)
-			mcs := helpers.NewMachineConfig(getManagedKeyCtrCfgDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(getManagedKeyCtrCfgDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
 			mcsUpdate := mcs.DeepCopy()
 			mcsUpdate.Name = keyCtrCfg
 
@@ -766,14 +766,14 @@ func TestImageConfigCreate(t *testing.T) {
 			f := newFixture(t)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			imgcfg1 := newImageConfig("cluster", &apicfgv1.RegistrySources{InsecureRegistries: []string{"blah.io"}, AllowedRegistries: []string{"allow.io"}, ContainerRuntimeSearchRegistries: []string{"search-reg.io"}})
 			cvcfg1 := newClusterVersionConfig("version", "test.io/myuser/myimage:test")
 			keyReg1, _ := getManagedKeyReg(mcp, nil)
 			keyReg2, _ := getManagedKeyReg(mcp2, nil)
-			mcs1 := helpers.NewMachineConfig(keyReg1, map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(keyReg2, map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(keyReg1, map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(keyReg2, map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
 
 			f.ccLister = append(f.ccLister, cc)
 			f.mcpLister = append(f.mcpLister, mcp)
@@ -814,14 +814,14 @@ func TestImageConfigUpdate(t *testing.T) {
 			f := newFixture(t)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			imgcfg1 := newImageConfig("cluster", &apicfgv1.RegistrySources{InsecureRegistries: []string{"blah.io"}, AllowedRegistries: []string{"allow.io"}, ContainerRuntimeSearchRegistries: []string{"search-reg.io"}})
 			cvcfg1 := newClusterVersionConfig("version", "test.io/myuser/myimage:test")
 			keyReg1, _ := getManagedKeyReg(mcp, nil)
 			keyReg2, _ := getManagedKeyReg(mcp2, nil)
-			mcs1 := helpers.NewMachineConfig(getManagedKeyRegDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(getManagedKeyRegDeprecated(mcp2), map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(getManagedKeyRegDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(getManagedKeyRegDeprecated(mcp2), map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
 			mcs1Update := mcs1.DeepCopy()
 			mcs2Update := mcs2.DeepCopy()
 			mcs1Update.Name = keyReg1
@@ -916,14 +916,14 @@ func TestICSPUpdate(t *testing.T) {
 			f := newFixture(t)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			imgcfg1 := newImageConfig("cluster", &apicfgv1.RegistrySources{InsecureRegistries: []string{"blah.io"}})
 			cvcfg1 := newClusterVersionConfig("version", "test.io/myuser/myimage:test")
 			keyReg1, _ := getManagedKeyReg(mcp, nil)
 			keyReg2, _ := getManagedKeyReg(mcp2, nil)
-			mcs1 := helpers.NewMachineConfig(getManagedKeyRegDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(getManagedKeyRegDeprecated(mcp2), map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(getManagedKeyRegDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(getManagedKeyRegDeprecated(mcp2), map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
 			icsp := newICSP("built-in", []apioperatorsv1alpha1.RepositoryDigestMirrors{
 				{Source: "built-in-source.example.com", Mirrors: []string{"built-in-mirror.example.com"}},
 			})
@@ -1025,14 +1025,14 @@ func TestIDMSUpdate(t *testing.T) {
 			f := newFixture(t)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			imgcfg1 := newImageConfig("cluster", &apicfgv1.RegistrySources{InsecureRegistries: []string{"blah.io"}})
 			cvcfg1 := newClusterVersionConfig("version", "test.io/myuser/myimage:test")
 			keyReg1, _ := getManagedKeyReg(mcp, nil)
 			keyReg2, _ := getManagedKeyReg(mcp2, nil)
-			mcs1 := helpers.NewMachineConfig(getManagedKeyRegDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(getManagedKeyRegDeprecated(mcp2), map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(getManagedKeyRegDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(getManagedKeyRegDeprecated(mcp2), map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
 			idms := newIDMS("built-in", []apicfgv1.ImageDigestMirrors{
 				{Source: "built-in-source.example.com", Mirrors: []apicfgv1.ImageMirror{"built-in-mirror.example.com"}},
 			})
@@ -1134,14 +1134,14 @@ func TestITMSUpdate(t *testing.T) {
 			f := newFixture(t)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			imgcfg1 := newImageConfig("cluster", &apicfgv1.RegistrySources{InsecureRegistries: []string{"blah.io"}})
 			cvcfg1 := newClusterVersionConfig("version", "test.io/myuser/myimage:test")
 			keyReg1, _ := getManagedKeyReg(mcp, nil)
 			keyReg2, _ := getManagedKeyReg(mcp2, nil)
-			mcs1 := helpers.NewMachineConfig(getManagedKeyRegDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(getManagedKeyRegDeprecated(mcp2), map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(getManagedKeyRegDeprecated(mcp), map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(getManagedKeyRegDeprecated(mcp2), map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
 			itms := newITMS("built-in", []apicfgv1.ImageTagMirrors{
 				{Source: "built-in-source.example.com", Mirrors: []apicfgv1.ImageMirror{"built-in-mirror.example.com"}},
 			})
@@ -1282,8 +1282,8 @@ func TestRunImageBootstrap(t *testing.T) {
 			t.Run(string(platform), func(t *testing.T) {
 				cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
 				pools := []*mcfgv1.MachineConfigPool{
-					helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0"),
-					helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0"),
+					fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0"),
+					fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0"),
 				}
 				// Adding the release-image registry "release-reg.io" to the list of blocked registries to ensure that is it not added to
 				// both registries.conf and policy.json as blocked
@@ -1633,7 +1633,7 @@ func TestCtrruntimeConfigMultiCreate(t *testing.T) {
 				poolLabelName := fmt.Sprintf("pools.operator.machineconfiguration.openshift.io/%s", poolName)
 				labelSelector := metav1.AddLabelToSelector(&metav1.LabelSelector{}, poolLabelName, "")
 
-				mcp := helpers.NewMachineConfigPool(poolName, nil, labelSelector, "v0")
+				mcp := fixtures.NewMachineConfigPool(poolName, nil, labelSelector, "v0")
 				mcp.ObjectMeta.Labels[poolLabelName] = ""
 
 				ccr := newContainerRuntimeConfig(poolName, &mcfgv1.ContainerRuntimeConfiguration{LogLevel: "debug"}, labelSelector)
@@ -1642,7 +1642,7 @@ func TestCtrruntimeConfigMultiCreate(t *testing.T) {
 				f.mccrLister = append(f.mccrLister, ccr)
 				f.objects = append(f.objects, ccr)
 
-				mcs := helpers.NewMachineConfig(generateManagedKey(ccr, 1), labelSelector.MatchLabels, "dummy://", []ign3types.File{{}})
+				mcs := fixtures.NewMachineConfig(generateManagedKey(ccr, 1), labelSelector.MatchLabels, "dummy://", []ign3types.File{{}})
 				mcsDeprecated := mcs.DeepCopy()
 				mcsDeprecated.Name = getManagedKeyCtrCfgDeprecated(mcp)
 
@@ -1668,13 +1668,13 @@ func TestContainerruntimeConfigResync(t *testing.T) {
 			f.newController()
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			ccr1 := newContainerRuntimeConfig("log-level-1", &mcfgv1.ContainerRuntimeConfiguration{LogLevel: "debug"}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			ccr2 := newContainerRuntimeConfig("log-level-2", &mcfgv1.ContainerRuntimeConfiguration{LogLevel: "debug"}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 
 			ctrConfigKey, _ := getManagedKeyCtrCfg(mcp, f.client, ccr1)
-			mcs := helpers.NewMachineConfig(ctrConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			mcs := fixtures.NewMachineConfig(ctrConfigKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
 			mcsDeprecated := mcs.DeepCopy()
 			mcsDeprecated.Name = getManagedKeyCtrCfgDeprecated(mcp)
 
@@ -1732,8 +1732,8 @@ func TestAddAnnotationExistingContainerRuntimeConfig(t *testing.T) {
 			f.newController()
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 
 			ctrMCKey := "99-master-generated-containerruntime"
 			ctr1MCKey := "99-master-generated-containerruntime-1"
@@ -1742,7 +1742,7 @@ func TestAddAnnotationExistingContainerRuntimeConfig(t *testing.T) {
 			ctrc1 := newContainerRuntimeConfig("log-level-1", &mcfgv1.ContainerRuntimeConfiguration{LogLevel: "debug"}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 			ctrc1.SetAnnotations(map[string]string{commonconsts.MCNameSuffixAnnotationKey: "1"})
 			ctrc1.Finalizers = []string{ctr1MCKey}
-			ctrcfgMC := helpers.NewMachineConfig(ctrMCKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
+			ctrcfgMC := fixtures.NewMachineConfig(ctrMCKey, map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{{}})
 
 			f.ccLister = append(f.ccLister, cc)
 			f.mcpLister = append(f.mcpLister, mcp)
@@ -1796,7 +1796,7 @@ func TestCleanUpDuplicatedMC(t *testing.T) {
 			f := newFixture(t)
 			f.newController()
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
 			f.ccLister = append(f.ccLister, cc)
 			f.mcpLister = append(f.mcpLister, mcp)
 
@@ -1874,16 +1874,16 @@ func TestClusterImagePolicyCreate(t *testing.T) {
 			f := newFixture(t)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			imgcfg1 := newImageConfig("cluster", &apicfgv1.RegistrySources{InsecureRegistries: []string{"blah.io"}, AllowedRegistries: []string{"example.com"}, ContainerRuntimeSearchRegistries: []string{"search-reg.io"}})
 
 			cvcfg1 := newClusterVersionConfig("version", "test.io/myuser/myimage:test")
 			keyReg1, _ := getManagedKeyReg(mcp, nil)
 			keyReg2, _ := getManagedKeyReg(mcp2, nil)
 
-			mcs1 := helpers.NewMachineConfig(keyReg1, map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(keyReg2, map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(keyReg1, map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(keyReg2, map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
 
 			clusterimgPolicy := newClusterImagePolicyWithPublicKey("image-policy", []string{"example.com"}, []byte("foo bar"))
 			f.ccLister = append(f.ccLister, cc)
@@ -1926,16 +1926,16 @@ func TestSigstoreRegistriesConfigIDMSandCIPCreate(t *testing.T) {
 			f := newFixture(t)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			imgcfg1 := newImageConfig("cluster", &apicfgv1.RegistrySources{InsecureRegistries: []string{"blah.io"}, AllowedRegistries: []string{"example.com"}, ContainerRuntimeSearchRegistries: []string{"search-reg.io"}})
 
 			cvcfg1 := newClusterVersionConfig("version", "test.io/myuser/myimage:test")
 			keyReg1, _ := getManagedKeyReg(mcp, nil)
 			keyReg2, _ := getManagedKeyReg(mcp2, nil)
 
-			mcs1 := helpers.NewMachineConfig(keyReg1, map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(keyReg2, map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(keyReg1, map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(keyReg2, map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
 
 			// idms source is the same as cip scope
 			idms := newIDMS("built-in", []apicfgv1.ImageDigestMirrors{
@@ -1985,16 +1985,16 @@ func TestImagePolicyCreate(t *testing.T) {
 			f := newFixture(t)
 
 			cc := newControllerConfig(commonconsts.ControllerConfigName, platform)
-			mcp := helpers.NewMachineConfigPool("master", nil, helpers.MasterSelector, "v0")
-			mcp2 := helpers.NewMachineConfigPool("worker", nil, helpers.WorkerSelector, "v0")
+			mcp := fixtures.NewMachineConfigPool("master", nil, fixtures.MasterSelector, "v0")
+			mcp2 := fixtures.NewMachineConfigPool("worker", nil, fixtures.WorkerSelector, "v0")
 			imgcfg1 := newImageConfig("cluster", &apicfgv1.RegistrySources{InsecureRegistries: []string{"blah.io"}, AllowedRegistries: []string{"example.com"}, ContainerRuntimeSearchRegistries: []string{"search-reg.io"}})
 
 			cvcfg1 := newClusterVersionConfig("version", "test.io/myuser/myimage:test")
 			keyReg1, _ := getManagedKeyReg(mcp, nil)
 			keyReg2, _ := getManagedKeyReg(mcp2, nil)
 
-			mcs1 := helpers.NewMachineConfig(keyReg1, map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
-			mcs2 := helpers.NewMachineConfig(keyReg2, map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
+			mcs1 := fixtures.NewMachineConfig(keyReg1, map[string]string{"node-role": "master"}, "dummy://", []ign3types.File{{}})
+			mcs2 := fixtures.NewMachineConfig(keyReg2, map[string]string{"node-role": "worker"}, "dummy://", []ign3types.File{{}})
 
 			imgPolicy := newImagePolicyWithPublicKey("image-policy", "testnamespace", []string{"example.com"}, []byte("namespace foo bar"))
 			f.ccLister = append(f.ccLister, cc)

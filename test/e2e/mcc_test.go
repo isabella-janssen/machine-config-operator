@@ -10,6 +10,7 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func TestMCCReconcileAfterBadMC(t *testing.T) {
 			Device: "/one",
 		},
 	}
-	rawIgnCfg := helpers.MarshalOrDie(ignCfg)
+	rawIgnCfg := fixtures.MarshalOrDie(ignCfg)
 	mcadd.Spec.Config.Raw = rawIgnCfg
 
 	workerOldMc := helpers.GetMcName(t, cs, "worker")

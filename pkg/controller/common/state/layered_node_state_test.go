@@ -5,6 +5,7 @@ import (
 
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -18,11 +19,11 @@ const (
 )
 
 func newNode(current, desired string) *corev1.Node {
-	return helpers.NewNodeBuilder("").WithCurrentConfig(current).WithDesiredConfig(desired).Node()
+	return fixtures.NewNodeBuilder("").WithCurrentConfig(current).WithDesiredConfig(desired).Node()
 }
 
 func newLayeredNode(currentConfig, desiredConfig, currentImage, desiredImage string) *corev1.Node {
-	nb := helpers.NewNodeBuilder("")
+	nb := fixtures.NewNodeBuilder("")
 	nb.WithCurrentConfig(currentConfig).WithDesiredConfig(desiredConfig)
 	nb.WithCurrentImage(currentImage).WithDesiredImage(desiredImage)
 	nb.WithNodeReady()
@@ -30,15 +31,15 @@ func newLayeredNode(currentConfig, desiredConfig, currentImage, desiredImage str
 }
 
 func newMachineConfigPool(currentConfig string) *mcfgv1.MachineConfigPool {
-	return helpers.NewMachineConfigPoolBuilder("").WithMachineConfig(currentConfig).MachineConfigPool()
+	return fixtures.NewMachineConfigPoolBuilder("").WithMachineConfig(currentConfig).MachineConfigPool()
 }
 
 func newLayeredMachineConfigPool(currentConfig string) *mcfgv1.MachineConfigPool {
-	return helpers.NewMachineConfigPoolBuilder("").WithMachineConfig(currentConfig).WithLayeringEnabled().MachineConfigPool()
+	return fixtures.NewMachineConfigPoolBuilder("").WithMachineConfig(currentConfig).WithLayeringEnabled().MachineConfigPool()
 }
 
 func newLayeredMachineConfigPoolWithImage(currentConfig, currentImage string) *mcfgv1.MachineConfigPool {
-	return helpers.NewMachineConfigPoolBuilder("").WithMachineConfig(currentConfig).WithImage(currentImage).MachineConfigPool()
+	return fixtures.NewMachineConfigPoolBuilder("").WithMachineConfig(currentConfig).WithImage(currentImage).MachineConfigPool()
 }
 
 func TestLayeredNodeState(t *testing.T) {
@@ -107,7 +108,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Node becoming layered should be unavailable",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithEqualConfigs(machineConfigV0).
 				WithDesiredImage(imageV0).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateWorking).
@@ -120,7 +121,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Node becoming layered should be unavailable even if the MCD hasn't started yet",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithEqualConfigs(machineConfigV0).
 				WithDesiredImage(imageV0).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateDone).
@@ -133,7 +134,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Node changing configs should be unavailable",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithConfigs(machineConfigV0, machineConfigV1).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateWorking).
 				WithNodeReady().
@@ -144,7 +145,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Node changing configs should be unavailable even if the MCD hasn't started yet",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithConfigs(machineConfigV0, machineConfigV1).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateDone).
 				WithNodeReady().
@@ -155,7 +156,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Node changing images should be unavailable",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithConfigs(machineConfigV0, machineConfigV0).
 				WithImages(imageV0, imageV1).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateWorking).
@@ -168,7 +169,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Node changing images should be unavailable even if the MCD hasn't started yet",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithConfigs(machineConfigV0, machineConfigV0).
 				WithImages(imageV0, imageV1).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateDone).
@@ -181,7 +182,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Degraded node should be unavailable",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithEqualConfigs(machineConfigV0).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateDegraded).
 				WithNodeReady().
@@ -193,7 +194,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Degraded layered node should be unavailable",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithEqualConfigs(machineConfigV0).
 				WithEqualImages(imageV0).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateDegraded).
@@ -206,7 +207,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Degraded layered node should be unavailable while transitioning images",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithCurrentImage(imageV0).
 				WithDesiredImage(imageV1).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateDegraded).
@@ -218,7 +219,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Rebooting node should be unavailable",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithEqualConfigs(machineConfigV0).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateRebooting).
 				WithNodeReady().
@@ -230,7 +231,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Rebooting layered node should be unavailable",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithEqualConfigs(machineConfigV0).
 				WithEqualImages(imageV0).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateRebooting).
@@ -243,7 +244,7 @@ func TestLayeredNodeState(t *testing.T) {
 		},
 		{
 			name: "Unready node should be unavailable",
-			node: helpers.NewNodeBuilder("").
+			node: fixtures.NewNodeBuilder("").
 				WithEqualConfigs(machineConfigV0).
 				WithEqualImages(imageV0).
 				WithMCDState(daemonconsts.MachineConfigDaemonStateRebooting).

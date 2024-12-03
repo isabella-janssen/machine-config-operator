@@ -32,7 +32,7 @@ import (
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 )
 
 var (
@@ -248,7 +248,7 @@ func newControllerConfig(name string) *mcfgv1.ControllerConfig {
 
 func TestCreatesGeneratedMachineConfig(t *testing.T) {
 	f := newFixture(t)
-	mcp := helpers.NewMachineConfigPool("test-cluster-master", helpers.MasterSelector, nil, "")
+	mcp := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.MasterSelector, nil, "")
 	files := []ign3types.File{{
 		Node: ign3types.Node{
 			Path: "/dummy/0",
@@ -259,8 +259,8 @@ func TestCreatesGeneratedMachineConfig(t *testing.T) {
 		},
 	}}
 	mcs := []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
-		helpers.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
+		fixtures.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
+		fixtures.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
 	}
 	cc := newControllerConfig(commonconsts.ControllerConfigName)
 
@@ -288,7 +288,7 @@ func TestCreatesGeneratedMachineConfig(t *testing.T) {
 // Testing that ignition validation in generateRenderedMachineConfig() correctly finds MCs that contain invalid ignconfigs.
 // generateRenderedMachineConfig should return an error when one of the MCs in configs contains an invalid ignconfig.
 func TestIgnValidationGenerateRenderedMachineConfig(t *testing.T) {
-	mcp := helpers.NewMachineConfigPool("test-cluster-master", helpers.MasterSelector, nil, "")
+	mcp := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.MasterSelector, nil, "")
 	files := []ign3types.File{{
 		Node: ign3types.Node{
 			Path: "/dummy/0",
@@ -299,8 +299,8 @@ func TestIgnValidationGenerateRenderedMachineConfig(t *testing.T) {
 		},
 	}}
 	mcs := []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
-		helpers.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
+		fixtures.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
+		fixtures.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
 	}
 	cc := newControllerConfig(commonconsts.ControllerConfigName)
 
@@ -332,7 +332,7 @@ func TestIgnValidationGenerateRenderedMachineConfig(t *testing.T) {
 
 func TestUpdatesGeneratedMachineConfig(t *testing.T) {
 	f := newFixture(t)
-	mcp := helpers.NewMachineConfigPool("test-cluster-master", helpers.MasterSelector, nil, "")
+	mcp := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.MasterSelector, nil, "")
 	files := []ign3types.File{{
 		Node: ign3types.Node{
 			Path:      "/dummy/0",
@@ -345,8 +345,8 @@ func TestUpdatesGeneratedMachineConfig(t *testing.T) {
 		},
 	}}
 	mcs := []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
-		helpers.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
+		fixtures.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
+		fixtures.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
 	}
 	cc := newControllerConfig(commonconsts.ControllerConfigName)
 
@@ -385,10 +385,10 @@ func TestUpdatesGeneratedMachineConfig(t *testing.T) {
 }
 
 func TestGenerateMachineConfigOverrideOSImageURL(t *testing.T) {
-	mcp := helpers.NewMachineConfigPool("test-cluster-master", helpers.MasterSelector, nil, "")
+	mcp := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.MasterSelector, nil, "")
 	mcs := []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy-test-1", []ign3types.File{}),
-		helpers.NewMachineConfig("00-test-cluster-master-0", map[string]string{"node-role/master": ""}, "dummy-change", []ign3types.File{}),
+		fixtures.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy-test-1", []ign3types.File{}),
+		fixtures.NewMachineConfig("00-test-cluster-master-0", map[string]string{"node-role/master": ""}, "dummy-change", []ign3types.File{}),
 	}
 
 	cc := newControllerConfig(commonconsts.ControllerConfigName)
@@ -399,7 +399,7 @@ func TestGenerateMachineConfigOverrideOSImageURL(t *testing.T) {
 	}
 	assert.Equal(t, "dummy-change", gmc.Spec.OSImageURL)
 
-	mcs = append(mcs, helpers.NewMachineConfig("00-test-cluster-master-1", map[string]string{"node-role/master": ""}, "dummy-change-2", []ign3types.File{}))
+	mcs = append(mcs, fixtures.NewMachineConfig("00-test-cluster-master-1", map[string]string{"node-role/master": ""}, "dummy-change-2", []ign3types.File{}))
 
 	gmc, err = generateAndValidateRenderedMachineConfig(gmc, mcp, mcs, cc)
 	assert.NoError(t, err)
@@ -407,10 +407,10 @@ func TestGenerateMachineConfigOverrideOSImageURL(t *testing.T) {
 }
 
 func TestVersionSkew(t *testing.T) {
-	mcp := helpers.NewMachineConfigPool("test-cluster-master", helpers.MasterSelector, nil, "")
+	mcp := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.MasterSelector, nil, "")
 	mcs := []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy-test-1", []ign3types.File{}),
-		helpers.NewMachineConfig("00-test-cluster-master-0", map[string]string{"node-role/master": ""}, "dummy-change", []ign3types.File{}),
+		fixtures.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy-test-1", []ign3types.File{}),
+		fixtures.NewMachineConfig("00-test-cluster-master-0", map[string]string{"node-role/master": ""}, "dummy-change", []ign3types.File{}),
 	}
 
 	cc := newControllerConfig(commonconsts.ControllerConfigName)
@@ -426,10 +426,10 @@ func TestVersionSkew(t *testing.T) {
 }
 
 func TestGenerateRenderedConfigOnLatestControllerVersionOnly(t *testing.T) {
-	mcp := helpers.NewMachineConfigPool("test-cluster-master", helpers.MasterSelector, nil, "")
+	mcp := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.MasterSelector, nil, "")
 	mcs := []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfigWithAnnotation("00-updated-conf", map[string]string{"node-role/master": ""}, map[string]string{commonconsts.GeneratedByControllerVersionAnnotationKey: "2"}, "dummy-test-1", []ign3types.File{}),
-		helpers.NewMachineConfigWithAnnotation("00-old-conf", map[string]string{"node-role/master": ""}, map[string]string{commonconsts.GeneratedByControllerVersionAnnotationKey: "1"}, "dummy-change", []ign3types.File{}),
+		fixtures.NewMachineConfigWithAnnotation("00-updated-conf", map[string]string{"node-role/master": ""}, map[string]string{commonconsts.GeneratedByControllerVersionAnnotationKey: "2"}, "dummy-test-1", []ign3types.File{}),
+		fixtures.NewMachineConfigWithAnnotation("00-old-conf", map[string]string{"node-role/master": ""}, map[string]string{commonconsts.GeneratedByControllerVersionAnnotationKey: "1"}, "dummy-change", []ign3types.File{}),
 	}
 	version.Hash = "2"
 	cc := newControllerConfig(commonconsts.ControllerConfigName)
@@ -437,8 +437,8 @@ func TestGenerateRenderedConfigOnLatestControllerVersionOnly(t *testing.T) {
 	require.NotNil(t, err)
 
 	mcs = []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfigWithAnnotation("00-updated-conf", map[string]string{"node-role/master": ""}, map[string]string{commonconsts.GeneratedByControllerVersionAnnotationKey: "2"}, "dummy-test-1", []ign3types.File{}),
-		helpers.NewMachineConfigWithAnnotation("99-user-conf", map[string]string{"node-role/master": ""}, map[string]string{commonconsts.GeneratedByControllerVersionAnnotationKey: ""}, "user-data", []ign3types.File{}),
+		fixtures.NewMachineConfigWithAnnotation("00-updated-conf", map[string]string{"node-role/master": ""}, map[string]string{commonconsts.GeneratedByControllerVersionAnnotationKey: "2"}, "dummy-test-1", []ign3types.File{}),
+		fixtures.NewMachineConfigWithAnnotation("99-user-conf", map[string]string{"node-role/master": ""}, map[string]string{commonconsts.GeneratedByControllerVersionAnnotationKey: ""}, "user-data", []ign3types.File{}),
 	}
 	_, err = generateRenderedMachineConfig(mcp, mcs, cc)
 	require.Nil(t, err)
@@ -446,7 +446,7 @@ func TestGenerateRenderedConfigOnLatestControllerVersionOnly(t *testing.T) {
 
 func TestDoNothing(t *testing.T) {
 	f := newFixture(t)
-	mcp := helpers.NewMachineConfigPool("test-cluster-master", helpers.MasterSelector, nil, "")
+	mcp := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.MasterSelector, nil, "")
 	files := []ign3types.File{{
 		Node: ign3types.Node{
 			Path:      "/dummy/0",
@@ -459,8 +459,8 @@ func TestDoNothing(t *testing.T) {
 		},
 	}}
 	mcs := []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
-		helpers.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
+		fixtures.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
+		fixtures.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
 	}
 	cc := newControllerConfig(commonconsts.ControllerConfigName)
 
@@ -492,7 +492,7 @@ func TestDoNothing(t *testing.T) {
 }
 
 func TestGetMachineConfigsForPool(t *testing.T) {
-	masterPool := helpers.NewMachineConfigPool("test-cluster-master", helpers.MasterSelector, nil, "")
+	masterPool := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.MasterSelector, nil, "")
 	files := []ign3types.File{{
 		Node: ign3types.Node{
 			Path: "/dummy/0",
@@ -507,9 +507,9 @@ func TestGetMachineConfigsForPool(t *testing.T) {
 		},
 	}}
 	mcs := []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
-		helpers.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
-		helpers.NewMachineConfig("00-test-cluster-worker", map[string]string{"node-role/worker": ""}, "dummy://2", []ign3types.File{files[2]}),
+		fixtures.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy://", []ign3types.File{files[0]}),
+		fixtures.NewMachineConfig("05-extra-master", map[string]string{"node-role/master": ""}, "dummy://1", []ign3types.File{files[1]}),
+		fixtures.NewMachineConfig("00-test-cluster-worker", map[string]string{"node-role/worker": ""}, "dummy://2", []ign3types.File{files[2]}),
 	}
 	masterConfigs, err := getMachineConfigsForPool(masterPool, mcs)
 	if err != nil {
@@ -521,7 +521,7 @@ func TestGetMachineConfigsForPool(t *testing.T) {
 	}
 
 	// search for a worker config in an array of MCs with no worker configs
-	workerPool := helpers.NewMachineConfigPool("test-cluster-worker", helpers.WorkerSelector, nil, "")
+	workerPool := fixtures.NewMachineConfigPool("test-cluster-worker", fixtures.WorkerSelector, nil, "")
 	_, err = getMachineConfigsForPool(workerPool, mcs[:2])
 	if err == nil {
 		t.Fatalf("expected error, no worker configs found")
@@ -539,10 +539,10 @@ func getKey(config *mcfgv1.MachineConfigPool, t *testing.T) string {
 
 func TestMachineConfigsNoBailWithoutPool(t *testing.T) {
 	f := newFixture(t)
-	mc := helpers.NewMachineConfig("00-test-cluster-worker", map[string]string{"node-role/worker": ""}, "dummy://2", []ign3types.File{})
+	mc := fixtures.NewMachineConfig("00-test-cluster-worker", map[string]string{"node-role/worker": ""}, "dummy://2", []ign3types.File{})
 	oref := metav1.NewControllerRef(newControllerConfig("test"), mcfgv1.SchemeGroupVersion.WithKind("ControllerConfig"))
 	mc.SetOwnerReferences([]metav1.OwnerReference{*oref})
-	mcp := helpers.NewMachineConfigPool("test-cluster-master", helpers.WorkerSelector, nil, "")
+	mcp := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.WorkerSelector, nil, "")
 	f.mcpLister = append(f.mcpLister, mcp)
 	c := f.newController()
 	queue := []*mcfgv1.MachineConfigPool{}
@@ -556,13 +556,13 @@ func TestMachineConfigsNoBailWithoutPool(t *testing.T) {
 }
 
 func TestGenerateMachineConfigValidation(t *testing.T) {
-	mcp := helpers.NewMachineConfigPool("test-cluster-master", helpers.MasterSelector, nil, "")
+	mcp := fixtures.NewMachineConfigPool("test-cluster-master", fixtures.MasterSelector, nil, "")
 	mcs := []*mcfgv1.MachineConfig{
-		helpers.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy-test-1", []ign3types.File{}),
-		helpers.NewMachineConfig("00-test-cluster-master-0", map[string]string{"node-role/master": ""}, "dummy-change", []ign3types.File{}),
+		fixtures.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy-test-1", []ign3types.File{}),
+		fixtures.NewMachineConfig("00-test-cluster-master-0", map[string]string{"node-role/master": ""}, "dummy-change", []ign3types.File{}),
 	}
 
-	currentMC := helpers.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy-test-1", []ign3types.File{})
+	currentMC := fixtures.NewMachineConfig("00-test-cluster-master", map[string]string{"node-role/master": ""}, "dummy-test-1", []ign3types.File{})
 	currentMC.Spec.FIPS = false
 
 	mcs[1].Spec.FIPS = true

@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/controller/build/utils"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
+	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/openshift/machine-config-operator/test/helpers"
 	"github.com/stretchr/testify/require"
@@ -244,20 +245,6 @@ func getMachineOSBuildNameForPool(cs *framework.ClientSet, poolName, moscName st
 	return "", fmt.Errorf("found multiple MachineOSBuilds for MachineOSConfig %s, MachineConfigPool %s, rendered MachineConfig %s", mosc.Name, mcp.Name, mcp.Spec.Configuration.Name)
 }
 
-// Waits for the target MachineConfigPool to reach a state defined in a supplied function.
-func waitForPoolToReachState(t *testing.T, cs *framework.ClientSet, poolName string, condFunc func(*mcfgv1.MachineConfigPool) bool) {
-	err := wait.PollImmediate(1*time.Second, 10*time.Minute, func() (bool, error) {
-		mcp, err := cs.MachineconfigurationV1Interface.MachineConfigPools().Get(context.TODO(), poolName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		return condFunc(mcp), nil
-	})
-
-	require.NoError(t, err, "MachineConfigPool %q did not reach desired state", poolName)
-}
-
 // Registers a cleanup function, making it idempotent, and wiring up the
 // skip-cleanup flag to it which will cause cleanup to be skipped, if set.
 func makeIdempotentAndRegister(t *testing.T, cleanupFunc func()) func() {
@@ -374,33 +361,6 @@ func deleteObject(ctx context.Context, t *testing.T, obj kubeObject, deleter int
 	return err
 }
 
-func ignoreErrNotFound(t *testing.T, err error) error {
-	if k8serrors.IsNotFound(err) {
-		t.Logf("")
-		return nil
-	}
-
-	return err
-}
-
-// Determines where to write the build logs in the event of a failure.
-// ARTIFACT_DIR is a well-known env var provided by the OpenShift CI system.
-// Writing to the path in this env var will ensure that any files written to
-// that path end up in the OpenShift CI GCP bucket for later viewing.
-//
-// If this env var is not set, these files will be written to the current
-// working directory.
-func getBuildArtifactDir(t *testing.T) string {
-	artifactDir := os.Getenv("ARTIFACT_DIR")
-	if artifactDir != "" {
-		return artifactDir
-	}
-
-	cwd, err := os.Getwd()
-	require.NoError(t, err)
-	return cwd
-}
-
 // Writes any ephemeral build objects to disk as YAML files.
 func writeBuildArtifactsToFiles(t *testing.T, cs *framework.ClientSet, poolName string) {
 	lo := metav1.ListOptions{
@@ -436,7 +396,7 @@ func writeMachineOSBuildsToFile(t *testing.T, cs *framework.ClientSet, archiveDi
 		return nil
 	}
 
-	return dumpObjectToYAMLFile(t, mosbList, filepath.Join(archiveDir, "machineosbuilds.yaml"))
+	return dumpObjectToYAMLFile(mosbList, filepath.Join(archiveDir, "machineosbuilds.yaml"))
 }
 
 // Writes all MachineOSConfigs to a file.
@@ -451,7 +411,7 @@ func writeMachineOSConfigsToFile(t *testing.T, cs *framework.ClientSet, archiveD
 		return nil
 	}
 
-	return dumpObjectToYAMLFile(t, moscList, filepath.Join(archiveDir, "machineosconfigs.yaml"))
+	return dumpObjectToYAMLFile(moscList, filepath.Join(archiveDir, "machineosconfigs.yaml"))
 }
 
 // Writes all ConfigMaps that match the OS Build labels to files.
@@ -467,7 +427,7 @@ func writeConfigMapsToFile(t *testing.T, cs *framework.ClientSet, lo metav1.List
 		return nil
 	}
 
-	return dumpObjectToYAMLFile(t, cmList, filepath.Join(archiveDir, "configmaps.yaml"))
+	return dumpObjectToYAMLFile(cmList, filepath.Join(archiveDir, "configmaps.yaml"))
 }
 
 // Wrttes all pod specs that match the OS Build labels to files.
@@ -482,12 +442,12 @@ func writeBuildPodsToFile(t *testing.T, cs *framework.ClientSet, lo metav1.ListO
 		return nil
 	}
 
-	return dumpObjectToYAMLFile(t, podList, filepath.Join(archiveDir, "pods.yaml"))
+	return dumpObjectToYAMLFile(podList, filepath.Join(archiveDir, "pods.yaml"))
 }
 
 // Dumps a struct to the provided filename in YAML format, creating any
 // parent directories as needed.
-func dumpObjectToYAMLFile(t *testing.T, obj interface{}, filename string) error {
+func dumpObjectToYAMLFile(obj interface{}, filename string) error {
 	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
 		return err
 	}
@@ -528,12 +488,12 @@ func streamBuildPodLogsToFile(ctx context.Context, t *testing.T, cs *framework.C
 }
 
 func getPodFromJob(ctx context.Context, cs *framework.ClientSet, jobName string) (*corev1.Pod, error) {
-	job, err := cs.BatchV1Interface.Jobs(ctrlcommon.MCONamespace).Get(ctx, jobName, metav1.GetOptions{})
+	job, err := cs.BatchV1Interface.Jobs(commonconsts.MCONamespace).Get(ctx, jobName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("could not get job %s: %w", job, err)
 	}
 
-	podList, err := cs.CoreV1Interface.Pods(ctrlcommon.MCONamespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("job-name=%s", jobName)})
+	podList, err := cs.CoreV1Interface.Pods(commonconsts.MCONamespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("job-name=%s", jobName)})
 	if err != nil {
 		return nil, fmt.Errorf("could not get pods with job label %s: %w", jobName, err)
 	}
@@ -794,7 +754,7 @@ func newMachineConfig(name, pool string) *mcfgv1.MachineConfig {
 		},
 	}
 
-	return helpers.NewMachineConfig(name, helpers.MCLabelForRole(pool), "", []ign3types.File{file})
+	return fixtures.NewMachineConfig(name, helpers.MCLabelForRole(pool), "", []ign3types.File{file})
 }
 
 // Gets an override image pullspec for TestGracefulBuildFailureRecovery. We
