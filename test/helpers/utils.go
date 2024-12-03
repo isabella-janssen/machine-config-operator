@@ -19,13 +19,13 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	aggerrs "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/yaml"
 
 	mcfgclientset "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
 
 	mcfgv1alpha1 "github.com/openshift/api/machineconfiguration/v1alpha1"
 
+	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	"github.com/davecgh/go-spew/spew"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
@@ -51,6 +51,7 @@ import (
 	rpmostreeclient "github.com/coreos/rpmostree-client-go/pkg/client"
 	opv1 "github.com/openshift/api/operator/v1"
 	mcoac "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 )
 
 const (
@@ -62,8 +63,6 @@ const (
 	// don't attach the test name to this label key because the test name may
 	// contain invalid characters such as slashes or underscores.
 	UsedByE2ETestLabelKey string = UsedByE2ETestAnnoKey
-
-	machineAPINamespace string = "openshift-machine-api"
 )
 
 type CleanupFuncs struct {
@@ -72,13 +71,13 @@ type CleanupFuncs struct {
 
 func (c *CleanupFuncs) Add(f func()) {
 	c.funcs = append(c.funcs, f)
-}
+} // duplicate of vendor: in many references
 
 func (c *CleanupFuncs) Run() {
 	for _, f := range c.funcs {
 		f()
 	}
-}
+} // duplicate of vendor: in many references
 
 func NewCleanupFuncs() CleanupFuncs {
 	return CleanupFuncs{
@@ -436,87 +435,6 @@ func WaitForPoolCompleteAny(t *testing.T, cs *framework.ClientSet, pool string) 
 	return nil
 }
 
-// WaitForPausedConfig waits for configuration to be pending in a paused pool
-func WaitForPausedConfig(t *testing.T, cs *framework.ClientSet, pool string) error {
-	ctx := context.TODO()
-
-	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
-		mcp, err := cs.MachineConfigPools().Get(ctx, pool, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		// paused == not updated, not updating, not degraded
-		if apihelpers.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, mcfgv1.MachineConfigPoolUpdated) &&
-			apihelpers.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) &&
-			apihelpers.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, mcfgv1.MachineConfigPoolDegraded) {
-			return true, nil
-		}
-		return false, nil
-	}); err != nil {
-		t.Errorf("Machine config pool never entered the state where configuration was waiting behind pause: %v", err)
-	}
-	return nil
-}
-
-// WaitForPodStart waits for a pod with the given name prefix in the given namespace to start.
-func WaitForPodStart(cs *framework.ClientSet, podPrefix, namespace string) error {
-	ctx := context.TODO()
-
-	return wait.PollUntilContextTimeout(ctx, 2*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
-		podList, err := cs.CoreV1Interface.Pods(namespace).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		for _, pod := range podList.Items {
-			if strings.HasPrefix(pod.Name, podPrefix) {
-				for _, condition := range pod.Status.Conditions {
-					if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-						return true, nil
-					}
-				}
-			}
-		}
-		return false, nil
-	})
-}
-
-// WaitForPodStop waits for a pod with the given name prefix in the given namespace to stop (i.e., to be deleted).
-func WaitForPodStop(cs *framework.ClientSet, podPrefix, namespace string) error {
-	ctx := context.TODO()
-
-	return wait.PollUntilContextTimeout(ctx, 2*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
-		podList, err := cs.CoreV1Interface.Pods(namespace).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, pod := range podList.Items {
-			if strings.HasPrefix(pod.Name, podPrefix) {
-				// Pod with prefix still exists, so we return false
-				return false, nil
-			}
-		}
-		// If we reached here, it means no pod with the given prefix exists, so we return true
-		return true, nil
-	})
-}
-
-// CheckDeploymentExists checks if a deployment with the given name in the given namespace exists.
-func CheckDeploymentExists(cs *framework.ClientSet, name, namespace string) (bool, error) {
-	ctx := context.TODO()
-	_, err := cs.Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
-
-	if err == nil {
-		return true, nil
-	}
-
-	if errors.IsNotFound(err) {
-		return false, nil
-	}
-
-	return false, err
-}
-
 // GetMonitoringToken retrieves the token from the openshift-monitoring secrets in the prometheus-k8s namespace.
 // It is equivalent to "oc sa get-token prometheus-k8s -n openshift-monitoring"
 func GetMonitoringToken(_ *testing.T, cs *framework.ClientSet) (string, error) {
@@ -563,23 +481,6 @@ func WaitForCertStatusToChange(t *testing.T, cs *framework.ClientSet, oldData st
 	return nil
 }
 
-func WaitForCADataToAppear(t *testing.T, cs *framework.ClientSet) error {
-	err := wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, 2*time.Minute, true, func(_ context.Context) (bool, error) {
-		controllerConfig, err := cs.ControllerConfigs().Get(context.TODO(), "machine-config-controller", metav1.GetOptions{})
-		require.Nil(t, err)
-		nodes, err := GetNodesByRole(cs, "worker")
-		require.Nil(t, err)
-		for _, cert := range controllerConfig.Spec.ImageRegistryBundleUserData {
-			foundCA, _ := ExecCmdOnNodeWithError(cs, nodes[0], "ls", canonicalizeNodeFilePath(filepath.Join("/etc/docker/certs.d", cert.File)))
-			if strings.Contains(foundCA, "ca.crt") {
-				return true, nil
-			}
-		}
-		return false, nil
-	})
-	return err
-}
-
 // WaitForMCDToSyncCert waits for the MCD to write annotation on the latest controllerconfig resourceVersion,
 // to indicate that is has completed the certificate write
 func WaitForMCDToSyncCert(t *testing.T, cs *framework.ClientSet, node corev1.Node, resourceVersion string) error {
@@ -607,19 +508,6 @@ func ForceKubeApiserverCertificateRotation(cs *framework.ClientSet) error {
 	// Take note that the slash had to be encoded as ~1 because it's a reference: https://www.rfc-editor.org/rfc/rfc6901#section-3
 	certPatch := fmt.Sprintf(`[{"op":"replace","path":"/metadata/annotations/auth.openshift.io~1certificate-not-after","value": null }]`)
 	_, err := cs.Secrets("openshift-kube-apiserver-operator").Patch(context.TODO(), "kube-apiserver-to-kubelet-signer", types.JSONPatchType, []byte(certPatch), metav1.PatchOptions{})
-	return err
-}
-
-// ForceImageRegistryCertRotationCertificateRotation sets the imae registry cert's not-after date to nil, which causes the
-// apiserver to rotate it
-func ForceImageRegistryCertRotationCertificateRotation(cs *framework.ClientSet) error {
-	cfg, err := cs.ConfigV1Interface.Images().Get(context.TODO(), "cluster", metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	// Take note that the slash had to be encoded as ~1 because it's a reference: https://www.rfc-editor.org/rfc/rfc6901#section-3
-	certPatch := fmt.Sprintf(`[{"op":"replace","path":"/metadata/annotations/auth.openshift.io~1certificate-not-after","value": null }]`)
-	_, err = cs.Secrets("openshift-config").Patch(context.TODO(), cfg.Spec.AdditionalTrustedCA.Name, types.JSONPatchType, []byte(certPatch), metav1.PatchOptions{})
 	return err
 }
 
@@ -718,7 +606,7 @@ func LabelRandomNodeFromPool(t *testing.T, cs *framework.ClientSet, pool, label 
 	return LabelNode(t, cs, infraNode, label)
 }
 
-// GetSingleNodeByRoll gets all nodes by role pool, and asserts there should only be one
+// GetSingleNodeByRole gets all nodes by role pool, and asserts there should only be one
 func GetSingleNodeByRole(t *testing.T, cs *framework.ClientSet, role string) corev1.Node {
 	nodes, err := GetNodesByRole(cs, role)
 	require.Nil(t, err)
@@ -877,14 +765,6 @@ func ExecCmdOnNode(t *testing.T, cs *framework.ClientSet, node corev1.Node, subA
 	return string(out)
 }
 
-// Gets the rpm-ostree status for a given node.
-func GetRPMOStreeStatusForNode(t *testing.T, cs *framework.ClientSet, node corev1.Node) *rpmostreeclient.Status {
-	status, err := getRPMOStreeStatusForNode(cs, node)
-	require.NoError(t, err)
-
-	return status
-}
-
 // Internal-only version of GetRPMOStreeStatusForNode()
 func getRPMOStreeStatusForNode(cs *framework.ClientSet, node corev1.Node) (*rpmostreeclient.Status, error) {
 	cmd, err := execCmdOnNode(cs, node, "chroot", "/rootfs", "rpm-ostree", "status", "--json")
@@ -1011,10 +891,6 @@ func MCLabelForRole(role string) map[string]string {
 	return mcLabels
 }
 
-func MCLabelForWorkers() map[string]string {
-	return MCLabelForRole("worker")
-}
-
 // TODO consider also testing for Ign2
 // func createIgn2File(path, content, fs string, mode int) ign2types.File {
 // 	return ign2types.File{
@@ -1051,7 +927,7 @@ func CreateGzippedIgn3File(path, content string, mode int) (ign3types.File, erro
 	}
 
 	ign3File = CreateEncodedIgn3File(path, buf.String(), mode)
-	ign3File.Contents.Compression = StrToPtr("gzip")
+	ign3File.Contents.Compression = coreosutils.StrToPtr("gzip")
 
 	return ign3File, nil
 }
@@ -1075,7 +951,7 @@ func CreateIgn3File(path, content string, mode int) ign3types.File {
 		Node: ign3types.Node{
 			Path: path,
 			User: ign3types.NodeUser{
-				Name: StrToPtr("root"),
+				Name: coreosutils.StrToPtr("root"),
 			},
 		},
 	}
@@ -1241,7 +1117,7 @@ func dumpNode(node *corev1.Node, silentNil bool) string {
 	}
 
 	return sb.String()
-}
+} // duplicate of vendor: in /bintree.go; vendor code is commented out?
 
 func dumpPool(pool *mcfgv1.MachineConfigPool, silentNil bool) string {
 	sb := &strings.Builder{}
@@ -1265,34 +1141,6 @@ func dumpPool(pool *mcfgv1.MachineConfigPool, silentNil bool) string {
 	return sb.String()
 }
 
-// Deletes the node and machine objects from a cluster. This is intended to
-// quickly remedy situations where a node degrades a MachineConfigPool and
-// undoing it is very difficult. In IPI clusters in AWS, GCP, Azure, et. al.,
-// the Machine API will provision a replacement node. For example, the
-// e2e-layering tests cannot cleanly undo layering at this time, so we destroy
-// the node / machine.
-func DeleteNodeAndMachine(t *testing.T, cs *framework.ClientSet, node corev1.Node) {
-	t.Helper()
-
-	machineID := strings.ReplaceAll(node.Annotations["machine.openshift.io/machine"], machineAPINamespace+"/", "")
-
-	ctx := context.Background()
-
-	machineClient := machineClientv1beta1.NewForConfigOrDie(cs.GetRestConfig())
-
-	t.Logf("Deleting machine %s / node %s", machineID, node.Name)
-
-	delErr := aggerrs.AggregateGoroutines(
-		func() error {
-			return machineClient.Machines(machineAPINamespace).Delete(ctx, machineID, metav1.DeleteOptions{})
-		},
-		func() error {
-			return cs.CoreV1Interface.Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{})
-		})
-
-	require.NoError(t, delErr)
-}
-
 // Sets the MachineSet to the desired number of replicas. Note: Does not wait
 // for new nodes to become available and does not wait for nodes to be scaled
 // back down. Returns an idempotent function that will scale the nodes back to
@@ -1302,7 +1150,7 @@ func ScaleMachineSet(t *testing.T, cs *framework.ClientSet, machinesetName strin
 
 	machineclient := machineClientv1beta1.NewForConfigOrDie(cs.GetRestConfig())
 
-	machineset, err := machineclient.MachineSets(machineAPINamespace).Get(context.TODO(), machinesetName, metav1.GetOptions{})
+	machineset, err := machineclient.MachineSets(commonconsts.MachineAPINamespace).Get(context.TODO(), machinesetName, metav1.GetOptions{})
 	require.NoError(t, err)
 
 	originalReplicaCount := *machineset.Spec.Replicas
@@ -1310,16 +1158,16 @@ func ScaleMachineSet(t *testing.T, cs *framework.ClientSet, machinesetName strin
 
 	machineset.Spec.Replicas = &desiredReplicas
 
-	_, err = machineclient.MachineSets(machineAPINamespace).Update(context.TODO(), machineset, metav1.UpdateOptions{})
+	_, err = machineclient.MachineSets(commonconsts.MachineAPINamespace).Update(context.TODO(), machineset, metav1.UpdateOptions{})
 	require.NoError(t, err)
 
 	return MakeIdempotent(func() {
-		machineset, err := machineclient.MachineSets(machineAPINamespace).Get(context.TODO(), machinesetName, metav1.GetOptions{})
+		machineset, err := machineclient.MachineSets(commonconsts.MachineAPINamespace).Get(context.TODO(), machinesetName, metav1.GetOptions{})
 		require.NoError(t, err)
 
 		machineset.Spec.Replicas = &originalReplicaCount
 
-		_, err = machineclient.MachineSets(machineAPINamespace).Update(context.TODO(), machineset, metav1.UpdateOptions{})
+		_, err = machineclient.MachineSets(commonconsts.MachineAPINamespace).Update(context.TODO(), machineset, metav1.UpdateOptions{})
 		require.NoError(t, err)
 
 		t.Logf("Scaled MachineSet %s back to the original replica count of %d", machinesetName, originalReplicaCount)
@@ -1455,36 +1303,17 @@ func setDeletionAnnotationOnMachineForNode(ctx context.Context, cs *framework.Cl
 		return err
 	}
 
-	machineID := strings.ReplaceAll(node.Annotations["machine.openshift.io/machine"], machineAPINamespace+"/", "")
+	machineID := strings.ReplaceAll(node.Annotations["machine.openshift.io/machine"], commonconsts.MachineAPINamespace+"/", "")
 	machineClient := machineClientv1beta1.NewForConfigOrDie(cs.GetRestConfig())
 
-	m, err := machineClient.Machines(machineAPINamespace).Get(ctx, machineID, metav1.GetOptions{})
+	m, err := machineClient.Machines(commonconsts.MachineAPINamespace).Get(ctx, machineID, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
 	m.Annotations["machine.openshift.io/delete-machine"] = "true"
-	_, err = machineClient.Machines(machineAPINamespace).Update(ctx, m, metav1.UpdateOptions{})
+	_, err = machineClient.Machines(commonconsts.MachineAPINamespace).Update(ctx, m, metav1.UpdateOptions{})
 	return err
-}
-
-// Writes a file to a given node. Returns an idempotent cleanup function.
-func WriteFileToNode(t *testing.T, cs *framework.ClientSet, node corev1.Node, filename, contents string) func() {
-	t.Helper()
-
-	if !strings.HasPrefix(filename, "/rootfs") {
-		filename = filepath.Join("/rootfs", filename)
-	}
-
-	bashCmd := fmt.Sprintf("printf '%s' > %s", contents, filename)
-	t.Logf("Writing file %s to node %s", filename, node.Name)
-
-	ExecCmdOnNode(t, cs, node, "/bin/bash", "-c", bashCmd)
-
-	return MakeIdempotent(func() {
-		t.Logf("Removing file %s from node %s", filename, node.Name)
-		ExecCmdOnNode(t, cs, node, "rm", filename)
-	})
 }
 
 // Polls the ControllerConfig and calls the provided condition function with
