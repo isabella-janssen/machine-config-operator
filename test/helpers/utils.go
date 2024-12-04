@@ -67,13 +67,13 @@ type CleanupFuncs struct {
 
 func (c *CleanupFuncs) Add(f func()) {
 	c.funcs = append(c.funcs, f)
-} // duplicate of vendor: in many references
+}
 
 func (c *CleanupFuncs) Run() {
 	for _, f := range c.funcs {
 		f()
 	}
-} // duplicate of vendor: in many references
+}
 
 func NewCleanupFuncs() CleanupFuncs {
 	return CleanupFuncs{
@@ -1066,7 +1066,7 @@ func dumpNode(node *corev1.Node, silentNil bool) string {
 	}
 
 	return sb.String()
-} // duplicate of vendor: in /bintree.go; vendor code is commented out?
+}
 
 func dumpPool(pool *mcfgv1.MachineConfigPool, silentNil bool) string {
 	sb := &strings.Builder{}

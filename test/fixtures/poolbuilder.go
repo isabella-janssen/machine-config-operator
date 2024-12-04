@@ -143,12 +143,7 @@ func (m *MachineConfigPoolBuilder) WithCondition(condType mcfgv1.MachineConfigPo
 func (m *MachineConfigPoolBuilder) WithNodeSelector(ns *metav1.LabelSelector) *MachineConfigPoolBuilder {
 	m.nodeSelector = ns
 	return m
-} // duplicate of vendor: in multiple
-
-func (m *MachineConfigPoolBuilder) WithMachineConfigSelector(mcs *metav1.LabelSelector) *MachineConfigPoolBuilder {
-	m.mcSelector = mcs
-	return m
-} // duplicate of vendor: in /machineconfigpoolspec.go // not used??
+}
 
 func (m *MachineConfigPoolBuilder) MachineConfigPool() *mcfgv1.MachineConfigPool {
 	mcp := NewMachineConfigPool(m.name, m.mcSelector, m.nodeSelector, m.currentConfig)
