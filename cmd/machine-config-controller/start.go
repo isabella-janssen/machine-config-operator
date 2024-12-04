@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/machine-config-operator/cmd/common"
 	"github.com/openshift/machine-config-operator/internal/clients"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	containerruntimeconfig "github.com/openshift/machine-config-operator/pkg/controller/container-runtime-config"
 	"github.com/openshift/machine-config-operator/pkg/controller/drain"
 	kubeletconfig "github.com/openshift/machine-config-operator/pkg/controller/kubelet-config"
@@ -62,7 +63,7 @@ func runStartCmd(_ *cobra.Command, _ []string) {
 
 	cb, err := clients.NewBuilder(startOpts.kubeconfig)
 	if err != nil {
-		ctrlcommon.WriteTerminationError(fmt.Errorf("creating clients: %w", err))
+		commonconfigs.WriteTerminationError(fmt.Errorf("creating clients: %w", err))
 	}
 
 	run := func(ctx context.Context) {

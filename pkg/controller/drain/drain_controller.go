@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/client-go/machineconfiguration/clientset/versioned/scheme"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/upgrademonitor"
 
@@ -121,7 +122,7 @@ func New(
 	ctrl := &Controller{
 		client:        mcfgClient,
 		kubeClient:    kubeClient,
-		eventRecorder: ctrlcommon.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-nodecontroller"})),
+		eventRecorder: commonconfigs.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-nodecontroller"})),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "machineconfigcontroller-draincontroller"}),

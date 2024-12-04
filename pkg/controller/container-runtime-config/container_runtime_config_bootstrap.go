@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,7 +64,7 @@ func RunContainerRuntimeBootstrap(templateDir string, crconfigs []*mcfgv1.Contai
 			cfg.SetAnnotations(map[string]string{
 				commonconsts.MCNameSuffixAnnotationKey: "",
 			})
-			mc, err := ctrlcommon.MachineConfigFromIgnConfig(role, managedKey, ctrRuntimeConfigIgn)
+			mc, err := commonconfigs.MachineConfigFromIgnConfig(role, managedKey, ctrRuntimeConfigIgn)
 			if err != nil {
 				return nil, fmt.Errorf("could not create MachineConfig from new Ignition config: %w", err)
 			}
@@ -92,7 +92,7 @@ func generateBootstrapManagedKeyContainerConfig(pool *mcfgv1.MachineConfigPool, 
 	if _, ok := managedKeyExist[pool.Name]; ok {
 		return "", fmt.Errorf("Error found multiple ContainerConfig targeting MachineConfigPool %v. Please apply only one ContainerConfig manifest for each pool during installation", pool.Name)
 	}
-	managedKey, err := ctrlcommon.GetManagedKey(pool, nil, "99", "containerruntime", "")
+	managedKey, err := commonconfigs.GetManagedKey(pool, nil, "99", "containerruntime", "")
 	if err != nil {
 		return "", err
 	}

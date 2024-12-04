@@ -43,6 +43,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	mtmpl "github.com/openshift/machine-config-operator/pkg/controller/template"
 	"github.com/openshift/machine-config-operator/pkg/version"
@@ -127,7 +128,7 @@ func New(
 		templatesDir:  templatesDir,
 		client:        mcfgClient,
 		configClient:  configclient,
-		eventRecorder: ctrlcommon.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-kubeletconfigcontroller"})),
+		eventRecorder: commonconfigs.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-kubeletconfigcontroller"})),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "machineconfigcontroller-kubeletconfigcontroller"}),
@@ -429,7 +430,7 @@ func generateOriginalKubeletConfigWithFeatureGates(cc *mcfgv1.ControllerConfig, 
 	if originalKubeletIgn.Contents.Source == nil {
 		return nil, fmt.Errorf("the original Kubelet source string is empty: %w", err)
 	}
-	contents, err := ctrlcommon.DecodeIgnitionFileContents(originalKubeletIgn.Contents.Source, originalKubeletIgn.Contents.Compression)
+	contents, err := commonconfigs.DecodeIgnitionFileContents(originalKubeletIgn.Contents.Source, originalKubeletIgn.Contents.Compression)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode the original Kubelet source string: %w", err)
 	}
@@ -454,7 +455,7 @@ func generateOriginalKubeletConfigWithFeatureGates(cc *mcfgv1.ControllerConfig, 
 
 func generateOriginalKubeletConfigIgn(cc *mcfgv1.ControllerConfig, templatesDir, role string, apiServer *osev1.APIServer) (*ign3types.File, error) {
 	// Render the default templates
-	tlsMinVersion, tlsCipherSuites := ctrlcommon.GetSecurityProfileCiphersFromAPIServer(apiServer)
+	tlsMinVersion, tlsCipherSuites := commonconfigs.GetSecurityProfileCiphersFromAPIServer(apiServer)
 	rc := &mtmpl.RenderConfig{ControllerConfigSpec: &cc.Spec, TLSMinVersion: tlsMinVersion, TLSCipherSuites: tlsCipherSuites}
 	generatedConfigs, err := mtmpl.GenerateMachineConfigsForRole(rc, role, templatesDir)
 	if err != nil {
@@ -641,7 +642,7 @@ func (ctrl *Controller) syncKubeletConfig(key string) error {
 		// If the provided kubeletconfig has a TLS profile, override the one generated from templates.
 		if cfg.Spec.TLSSecurityProfile != nil {
 			klog.Infof("Using tlsSecurityProfile provided by KubeletConfig %s", cfg.Name)
-			observedMinTLSVersion, observedCipherSuites := ctrlcommon.GetSecurityProfileCiphers(cfg.Spec.TLSSecurityProfile)
+			observedMinTLSVersion, observedCipherSuites := commonconfigs.GetSecurityProfileCiphers(cfg.Spec.TLSSecurityProfile)
 			originalKubeConfig.TLSMinVersion = observedMinTLSVersion
 			originalKubeConfig.TLSCipherSuites = observedCipherSuites
 		}
@@ -652,8 +653,8 @@ func (ctrl *Controller) syncKubeletConfig(key string) error {
 		}
 
 		if isNotFound {
-			ignConfig := ctrlcommon.NewIgnConfig()
-			mc, err = ctrlcommon.MachineConfigFromIgnConfig(role, managedKey, ignConfig)
+			ignConfig := commonconfigs.NewIgnConfig()
+			mc, err = commonconfigs.MachineConfigFromIgnConfig(role, managedKey, ignConfig)
 			if err != nil {
 				return ctrl.syncStatusOnly(cfg, err, "could not create MachineConfig from new Ignition config: %v", err)
 			}
@@ -679,7 +680,7 @@ func (ctrl *Controller) syncKubeletConfig(key string) error {
 			}
 		}
 
-		tempIgnConfig := ctrlcommon.NewIgnConfig()
+		tempIgnConfig := commonconfigs.NewIgnConfig()
 		if autoSizingReservedIgnition != nil {
 			tempIgnConfig.Storage.Files = append(tempIgnConfig.Storage.Files, *autoSizingReservedIgnition)
 		}
@@ -820,7 +821,7 @@ func (ctrl *Controller) addFinalizerToKubeletConfig(kc *mcfgv1.KubeletConfig, mc
 		// When we update an existing kubeletconfig, the generation number increases causing
 		// a resync to happen. When this happens, the mc name is the same, so we don't
 		// want to add duplicate entries to the list of finalizers.
-		if !ctrlcommon.InSlice(mc.Name, kcTmp.ObjectMeta.Finalizers) {
+		if !commonconfigs.InSlice(mc.Name, kcTmp.ObjectMeta.Finalizers) {
 			kcTmp.ObjectMeta.Finalizers = append(kcTmp.ObjectMeta.Finalizers, mc.Name)
 		}
 

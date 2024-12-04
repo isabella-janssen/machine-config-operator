@@ -17,6 +17,7 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/controller/build/fixtures"
 	"github.com/openshift/machine-config-operator/pkg/controller/build/utils"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	testfixtures "github.com/openshift/machine-config-operator/test/fixtures"
 	testhelpers "github.com/openshift/machine-config-operator/test/helpers"
@@ -590,7 +591,7 @@ func insertNewRenderedMachineConfigAndUpdatePool(ctx context.Context, t *testing
 func insertNewRenderedMachineConfig(ctx context.Context, t *testing.T, mcfgclient mcfgclientset.Interface, poolName, renderedName string) {
 	filename := filepath.Join("/etc", poolName, renderedName)
 
-	file := ctrlcommon.NewIgnFile(filename, renderedName)
+	file := commonconfigs.NewIgnFile(filename, renderedName)
 	mc := testfixtures.NewMachineConfig(
 		renderedName,
 		map[string]string{

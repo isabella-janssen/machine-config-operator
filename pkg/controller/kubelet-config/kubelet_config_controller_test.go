@@ -33,7 +33,7 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/client-go/machineconfiguration/clientset/versioned/fake"
 	informers "github.com/openshift/client-go/machineconfiguration/informers/externalversions"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
 	"github.com/openshift/machine-config-operator/test/fixtures"
@@ -1166,7 +1166,7 @@ func TestKubeletConfigTLSRender(t *testing.T) {
 			if err != nil {
 				t.Errorf("could not generate kubelet config from templates %v", err)
 			}
-			contents, err := ctrlcommon.DecodeIgnitionFileContents(kubeletConfig.Contents.Source, kubeletConfig.Contents.Compression)
+			contents, err := commonconfigs.DecodeIgnitionFileContents(kubeletConfig.Contents.Source, kubeletConfig.Contents.Compression)
 			require.NoError(t, err)
 			originalKubeConfig, err := DecodeKubeletConfig(contents)
 			require.NoError(t, err)
@@ -1176,9 +1176,9 @@ func TestKubeletConfigTLSRender(t *testing.T) {
 			var expectedTLSMinVersion string
 			// Use an intermediate profile for the nil cases
 			if testCase.apiserver == nil || testCase.apiserver.Spec.TLSSecurityProfile == nil {
-				expectedTLSMinVersion, expectedTLSCipherSuites = ctrlcommon.GetSecurityProfileCiphers(&osev1.TLSSecurityProfile{Type: osev1.TLSProfileIntermediateType})
+				expectedTLSMinVersion, expectedTLSCipherSuites = commonconfigs.GetSecurityProfileCiphers(&osev1.TLSSecurityProfile{Type: osev1.TLSProfileIntermediateType})
 			} else {
-				expectedTLSMinVersion, expectedTLSCipherSuites = ctrlcommon.GetSecurityProfileCiphers(testCase.apiserver.Spec.TLSSecurityProfile)
+				expectedTLSMinVersion, expectedTLSCipherSuites = commonconfigs.GetSecurityProfileCiphers(testCase.apiserver.Spec.TLSSecurityProfile)
 			}
 
 			require.Equal(t, originalKubeConfig.TLSCipherSuites, expectedTLSCipherSuites)
@@ -1211,7 +1211,7 @@ func TestKubeletConfigTLSOverride(t *testing.T) {
 	f.ccLister = append(f.ccLister, cc)
 	f.mcpLister = append(f.mcpLister, mcp)
 
-	overrideTLSMinVersion, overrideTLSCiphers := ctrlcommon.GetSecurityProfileCiphers(&osev1.TLSSecurityProfile{Type: osev1.TLSProfileIntermediateType})
+	overrideTLSMinVersion, overrideTLSCiphers := commonconfigs.GetSecurityProfileCiphers(&osev1.TLSSecurityProfile{Type: osev1.TLSProfileIntermediateType})
 	userDefinedKC := newKubeletConfig("tls-override", &kubeletconfigv1beta1.KubeletConfiguration{TLSCipherSuites: overrideTLSCiphers, TLSMinVersion: overrideTLSMinVersion}, metav1.AddLabelToSelector(&metav1.LabelSelector{}, "pools.operator.machineconfiguration.openshift.io/master", ""))
 
 	f.mckLister = append(f.mckLister, userDefinedKC)
@@ -1227,7 +1227,7 @@ func TestKubeletConfigTLSOverride(t *testing.T) {
 	generatedConfig, err := ctrl.client.MachineconfigurationV1().MachineConfigs().Get(context.TODO(), "99-master-generated-kubelet", metav1.GetOptions{})
 	require.NoError(t, err)
 
-	generatedIgnConfig, err := ctrlcommon.ParseAndConvertConfig(generatedConfig.Spec.Config.Raw)
+	generatedIgnConfig, err := commonconfigs.ParseAndConvertConfig(generatedConfig.Spec.Config.Raw)
 	require.NoError(t, err)
 	var kubeletConfigFile ign3types.File
 	for _, file := range generatedIgnConfig.Storage.Files {
@@ -1238,7 +1238,7 @@ func TestKubeletConfigTLSOverride(t *testing.T) {
 	require.NotEmpty(t, kubeletConfigFile)
 
 	// Decode this to a native KubeletConfiguration object
-	contents, err := ctrlcommon.DecodeIgnitionFileContents(kubeletConfigFile.Contents.Source, kubeletConfigFile.Contents.Compression)
+	contents, err := commonconfigs.DecodeIgnitionFileContents(kubeletConfigFile.Contents.Source, kubeletConfigFile.Contents.Compression)
 	require.NoError(t, err)
 	kc, err := DecodeKubeletConfig(contents)
 	require.NoError(t, err)

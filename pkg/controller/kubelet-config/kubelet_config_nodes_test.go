@@ -15,7 +15,7 @@ import (
 	osev1 "github.com/openshift/api/config/v1"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/test/fixtures"
 )
@@ -34,7 +34,7 @@ func TestOriginalKubeletConfigDefaultNodeConfig(t *testing.T) {
 			if err != nil {
 				t.Errorf("could not generate kubelet config from templates %v", err)
 			}
-			contents, err := ctrlcommon.DecodeIgnitionFileContents(kubeletConfig.Contents.Source, kubeletConfig.Contents.Compression)
+			contents, err := commonconfigs.DecodeIgnitionFileContents(kubeletConfig.Contents.Source, kubeletConfig.Contents.Compression)
 			require.NoError(t, err)
 			originalKubeConfig, err := DecodeKubeletConfig(contents)
 			require.NoError(t, err)

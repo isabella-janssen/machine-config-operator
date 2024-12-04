@@ -24,7 +24,7 @@ import (
 
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,7 +70,7 @@ func TestKernelArguments(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 			},
 			KernelArguments: []string{"foo=bar", "foo=baz", " baz=test bar=hello world"},
 		},
@@ -134,7 +134,7 @@ func TestKernelType(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 			},
 			KernelType: "realtime",
 		},
@@ -196,7 +196,7 @@ func TestExtensions(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 			},
 			Extensions: []string{"wasm", "ipsec", "usbguard", "kernel-devel", "kerberos", "sysstat"},
 		},
@@ -284,7 +284,7 @@ func TestNoReboot(t *testing.T) {
 	helpers.ExecCmdOnNode(t, cs, node, "rm", "-rf", filepath.Join("/rootfs", filepath.Dir(sshPaths.Expected)))
 
 	// Adding authorized key for user core
-	testIgnConfig := ctrlcommon.NewIgnConfig()
+	testIgnConfig := commonconfigs.NewIgnConfig()
 	testSSHKey := ign3types.PasswdUser{Name: "core", SSHAuthorizedKeys: []ign3types.SSHAuthorizedKey{ign3types.SSHAuthorizedKey(sshKeyContent)}}
 	testIgnConfig.Passwd.Users = append(testIgnConfig.Passwd.Users, testSSHKey)
 

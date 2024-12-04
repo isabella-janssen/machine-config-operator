@@ -8,6 +8,7 @@ import (
 	mcfgv1alpha1 "github.com/openshift/api/machineconfiguration/v1alpha1"
 	"github.com/openshift/machine-config-operator/pkg/controller/build/constants"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	testfixtures "github.com/openshift/machine-config-operator/test/fixtures"
 	testhelpers "github.com/openshift/machine-config-operator/test/helpers"
@@ -176,7 +177,7 @@ func newMachineConfigsFromPool(mcp *mcfgv1.MachineConfigPool) []*mcfgv1.MachineC
 		}
 
 		filename := fmt.Sprintf("/etc/%s", childConfig.Name)
-		file := ctrlcommon.NewIgnFile(filename, childConfig.Name)
+		file := commonconfigs.NewIgnFile(filename, childConfig.Name)
 		files = append(files, file)
 
 		out = append(out, testfixtures.NewMachineConfig(

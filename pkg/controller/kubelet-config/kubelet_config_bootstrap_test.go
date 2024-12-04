@@ -13,7 +13,7 @@ import (
 	osev1 "github.com/openshift/api/config/v1"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/test/fixtures"
 )
@@ -92,10 +92,10 @@ func TestRunKubeletBootstrap(t *testing.T) {
 }
 
 func verifyKubeletConfigYAMLContents(t *testing.T, mc *mcfgv1.MachineConfig, mcName string, releaseImageReg string) {
-	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mc.Spec.Config.Raw)
+	ignCfg, err := commonconfigs.ParseAndConvertConfig(mc.Spec.Config.Raw)
 	require.NoError(t, err)
 	regfile := ignCfg.Storage.Files[0]
-	conf, err := ctrlcommon.DecodeIgnitionFileContents(regfile.Contents.Source, regfile.Contents.Compression)
+	conf, err := commonconfigs.DecodeIgnitionFileContents(regfile.Contents.Source, regfile.Contents.Compression)
 	require.NoError(t, err)
 	require.Contains(t, string(conf), `maxPods: 100`)
 }

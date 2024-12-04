@@ -14,6 +14,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	mcfgv1alpha1 "github.com/openshift/api/machineconfiguration/v1alpha1"
@@ -70,7 +71,7 @@ func (a *assetRenderer) read() error {
 }
 
 func (a *assetRenderer) addTemplateFuncs() {
-	funcs := ctrlcommon.GetTemplateFuncMap()
+	funcs := commonconfigs.GetTemplateFuncMap()
 	funcs["toYAML"] = toYAML
 	funcs["onPremPlatformAPIServerInternalIP"] = onPremPlatformAPIServerInternalIP
 	funcs["onPremPlatformAPIServerInternalIPs"] = onPremPlatformAPIServerInternalIPs

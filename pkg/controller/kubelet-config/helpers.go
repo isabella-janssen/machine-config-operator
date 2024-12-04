@@ -24,7 +24,7 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	mcfgclientset "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 )
 
@@ -72,19 +72,19 @@ func createNewKubeletDynamicSystemReservedIgnition(autoSystemReserved *bool, use
 	config := fmt.Sprintf("NODE_SIZING_ENABLED=%s\nSYSTEM_RESERVED_MEMORY=%s\nSYSTEM_RESERVED_CPU=%s\nSYSTEM_RESERVED_ES=%s\n",
 		autoNodeSizing, systemReservedMemory, systemReservedCPU, systemReservedEphemeralStorage)
 
-	r := ctrlcommon.NewIgnFileBytesOverwriting("/etc/node-sizing-enabled.env", []byte(config))
+	r := commonconfigs.NewIgnFileBytesOverwriting("/etc/node-sizing-enabled.env", []byte(config))
 	return &r
 }
 
 func createNewKubeletLogLevelIgnition(level int32) *ign3types.File {
 	config := fmt.Sprintf("[Service]\nEnvironment=\"KUBELET_LOG_LEVEL=%d\"\n", level)
-	r := ctrlcommon.NewIgnFileBytesOverwriting("/etc/systemd/system/kubelet.service.d/20-logging.conf", []byte(config))
+	r := commonconfigs.NewIgnFileBytesOverwriting("/etc/systemd/system/kubelet.service.d/20-logging.conf", []byte(config))
 	return &r
 }
 
 func createNewKubeletIgnition(yamlConfig []byte) *ign3types.File {
 
-	r := ctrlcommon.NewIgnFileBytesOverwriting("/etc/kubernetes/kubelet.conf", yamlConfig)
+	r := commonconfigs.NewIgnFileBytesOverwriting("/etc/kubernetes/kubelet.conf", yamlConfig)
 	return &r
 }
 
@@ -172,14 +172,14 @@ func updateMachineConfigwithCgroup(node *osev1.Node, mc *mcfgv1.MachineConfig) e
 
 	for _, arg := range mc.Spec.KernelArguments {
 		// only append the args we want to keep, omitting the undesired
-		if !ctrlcommon.InSlice(arg, kernelArgsToRemove) {
+		if !commonconfigs.InSlice(arg, kernelArgsToRemove) {
 			adjustedKernelArgs = append(adjustedKernelArgs, arg)
 		}
 	}
 
 	for _, arg := range kernelArgsToAdd {
 		// add the additional that aren't already there
-		if !ctrlcommon.InSlice(arg, adjustedKernelArgs) {
+		if !commonconfigs.InSlice(arg, adjustedKernelArgs) {
 			adjustedKernelArgs = append(adjustedKernelArgs, arg)
 		}
 	}
@@ -189,7 +189,7 @@ func updateMachineConfigwithCgroup(node *osev1.Node, mc *mcfgv1.MachineConfig) e
 }
 
 func findKubeletConfig(mc *mcfgv1.MachineConfig) (*ign3types.File, error) {
-	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mc.Spec.Config.Raw)
+	ignCfg, err := commonconfigs.ParseAndConvertConfig(mc.Spec.Config.Raw)
 	if err != nil {
 		return nil, fmt.Errorf("parsing Kubelet Ignition config failed with error: %w", err)
 	}
@@ -211,7 +211,7 @@ func getManagedKubeletConfigKey(pool *mcfgv1.MachineConfigPool, client mcfgclien
 
 	// If there is no kubelet config in the list, return the default MC name with no suffix
 	if kcListAll == nil || len(kcListAll.Items) == 0 {
-		return ctrlcommon.GetManagedKey(pool, client, managedKubeletConfigKeyPrefix, "kubelet", getManagedKubeletConfigKeyDeprecated(pool))
+		return commonconfigs.GetManagedKey(pool, client, managedKubeletConfigKeyPrefix, "kubelet", getManagedKubeletConfigKeyDeprecated(pool))
 	}
 
 	var kcList []mcfgv1.KubeletConfig
@@ -240,7 +240,7 @@ func getManagedKubeletConfigKey(pool *mcfgv1.MachineConfigPool, client mcfgclien
 			return fmt.Sprintf("%s-%s-generated-kubelet-%s", managedKubeletConfigKeyPrefix, pool.Name, val), nil
 		}
 		// if the suffix val is "", mc name should not suffixed the cfg to be updated is the first kubelet config has been created
-		return ctrlcommon.GetManagedKey(pool, client, managedKubeletConfigKeyPrefix, "kubelet", getManagedKubeletConfigKeyDeprecated(pool))
+		return commonconfigs.GetManagedKey(pool, client, managedKubeletConfigKeyPrefix, "kubelet", getManagedKubeletConfigKeyDeprecated(pool))
 	}
 
 	// If we are here, this means that
@@ -248,7 +248,7 @@ func getManagedKubeletConfigKey(pool *mcfgv1.MachineConfigPool, client mcfgclien
 	// 2. or this is an existing kubeletconfig did not get ctrlcommon.MCNameSuffixAnnotationKey set, so we have to set the MCNameSuffixAnnotationKey to the machineconfig suffix it was rendered to, assume for existing kubeletconfig, cfg.Finalizers with the largest suffix is the machine config the kcfg was rendered to
 	// if the kubelet config is the only one in the list, mc name should not suffixed since cfg is the first kubelet config to be created
 	if len(kcList) == 1 {
-		return ctrlcommon.GetManagedKey(pool, client, managedKubeletConfigKeyPrefix, "kubelet", getManagedKubeletConfigKeyDeprecated(pool))
+		return commonconfigs.GetManagedKey(pool, client, managedKubeletConfigKeyPrefix, "kubelet", getManagedKubeletConfigKeyDeprecated(pool))
 	}
 	// if cfg is not a newly created kubeletconfig and did not get ctrlcommon.MCNameSuffixAnnotationKey
 	// but has been rendered to a machineconfig, its len(cfg.Finalizers) > 0
@@ -273,7 +273,7 @@ func getManagedKubeletConfigKey(pool *mcfgv1.MachineConfigPool, client mcfgclien
 			// if the finalizer does not end with a number, make sure it is in the format 99-<poolname>-generated-kubelet
 			// otherwise, the kcfg contains invalid finalizer, do not generate managedKey from finalizers
 			if err != nil {
-				key, err := ctrlcommon.GetManagedKey(pool, nil, managedKubeletConfigKeyPrefix, "kubelet", getManagedKubeletConfigKeyDeprecated(pool))
+				key, err := commonconfigs.GetManagedKey(pool, nil, managedKubeletConfigKeyPrefix, "kubelet", getManagedKubeletConfigKeyDeprecated(pool))
 				if err != nil {
 					klog.Infof("skipping error: %v", fmt.Errorf("error generating managedKey for suffix %s: %v", key, err))
 					continue
@@ -336,7 +336,7 @@ func notLatestKubeletConfigInPool(kcList []mcfgv1.KubeletConfig, cfg *mcfgv1.Kub
 }
 
 func getManagedFeaturesKey(pool *mcfgv1.MachineConfigPool, client mcfgclientset.Interface) (string, error) {
-	return ctrlcommon.GetManagedKey(pool, client, managedFeaturesKeyPrefix, "kubelet", getManagedFeaturesKeyDeprecated(pool))
+	return commonconfigs.GetManagedKey(pool, client, managedFeaturesKeyPrefix, "kubelet", getManagedFeaturesKeyDeprecated(pool))
 }
 
 // Deprecated: use getManagedFeaturesKey
@@ -345,7 +345,7 @@ func getManagedFeaturesKeyDeprecated(pool *mcfgv1.MachineConfigPool) string {
 }
 
 func getManagedNodeConfigKey(pool *mcfgv1.MachineConfigPool, client mcfgclientset.Interface) (string, error) {
-	return ctrlcommon.GetManagedKey(pool, client, managedNodeConfigKeyPrefix, "kubelet", fmt.Sprintf("%s-%s-%s-kubelet", managedNodeConfigKeyPrefix, pool.Name, pool.ObjectMeta.UID))
+	return commonconfigs.GetManagedKey(pool, client, managedNodeConfigKeyPrefix, "kubelet", fmt.Sprintf("%s-%s-%s-kubelet", managedNodeConfigKeyPrefix, pool.Name, pool.ObjectMeta.UID))
 }
 
 // Deprecated: use getManagedKubeletConfigKey

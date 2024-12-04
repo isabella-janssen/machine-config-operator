@@ -18,7 +18,7 @@ import (
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	opv1 "github.com/openshift/api/operator/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/pkg/daemon/osrelease"
 	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/stretchr/testify/assert"
@@ -83,10 +83,10 @@ func TestRunCmdSync(t *testing.T) {
 }
 
 func TestMachineConfigDiff(t *testing.T) {
-	oldIgnCfg := ctrlcommon.NewIgnConfig()
+	oldIgnCfg := commonconfigs.NewIgnConfig()
 	oldConfig := fixtures.CreateMachineConfigFromIgnition(oldIgnCfg)
 	oldConfig.ObjectMeta = metav1.ObjectMeta{Name: "oldconfig"}
-	newIgnCfg := ctrlcommon.NewIgnConfig()
+	newIgnCfg := commonconfigs.NewIgnConfig()
 	newConfig := fixtures.CreateMachineConfigFromIgnition(newIgnCfg)
 	newConfig.ObjectMeta = metav1.ObjectMeta{Name: "newconfig"}
 	diff, err := newMachineConfigDiff(oldConfig, newConfig)
@@ -162,7 +162,7 @@ func TestMachineConfigDiff(t *testing.T) {
 
 	for _, testCase := range passwdTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			newIgnCfg := ctrlcommon.NewIgnConfig()
+			newIgnCfg := commonconfigs.NewIgnConfig()
 			newIgnCfg.Passwd.Users = testCase.passwdUsers
 			newMC := fixtures.CreateMachineConfigFromIgnition(newIgnCfg)
 
@@ -181,7 +181,7 @@ func newTestIgnitionFile(i uint) ign3types.File {
 }
 
 func newMachineConfigFromFiles(files []ign3types.File) *mcfgv1.MachineConfig {
-	newIgnCfg := ctrlcommon.NewIgnConfig()
+	newIgnCfg := commonconfigs.NewIgnConfig()
 	newIgnCfg.Storage.Files = files
 	newConfig := fixtures.CreateMachineConfigFromIgnition(newIgnCfg)
 	return newConfig
@@ -363,8 +363,8 @@ func TestUpdateSSHKeys(t *testing.T) {
 
 	// Set up machineconfigs that are identical except for SSH keys
 	tempUser := ign3types.PasswdUser{Name: "core", SSHAuthorizedKeys: []ign3types.SSHAuthorizedKey{"1234", "4567"}}
-	newIgnCfg := ctrlcommon.NewIgnConfig()
-	oldIgnConfig := ctrlcommon.NewIgnConfig()
+	newIgnCfg := commonconfigs.NewIgnConfig()
+	oldIgnConfig := commonconfigs.NewIgnConfig()
 	newIgnCfg.Passwd.Users = []ign3types.PasswdUser{tempUser}
 	err := d.updateSSHKeys(newIgnCfg.Passwd.Users, oldIgnConfig.Passwd.Users)
 	if err != nil {
@@ -373,7 +373,7 @@ func TestUpdateSSHKeys(t *testing.T) {
 	}
 
 	// if Users is empty, nothing should happen and no error should ever be generated
-	newIgnCfg2 := ctrlcommon.NewIgnConfig()
+	newIgnCfg2 := commonconfigs.NewIgnConfig()
 	newIgnCfg2.Passwd.Users = []ign3types.PasswdUser{}
 	err = d.updateSSHKeys(newIgnCfg2.Passwd.Users, oldIgnConfig.Passwd.Users)
 	if err != nil {
@@ -384,13 +384,13 @@ func TestUpdateSSHKeys(t *testing.T) {
 // This test should fail until Ignition validation enabled.
 // Ignition validation does not permit writing files to relative paths.
 func TestInvalidIgnConfig(t *testing.T) {
-	oldIgnConfig := ctrlcommon.NewIgnConfig()
+	oldIgnConfig := commonconfigs.NewIgnConfig()
 	oldMcfg := fixtures.CreateMachineConfigFromIgnition(oldIgnConfig)
 
 	// create file to write that contains an impermissable relative path
 	tempFileContents := ign3types.Resource{Source: coreosutils.StrToPtr("data:,hello%20world%0A")}
 	tempMode := 420
-	newIgnConfig := ctrlcommon.NewIgnConfig()
+	newIgnConfig := commonconfigs.NewIgnConfig()
 	newIgnFile := ign3types.File{
 		Node:          ign3types.Node{Path: "home/core/test"},
 		FileEmbedded1: ign3types.FileEmbedded1{Contents: tempFileContents, Mode: &tempMode},
@@ -444,7 +444,7 @@ func TestDropinCheck(t *testing.T) {
 
 	for idx, test := range tests {
 		t.Run(fmt.Sprintf("case#%d", idx), func(t *testing.T) {
-			ignCfg := ctrlcommon.NewIgnConfig()
+			ignCfg := commonconfigs.NewIgnConfig()
 			ignCfg.Systemd.Units = []ign3types.Unit{
 				{
 					Name: test.service,
@@ -477,20 +477,20 @@ func TestDropinCheck(t *testing.T) {
 // i.e. whether we need to reboot and what actions need to be taken if no reboot is needed
 func TestCalculatePostConfigChangeAction(t *testing.T) {
 	files := map[string]ign3types.File{
-		"pullsecret1":     ctrlcommon.NewIgnFile("/var/lib/kubelet/config.json", "kubelet conf 1\n"),
-		"pullsecret2":     ctrlcommon.NewIgnFile("/var/lib/kubelet/config.json", "kubelet conf 2\n"),
-		"registries1":     ctrlcommon.NewIgnFile("/etc/containers/registries.conf", "registries content 1\n"),
-		"registries2":     ctrlcommon.NewIgnFile("/etc/containers/registries.conf", "registries content 2\n"),
-		"randomfile1":     ctrlcommon.NewIgnFile("/etc/random-reboot-file", "test\n"),
-		"randomfile2":     ctrlcommon.NewIgnFile("/etc/random-reboot-file", "test 2\n"),
-		"kubeletCA1":      ctrlcommon.NewIgnFile("/etc/kubernetes/kubelet-ca.crt", "kubeletCA1\n"),
-		"kubeletCA2":      ctrlcommon.NewIgnFile("/etc/kubernetes/kubelet-ca.crt", "kubeletCA2\n"),
-		"policy1":         ctrlcommon.NewIgnFile("/etc/containers/policy.json", "policy1"),
-		"policy2":         ctrlcommon.NewIgnFile("/etc/containers/policy.json", "policy2"),
-		"containers-gpg1": ctrlcommon.NewIgnFile("/etc/machine-config-daemon/no-reboot/containers-gpg.pub", "containers-gpg1"),
-		"containers-gpg2": ctrlcommon.NewIgnFile("/etc/machine-config-daemon/no-reboot/containers-gpg.pub", "containers-gpg2"),
-		"restart-crio1":   ctrlcommon.NewIgnFile("/etc/pki/ca-trust/source/anchors/openshift-config-user-ca-bundle.crt", "restart-crio1"),
-		"restart-crio2":   ctrlcommon.NewIgnFile("/etc/pki/ca-trust/source/anchors/openshift-config-user-ca-bundle.crt", "restart-crio2"),
+		"pullsecret1":     commonconfigs.NewIgnFile("/var/lib/kubelet/config.json", "kubelet conf 1\n"),
+		"pullsecret2":     commonconfigs.NewIgnFile("/var/lib/kubelet/config.json", "kubelet conf 2\n"),
+		"registries1":     commonconfigs.NewIgnFile("/etc/containers/registries.conf", "registries content 1\n"),
+		"registries2":     commonconfigs.NewIgnFile("/etc/containers/registries.conf", "registries content 2\n"),
+		"randomfile1":     commonconfigs.NewIgnFile("/etc/random-reboot-file", "test\n"),
+		"randomfile2":     commonconfigs.NewIgnFile("/etc/random-reboot-file", "test 2\n"),
+		"kubeletCA1":      commonconfigs.NewIgnFile("/etc/kubernetes/kubelet-ca.crt", "kubeletCA1\n"),
+		"kubeletCA2":      commonconfigs.NewIgnFile("/etc/kubernetes/kubelet-ca.crt", "kubeletCA2\n"),
+		"policy1":         commonconfigs.NewIgnFile("/etc/containers/policy.json", "policy1"),
+		"policy2":         commonconfigs.NewIgnFile("/etc/containers/policy.json", "policy2"),
+		"containers-gpg1": commonconfigs.NewIgnFile("/etc/machine-config-daemon/no-reboot/containers-gpg.pub", "containers-gpg1"),
+		"containers-gpg2": commonconfigs.NewIgnFile("/etc/machine-config-daemon/no-reboot/containers-gpg.pub", "containers-gpg2"),
+		"restart-crio1":   commonconfigs.NewIgnFile("/etc/pki/ca-trust/source/anchors/openshift-config-user-ca-bundle.crt", "restart-crio1"),
+		"restart-crio2":   commonconfigs.NewIgnFile("/etc/pki/ca-trust/source/anchors/openshift-config-user-ca-bundle.crt", "restart-crio2"),
 	}
 
 	tests := []struct {
@@ -585,11 +585,11 @@ func TestCalculatePostConfigChangeAction(t *testing.T) {
 
 	for idx, test := range tests {
 		t.Run(fmt.Sprintf("case#%d", idx), func(t *testing.T) {
-			oldIgnConfig, err := ctrlcommon.ParseAndConvertConfig(test.oldConfig.Spec.Config.Raw)
+			oldIgnConfig, err := commonconfigs.ParseAndConvertConfig(test.oldConfig.Spec.Config.Raw)
 			if err != nil {
 				t.Errorf("parsing old Ignition config failed: %v", err)
 			}
-			newIgnConfig, err := ctrlcommon.ParseAndConvertConfig(test.newConfig.Spec.Config.Raw)
+			newIgnConfig, err := commonconfigs.ParseAndConvertConfig(test.newConfig.Spec.Config.Raw)
 			if err != nil {
 				t.Errorf("parsing new Ignition config failed: %v", err)
 			}
@@ -597,7 +597,7 @@ func TestCalculatePostConfigChangeAction(t *testing.T) {
 			if err != nil {
 				t.Errorf("error creating machineConfigDiff: %v", err)
 			}
-			diffFileSet := ctrlcommon.CalculateConfigFileDiffs(&oldIgnConfig, &newIgnConfig)
+			diffFileSet := commonconfigs.CalculateConfigFileDiffs(&oldIgnConfig, &newIgnConfig)
 			calculatedAction, err := calculatePostConfigChangeAction(mcDiff, diffFileSet)
 
 			if !reflect.DeepEqual(test.expectedAction, calculatedAction) {
@@ -818,7 +818,7 @@ func TestFindClosestFilePolicyPathMatch(t *testing.T) {
 	for idx, test := range tests {
 		t.Run(fmt.Sprintf("case#%d", idx), func(t *testing.T) {
 
-			pathFound, actionsFound := ctrlcommon.FindClosestFilePolicyPathMatch(test.diffPath, test.filePolicies)
+			pathFound, actionsFound := commonconfigs.FindClosestFilePolicyPathMatch(test.diffPath, test.filePolicies)
 
 			if !reflect.DeepEqual(test.expectedPathFound, pathFound) {
 				t.Errorf("Failed finding node disruption file policy action: expected: %v but result is: %v.", test.expectedPathFound, pathFound)

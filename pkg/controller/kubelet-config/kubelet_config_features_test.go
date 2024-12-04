@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/test/fixtures"
 )
@@ -201,9 +201,9 @@ func TestBootstrapFeaturesCustomNoUpgrade(t *testing.T) {
 			}
 
 			for _, mc := range mcs {
-				ignCfg, err := ctrlcommon.ParseAndConvertConfig(mc.Spec.Config.Raw)
+				ignCfg, err := commonconfigs.ParseAndConvertConfig(mc.Spec.Config.Raw)
 				regfile := ignCfg.Storage.Files[0]
-				conf, err := ctrlcommon.DecodeIgnitionFileContents(regfile.Contents.Source, regfile.Contents.Compression)
+				conf, err := commonconfigs.DecodeIgnitionFileContents(regfile.Contents.Source, regfile.Contents.Compression)
 				require.NoError(t, err)
 
 				originalKubeConfig, err := DecodeKubeletConfig(conf)

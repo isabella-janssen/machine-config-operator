@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
 	corev1 "k8s.io/api/core/v1"
@@ -115,8 +116,8 @@ func (ctrl *Controller) syncNodeConfigHandler(key string) error {
 			return err
 		}
 		if isNotFound {
-			ignConfig := ctrlcommon.NewIgnConfig()
-			mc, err = ctrlcommon.MachineConfigFromIgnConfig(role, key, ignConfig)
+			ignConfig := commonconfigs.NewIgnConfig()
+			mc, err = commonconfigs.MachineConfigFromIgnConfig(role, key, ignConfig)
 			if err != nil {
 				return err
 			}
@@ -145,7 +146,7 @@ func (ctrl *Controller) syncNodeConfigHandler(key string) error {
 		if err != nil {
 			return err
 		}
-		tempIgnConfig := ctrlcommon.NewIgnConfig()
+		tempIgnConfig := commonconfigs.NewIgnConfig()
 		tempIgnConfig.Storage.Files = append(tempIgnConfig.Storage.Files, *cfgIgn)
 		rawCfgIgn, err := json.Marshal(tempIgnConfig)
 		if err != nil {
@@ -311,8 +312,8 @@ func RunNodeConfigBootstrap(templateDir string, featureGateAccess featuregates.F
 		if err != nil {
 			return nil, err
 		}
-		ignConfig := ctrlcommon.NewIgnConfig()
-		mc, err := ctrlcommon.MachineConfigFromIgnConfig(role, key, ignConfig)
+		ignConfig := commonconfigs.NewIgnConfig()
+		mc, err := commonconfigs.MachineConfigFromIgnConfig(role, key, ignConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +338,7 @@ func RunNodeConfigBootstrap(templateDir string, featureGateAccess featuregates.F
 		if err != nil {
 			return nil, err
 		}
-		tempIgnConfig := ctrlcommon.NewIgnConfig()
+		tempIgnConfig := commonconfigs.NewIgnConfig()
 		tempIgnConfig.Storage.Files = append(tempIgnConfig.Storage.Files, *cfgIgn)
 		rawCfgIgn, err := json.Marshal(tempIgnConfig)
 		if err != nil {

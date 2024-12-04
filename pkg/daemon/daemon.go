@@ -48,7 +48,7 @@ import (
 	mcfglistersv1 "github.com/openshift/client-go/machineconfiguration/listers/machineconfiguration/v1"
 
 	mcoResourceRead "github.com/openshift/machine-config-operator/lib/resourceread"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/upgrademonitor"
@@ -1049,12 +1049,12 @@ func (dn *Daemon) syncNodeHypershift(key string) error {
 	}
 	targetHash := string(targetHashBytes)
 
-	ignConfig, err := ctrlcommon.ParseAndConvertGzippedConfig(ignServedConfigBytes)
+	ignConfig, err := commonconfigs.ParseAndConvertGzippedConfig(ignServedConfigBytes)
 	if err != nil {
 		return fmt.Errorf("failed to parse Ignition from configmap data.config: %w", err)
 	}
 
-	desiredConfigBytes, err := ctrlcommon.GetIgnitionFileDataByPath(&ignConfig, mcsServedConfigPath)
+	desiredConfigBytes, err := commonconfigs.GetIgnitionFileDataByPath(&ignConfig, mcsServedConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to find desiredConfig from configmap data: %w", err)
 	}
@@ -1105,15 +1105,15 @@ func (dn *Daemon) syncNodeHypershift(key string) error {
 	klog.Infof("Update is reconcilable. Diff: %+v", mcDiff)
 
 	// This should be eventually de-duplicated with the update() function.
-	oldIgnConfig, err := ctrlcommon.ParseAndConvertConfig(currentConfig.Spec.Config.Raw)
+	oldIgnConfig, err := commonconfigs.ParseAndConvertConfig(currentConfig.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("parsing old Ignition config failed: %w", err)
 	}
-	newIgnConfig, err := ctrlcommon.ParseAndConvertConfig(desiredConfig.Spec.Config.Raw)
+	newIgnConfig, err := commonconfigs.ParseAndConvertConfig(desiredConfig.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("parsing new Ignition config failed: %w", err)
 	}
-	diffFileSet := ctrlcommon.CalculateConfigFileDiffs(&oldIgnConfig, &newIgnConfig)
+	diffFileSet := commonconfigs.CalculateConfigFileDiffs(&oldIgnConfig, &newIgnConfig)
 	actions, err := calculatePostConfigChangeAction(mcDiff, diffFileSet)
 	if err != nil {
 		return err
@@ -1157,16 +1157,16 @@ func (dn *Daemon) syncNodeHypershift(key string) error {
 
 	// Finally, once we are successful, we perform the necessary post config change action
 	// TODO should be de-duplicated with update()
-	if ctrlcommon.InSlice(postConfigChangeActionReboot, actions) {
+	if commonconfigs.InSlice(postConfigChangeActionReboot, actions) {
 		klog.Info("Rebooting node")
 		return dn.reboot(fmt.Sprintf("Node will reboot into config %s", desiredConfig.Name))
 	}
 
-	if ctrlcommon.InSlice(postConfigChangeActionNone, actions) {
+	if commonconfigs.InSlice(postConfigChangeActionNone, actions) {
 		klog.Infof("Node has Desired Config %s, skipping reboot", desiredConfig.Name)
 	}
 
-	if ctrlcommon.InSlice(postConfigChangeActionReloadCrio, actions) {
+	if commonconfigs.InSlice(postConfigChangeActionReloadCrio, actions) {
 		serviceName := constants.CRIOServiceName
 		if err := reloadService(serviceName); err != nil {
 			return fmt.Errorf("could not apply update: reloading %s configuration failed. Error: %w", serviceName, err)
@@ -2024,7 +2024,7 @@ func (dn *Daemon) isSSHKeyLocationUpdateRequired() (bool, error) {
 func (dn *Daemon) updateSSHKeyLocation(cfg *mcfgv1.MachineConfig) error {
 	klog.Infof("SSH key location update required. Moving SSH keys from %q to %q.", constants.RHCOS8SSHKeyPath, constants.RHCOS9SSHKeyPath)
 
-	ignConfig, err := ctrlcommon.ParseAndConvertConfig(cfg.Spec.Config.Raw)
+	ignConfig, err := commonconfigs.ParseAndConvertConfig(cfg.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("ignition failure when updating SSH key location: %w", err)
 	}
@@ -2696,7 +2696,7 @@ func (dn *Daemon) senseAndLoadOnceFrom(onceFrom string) (interface{}, onceFromOr
 	}
 
 	// Try each supported parser
-	ignConfig, err := ctrlcommon.ParseAndConvertConfig(content)
+	ignConfig, err := commonconfigs.ParseAndConvertConfig(content)
 	if err == nil && ignConfig.Ignition.Version != "" {
 		klog.V(2).Info("onceFrom file is of type Ignition")
 		return ignConfig, contentFrom, nil
@@ -2863,7 +2863,7 @@ func (dn *Daemon) getUnsupportedPackages() {
 	}
 
 	supportedPackages := make(map[string]bool)
-	for _, packages := range ctrlcommon.SupportedExtensions() {
+	for _, packages := range commonconfigs.SupportedExtensions() {
 		for _, pkg := range packages {
 			supportedPackages[pkg] = true
 		}

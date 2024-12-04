@@ -12,7 +12,7 @@ import (
 	coreosutils "github.com/coreos/ignition/config/util"
 	ign2types "github.com/coreos/ignition/config/v2_2/types"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vincent-petithory/dataurl"
@@ -332,10 +332,10 @@ func newNode(annotations map[string]string) *corev1.Node {
 }
 
 func TestSetRunningKargs(t *testing.T) {
-	oldIgnCfg := ctrlcommon.NewIgnConfig()
+	oldIgnCfg := commonconfigs.NewIgnConfig()
 	oldConfig := fixtures.CreateMachineConfigFromIgnition(oldIgnCfg)
 	oldConfig.ObjectMeta = metav1.ObjectMeta{Name: "oldconfig"}
-	newIgnCfg := ctrlcommon.NewIgnConfig()
+	newIgnCfg := commonconfigs.NewIgnConfig()
 	newConfig := fixtures.CreateMachineConfigFromIgnition(newIgnCfg)
 	newConfig.ObjectMeta = metav1.ObjectMeta{Name: "newconfig"}
 	diff, err := newMachineConfigDiff(oldConfig, newConfig)

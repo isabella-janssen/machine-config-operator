@@ -9,7 +9,7 @@ import (
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/openshift/machine-config-operator/test/helpers"
@@ -30,7 +30,7 @@ func TestMCCReconcileAfterBadMC(t *testing.T) {
 
 	// create a MC that contains a valid ignition config but is not reconcilable
 	mcadd := createMCToAddFile("add-a-file", "/etc/mytestconfs", "test")
-	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mcadd.Spec.Config.Raw)
+	ignCfg, err := commonconfigs.ParseAndConvertConfig(mcadd.Spec.Config.Raw)
 	require.Nil(t, err, "failed to parse ignition config")
 	ignCfg.Storage.Disks = []ign3types.Disk{
 		{

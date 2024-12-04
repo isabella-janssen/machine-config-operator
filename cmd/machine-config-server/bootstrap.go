@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/pkg/server"
 	"github.com/openshift/machine-config-operator/pkg/version"
 	"github.com/spf13/cobra"
@@ -46,7 +46,7 @@ func runBootstrapCmd(_ *cobra.Command, _ []string) {
 	}
 
 	// Read-in bootstrap apiserver file /etc/mcs/bootstrap/api-server/apiserver.yaml.
-	apiServer, err := ctrlcommon.GetBootstrapAPIServer()
+	apiServer, err := commonconfigs.GetBootstrapAPIServer()
 	if err != nil {
 		// If an error happened, log it. Exiting here would end the installation which may not be desirable.
 		// In such cases of error, the MCS will default to using the intermediate tls profile as apiServer==nil
@@ -55,9 +55,9 @@ func runBootstrapCmd(_ *cobra.Command, _ []string) {
 
 	// Determine tls settings from APIServer object.
 	// If apiServer==nil, this call will default to the intermediate profile
-	tlsminversion, tlsciphersuites := ctrlcommon.GetSecurityProfileCiphersFromAPIServer(apiServer)
+	tlsminversion, tlsciphersuites := commonconfigs.GetSecurityProfileCiphersFromAPIServer(apiServer)
 	klog.Infof("Launching bootstrap server with tls min version: %v & cipher suites %v", tlsminversion, tlsciphersuites)
-	tlsConfig := ctrlcommon.GetGoTLSConfig(tlsminversion, tlsciphersuites)
+	tlsConfig := commonconfigs.GetGoTLSConfig(tlsminversion, tlsciphersuites)
 
 	apiHandler := server.NewServerAPIHandler(bs)
 	secureServer := server.NewAPIServer(apiHandler, rootOpts.sport, false, rootOpts.cert, rootOpts.key, tlsConfig)

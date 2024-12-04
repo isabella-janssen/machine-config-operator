@@ -29,6 +29,7 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/controller/build/constants"
 	"github.com/openshift/machine-config-operator/pkg/controller/build/utils"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1033,7 +1034,7 @@ func prepareForOnClusterLayeringTest(t *testing.T, cs *framework.ClientSet, test
 			},
 			Spec: mcfgv1.MachineConfigSpec{
 				Config: runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				},
 				Extensions: []string{"usbguard"},
 			},
@@ -1111,7 +1112,7 @@ func TestSSHKeyAndPasswordForOSBuilder(t *testing.T) {
 	})
 
 	// Set up Ignition config with the desired SSH key and password
-	testIgnConfig := ctrlcommon.NewIgnConfig()
+	testIgnConfig := commonconfigs.NewIgnConfig()
 	sshKeyContent := "testsshkey11"
 	passwordHash := "testpassword11"
 

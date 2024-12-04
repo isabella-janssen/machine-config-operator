@@ -14,6 +14,7 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/controller/build/constants"
 	"github.com/openshift/machine-config-operator/pkg/controller/build/utils"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -81,7 +82,7 @@ func (b BuildRequestOpts) getExtensionsPackages() ([]string, error) {
 		return nil, nil
 	}
 
-	return ctrlcommon.GetPackagesForSupportedExtensions(b.MachineConfig.Spec.Extensions)
+	return commonconfigs.GetPackagesForSupportedExtensions(b.MachineConfig.Spec.Extensions)
 }
 
 // Gets all of the image build request opts from the Kube API server.

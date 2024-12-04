@@ -41,7 +41,7 @@ import (
 	fakeoperatorclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	operatorinformer "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
@@ -512,7 +512,7 @@ func verifyRegistriesConfigAndPolicyJSONContents(t *testing.T, mc *mcfgv1.Machin
 	require.NoError(t, err)
 	assert.Equal(t, mcName, mc.ObjectMeta.Name)
 
-	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mc.Spec.Config.Raw)
+	ignCfg, err := commonconfigs.ParseAndConvertConfig(mc.Spec.Config.Raw)
 	require.NoError(t, err)
 
 	switch {
@@ -539,7 +539,7 @@ func verifyRegistriesConfigAndPolicyJSONContents(t *testing.T, mc *mcfgv1.Machin
 		regfile = ignCfg.Storage.Files[1]
 	}
 	assert.Equal(t, registriesConfigPath, regfile.Node.Path)
-	registriesConf, err := ctrlcommon.DecodeIgnitionFileContents(regfile.Contents.Source, regfile.Contents.Compression)
+	registriesConf, err := commonconfigs.DecodeIgnitionFileContents(regfile.Contents.Source, regfile.Contents.Compression)
 	require.NoError(t, err)
 	assert.Equal(t, string(expectedRegistriesConf), string(registriesConf))
 
@@ -558,7 +558,7 @@ func verifyRegistriesConfigAndPolicyJSONContents(t *testing.T, mc *mcfgv1.Machin
 			policyfile = ignCfg.Storage.Files[0]
 		}
 		assert.Equal(t, policyConfigPath, policyfile.Node.Path)
-		policyJSON, err := ctrlcommon.DecodeIgnitionFileContents(policyfile.Contents.Source, policyfile.Contents.Compression)
+		policyJSON, err := commonconfigs.DecodeIgnitionFileContents(policyfile.Contents.Source, policyfile.Contents.Compression)
 		require.NoError(t, err)
 		assert.Equal(t, string(expectedPolicyJSON), string(policyJSON))
 	}
@@ -570,7 +570,7 @@ func verifyRegistriesConfigAndPolicyJSONContents(t *testing.T, mc *mcfgv1.Machin
 		for _, dropinfile := range ignCfg.Storage.Files {
 			if dropinfile.Node.Path == searchRegDropInFilePath {
 				foundFile = true
-				searchRegsConf, err := ctrlcommon.DecodeIgnitionFileContents(dropinfile.Contents.Source, dropinfile.Contents.Compression)
+				searchRegsConf, err := commonconfigs.DecodeIgnitionFileContents(dropinfile.Contents.Source, dropinfile.Contents.Compression)
 				require.NoError(t, err)
 				assert.Equal(t, string(expectedSearchRegsConf[0].data), string(searchRegsConf))
 			}
@@ -589,7 +589,7 @@ func verifyRegistriesConfigAndPolicyJSONContents(t *testing.T, mc *mcfgv1.Machin
 			if f.Node.Path == sigstoreRegistriesConfigFilePath {
 				foundFile = true
 				require.Equal(t, sigstoreRegistriesConfigFilePath, f.Node.Path)
-				registriesYaml, err := ctrlcommon.DecodeIgnitionFileContents(f.Contents.Source, f.Contents.Compression)
+				registriesYaml, err := commonconfigs.DecodeIgnitionFileContents(f.Contents.Source, f.Contents.Compression)
 				require.NoError(t, err)
 				assert.Equal(t, string(expectedRegistriesConfd), string(registriesYaml))
 			}
@@ -612,7 +612,7 @@ func verifyRegistriesConfigAndPolicyJSONContents(t *testing.T, mc *mcfgv1.Machin
 		for _, f := range ignCfg.Storage.Files {
 			if filepath.Dir(f.Node.Path) == constants.CrioPoliciesDir {
 				foundFile = true
-				policyJSON, err := ctrlcommon.DecodeIgnitionFileContents(f.Contents.Source, f.Contents.Compression)
+				policyJSON, err := commonconfigs.DecodeIgnitionFileContents(f.Contents.Source, f.Contents.Compression)
 				require.NoError(t, err)
 				namespaceFromPath := strings.TrimSuffix(filepath.Base(f.Node.Path), ".json")
 				gotNamespacedPolicyJSONs[namespaceFromPath] = policyJSON

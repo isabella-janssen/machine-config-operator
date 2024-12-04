@@ -50,6 +50,7 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	"github.com/openshift/machine-config-operator/pkg/controller/build"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	templatectrl "github.com/openshift/machine-config-operator/pkg/controller/template"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
@@ -611,7 +612,7 @@ func (optr *Operator) syncRenderConfig(_ *renderConfig, _ *configv1.ClusterOpera
 		return err
 	}
 
-	pointerConfig, err := ctrlcommon.PointerConfig(ignitionHost, rootCA)
+	pointerConfig, err := commonconfigs.PointerConfig(ignitionHost, rootCA)
 	if err != nil {
 		return err
 	}
@@ -2024,7 +2025,7 @@ func setGVK(obj runtime.Object, scheme *runtime.Scheme) error {
 }
 
 func getRenderConfig(tnamespace, kubeAPIServerServingCA string, ccSpec *mcfgv1.ControllerConfigSpec, imgs *ctrlcommon.RenderConfigImages, apiServerURL string, pointerConfigData []byte, moscs []*mcfgv1alpha1.MachineOSConfig, apiServer *configv1.APIServer) *renderConfig {
-	tlsMinVersion, tlsCipherSuites := ctrlcommon.GetSecurityProfileCiphersFromAPIServer(apiServer)
+	tlsMinVersion, tlsCipherSuites := commonconfigs.GetSecurityProfileCiphersFromAPIServer(apiServer)
 	return &renderConfig{
 		TargetNamespace:        tnamespace,
 		Version:                version.Raw,

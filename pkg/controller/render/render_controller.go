@@ -16,6 +16,7 @@ import (
 	mcoResourceApply "github.com/openshift/machine-config-operator/lib/resourceapply"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
@@ -88,7 +89,7 @@ func New(
 
 	ctrl := &Controller{
 		client:        mcfgClient,
-		eventRecorder: ctrlcommon.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-rendercontroller"})),
+		eventRecorder: commonconfigs.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-rendercontroller"})),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "machineconfigcontroller-rendercontroller"}),
@@ -523,7 +524,7 @@ func (ctrl *Controller) syncGeneratedMachineConfig(pool *mcfgv1.MachineConfigPoo
 	}
 
 	// Emit event and collect metric when OSImageURL was overridden.
-	if generated.Spec.OSImageURL != ctrlcommon.GetDefaultBaseImageContainer(&cc.Spec) {
+	if generated.Spec.OSImageURL != commonconfigs.GetDefaultBaseImageContainer(&cc.Spec) {
 		ctrlcommon.OSImageURLOverride.WithLabelValues(pool.Name).Set(1)
 		ctrl.eventRecorder.Eventf(generated, corev1.EventTypeNormal, "OSImageURLOverridden", "OSImageURL was overridden via machineconfig in %s (was: %s is: %s)", generated.Name, cc.Spec.OSImageURL, generated.Spec.OSImageURL)
 	} else {
@@ -597,12 +598,12 @@ func generateRenderedMachineConfig(pool *mcfgv1.MachineConfigPool, configs []*mc
 
 	// Before merging all MCs for a specific pool, let's make sure MachineConfigs are valid
 	for _, config := range configs {
-		if err := ctrlcommon.ValidateMachineConfig(config.Spec); err != nil {
+		if err := commonconfigs.ValidateMachineConfig(config.Spec); err != nil {
 			return nil, err
 		}
 	}
 
-	merged, err := ctrlcommon.MergeMachineConfigs(configs, cconfig)
+	merged, err := commonconfigs.MergeMachineConfigs(configs, cconfig)
 
 	if err != nil {
 		return nil, err
@@ -624,7 +625,7 @@ func generateRenderedMachineConfig(pool *mcfgv1.MachineConfigPool, configs []*mc
 	// The operator needs to know the user overrode this, so it knows if it needs to skip the
 	// OSImageURL check during upgrade -- if the user took over managing OS upgrades this way,
 	// the operator shouldn't stop the rest of the upgrade from progressing/completing.
-	if merged.Spec.OSImageURL != ctrlcommon.GetDefaultBaseImageContainer(&cconfig.Spec) {
+	if merged.Spec.OSImageURL != commonconfigs.GetDefaultBaseImageContainer(&cconfig.Spec) {
 		merged.Annotations[commonconsts.OSImageURLOverriddenKey] = "true"
 	}
 
@@ -649,8 +650,8 @@ func generateAndValidateRenderedMachineConfig(currentMC *mcfgv1.MachineConfig, p
 
 	klog.V(4).Infof("Considering generated MachineConfig %q", generated.Name)
 
-	if err := ctrlcommon.IsRenderedConfigReconcilable(currentMC, generated); err != nil {
-		return nil, goerrs.Join(err, ctrlcommon.IsComponentConfigsReconcilable(currentMC, configs))
+	if err := commonconfigs.IsRenderedConfigReconcilable(currentMC, generated); err != nil {
+		return nil, goerrs.Join(err, commonconfigs.IsComponentConfigsReconcilable(currentMC, configs))
 	}
 
 	klog.V(4).Infof("Rendered MachineConfig %q is reconcilable against %q", generated.Name, currentMC.Name)

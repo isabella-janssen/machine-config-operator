@@ -18,7 +18,7 @@ import (
 
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/machine-config-operator/pkg/constants"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
 )
@@ -64,7 +64,7 @@ const (
 //	              /master/00-master/_base/units/kubelet.tmpl
 //	                                  /files/hostname.tmpl
 func generateTemplateMachineConfigs(config *RenderConfig, templateDir string) ([]*mcfgv1.MachineConfig, error) {
-	infos, err := ctrlcommon.ReadDir(templateDir)
+	infos, err := commonconfigs.ReadDir(templateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func GenerateMachineConfigsForRole(config *RenderConfig, role, templateDir strin
 	}
 
 	path := filepath.Join(templateDir, rolePath)
-	infos, err := ctrlcommon.ReadDir(path)
+	infos, err := commonconfigs.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
@@ -307,11 +307,11 @@ func generateMachineConfigForName(config *RenderConfig, role, name, templateDir,
 		return vs
 	}
 
-	ignCfg, err := ctrlcommon.TranspileCoreOSConfigToIgn(keySortVals(files), keySortVals(units))
+	ignCfg, err := commonconfigs.TranspileCoreOSConfigToIgn(keySortVals(files), keySortVals(units))
 	if err != nil {
 		return nil, fmt.Errorf("error transpiling CoreOS config to Ignition config: %w", err)
 	}
-	mcfg, err := ctrlcommon.MachineConfigFromIgnConfig(role, name, ignCfg)
+	mcfg, err := commonconfigs.MachineConfigFromIgnConfig(role, name, ignCfg)
 	if err != nil {
 		return nil, fmt.Errorf("error creating MachineConfig from Ignition config: %w", err)
 	}
@@ -322,7 +322,7 @@ func generateMachineConfigForName(config *RenderConfig, role, name, templateDir,
 	// will keep that last value forever once you upgrade...which is a problen now that we allow OSImageURL overrides
 	// because it will look like an override when it shouldn't be. So don't take this out until you've solved that.
 	// And inject the osimageurl here
-	mcfg.Spec.OSImageURL = ctrlcommon.GetDefaultBaseImageContainer(config.ControllerConfigSpec)
+	mcfg.Spec.OSImageURL = commonconfigs.GetDefaultBaseImageContainer(config.ControllerConfigSpec)
 
 	return mcfg, nil
 }
@@ -330,7 +330,7 @@ func generateMachineConfigForName(config *RenderConfig, role, name, templateDir,
 // renderTemplate renders a template file with values from a RenderConfig
 // returns the rendered file data
 func renderTemplate(config RenderConfig, path string, b []byte) ([]byte, error) {
-	funcs := ctrlcommon.GetTemplateFuncMap()
+	funcs := commonconfigs.GetTemplateFuncMap()
 	funcs["skip"] = skipMissing
 	funcs["cloudProvider"] = cloudProvider
 	funcs["credentialProviderConfigFlag"] = credentialProviderConfigFlag

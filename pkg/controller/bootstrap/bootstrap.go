@@ -23,7 +23,7 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	apioperatorsv1alpha1 "github.com/openshift/api/operator/v1alpha1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	containerruntimeconfig "github.com/openshift/machine-config-operator/pkg/controller/container-runtime-config"
 	kubeletconfig "github.com/openshift/machine-config-operator/pkg/controller/kubelet-config"
@@ -55,7 +55,7 @@ func New(templatesDir, manifestDir, pullSecretFile string) *Bootstrap {
 // It writes all the assets to destDir
 // nolint:gocyclo
 func (b *Bootstrap) Run(destDir string) error {
-	infos, err := ctrlcommon.ReadDir(b.manifestDir)
+	infos, err := commonconfigs.ReadDir(b.manifestDir)
 	if err != nil {
 		return err
 	}

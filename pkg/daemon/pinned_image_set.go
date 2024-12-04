@@ -46,7 +46,7 @@ import (
 	mcfglistersv1 "github.com/openshift/client-go/machineconfiguration/listers/machineconfiguration/v1"
 	mcfglistersv1alpha1 "github.com/openshift/client-go/machineconfiguration/listers/machineconfiguration/v1alpha1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/cri"
 	"github.com/openshift/machine-config-operator/pkg/helpers"
@@ -520,7 +520,7 @@ func ensureCrioPinnedImagesConfigFile(path string, imageNames []string) error {
 
 	// if the existing config is the same as the new config, do nothing
 	if !bytes.Equal(bytes.TrimSpace(existingCfgBytes), bytes.TrimSpace(newCfgBytes)) {
-		ignFile := ctrlcommon.NewIgnFileBytes(path, newCfgBytes)
+		ignFile := commonconfigs.NewIgnFileBytes(path, newCfgBytes)
 		if err := writeFiles([]ign3types.File{ignFile}, true); err != nil {
 			return fmt.Errorf("failed to write CRIO config file: %w", err)
 		}

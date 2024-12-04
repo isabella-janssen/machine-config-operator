@@ -35,7 +35,7 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	mcfgclientset "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 )
@@ -147,14 +147,14 @@ type updateConfigFunc func(data []byte, internal *mcfgv1.ContainerRuntimeConfigu
 // new data in the form of a byte array. The function returns the ignition config with the
 // updated data.
 func createNewIgnition(configs []generatedConfigFile) ign3types.Config {
-	tempIgnConfig := ctrlcommon.NewIgnConfig()
+	tempIgnConfig := commonconfigs.NewIgnConfig()
 	// Create ignitions
 	for _, ignConf := range configs {
 		// If the file is not included, the data will be nil so skip over
 		if ignConf.data == nil {
 			continue
 		}
-		configTempFile := ctrlcommon.NewIgnFileBytesOverwriting(ignConf.filePath, ignConf.data)
+		configTempFile := commonconfigs.NewIgnFileBytesOverwriting(ignConf.filePath, ignConf.data)
 		tempIgnConfig.Storage.Files = append(tempIgnConfig.Storage.Files, configTempFile)
 	}
 
@@ -162,7 +162,7 @@ func createNewIgnition(configs []generatedConfigFile) ign3types.Config {
 }
 
 func findStorageConfig(mc *mcfgv1.MachineConfig) (*ign3types.File, error) {
-	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mc.Spec.Config.Raw)
+	ignCfg, err := commonconfigs.ParseAndConvertConfig(mc.Spec.Config.Raw)
 	if err != nil {
 		return nil, fmt.Errorf("parsing Storage Ignition config failed with error: %w", err)
 	}
@@ -176,7 +176,7 @@ func findStorageConfig(mc *mcfgv1.MachineConfig) (*ign3types.File, error) {
 }
 
 func findRegistriesConfig(mc *mcfgv1.MachineConfig) (*ign3types.File, error) {
-	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mc.Spec.Config.Raw)
+	ignCfg, err := commonconfigs.ParseAndConvertConfig(mc.Spec.Config.Raw)
 	if err != nil {
 		return nil, fmt.Errorf("parsing Registries Ignition config failed with error: %w", err)
 	}
@@ -189,7 +189,7 @@ func findRegistriesConfig(mc *mcfgv1.MachineConfig) (*ign3types.File, error) {
 }
 
 func findPolicyJSON(mc *mcfgv1.MachineConfig) (*ign3types.File, error) {
-	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mc.Spec.Config.Raw)
+	ignCfg, err := commonconfigs.ParseAndConvertConfig(mc.Spec.Config.Raw)
 	if err != nil {
 		return nil, fmt.Errorf("parsing Policy JSON Ignition config failed with error: %w", err)
 	}
@@ -215,7 +215,7 @@ func getManagedKeyCtrCfg(pool *mcfgv1.MachineConfigPool, client mcfgclientset.In
 	}
 	// If there is no ctrcfg in the list, return the default MC name with no suffix
 	if ctrcfgListAll == nil || len(ctrcfgListAll.Items) == 0 {
-		return ctrlcommon.GetManagedKey(pool, client, "99", "containerruntime", getManagedKeyCtrCfgDeprecated(pool))
+		return commonconfigs.GetManagedKey(pool, client, "99", "containerruntime", getManagedKeyCtrCfgDeprecated(pool))
 	}
 
 	var ctrcfgList []mcfgv1.ContainerRuntimeConfig
@@ -244,7 +244,7 @@ func getManagedKeyCtrCfg(pool *mcfgv1.MachineConfigPool, client mcfgclientset.In
 			return fmt.Sprintf("99-%s-generated-containerruntime-%s", pool.Name, val), nil
 		}
 		// if the suffix val is "", mc name should not suffixed the cfg to be updated is the first containerruntime config has been created
-		return ctrlcommon.GetManagedKey(pool, client, "99", "containerruntime", getManagedKeyCtrCfgDeprecated(pool))
+		return commonconfigs.GetManagedKey(pool, client, "99", "containerruntime", getManagedKeyCtrCfgDeprecated(pool))
 	}
 
 	// If we are here, this means that
@@ -252,7 +252,7 @@ func getManagedKeyCtrCfg(pool *mcfgv1.MachineConfigPool, client mcfgclientset.In
 	// 2. or this is an existing containerruntime config did not get commonconsts.MCNameSuffixAnnotationKey set, so we have to set the MCNameSuffixAnnotationKey to the machineconfig suffix it was rendered to, assume for existing containerruntime config, cfg.Finalizers with the largest suffix is the machine config the ctrcfg was rendered to
 	// if the containerruntime config is the only one in the list, mc name should not suffixed since cfg is the first containerruntime config to be created
 	if len(ctrcfgList) == 1 {
-		return ctrlcommon.GetManagedKey(pool, client, "99", "containerruntime", getManagedKeyCtrCfgDeprecated(pool))
+		return commonconfigs.GetManagedKey(pool, client, "99", "containerruntime", getManagedKeyCtrCfgDeprecated(pool))
 	}
 	// if cfg is not a newly created containerruntime config and did not get commonconsts.MCNameSuffixAnnotationKey
 	// but has been rendered to a machineconfig, its len(cfg.Finalizers) > 0
@@ -277,7 +277,7 @@ func getManagedKeyCtrCfg(pool *mcfgv1.MachineConfigPool, client mcfgclientset.In
 			// if the finalizer does not end with a number, make sure it is in the format 99-<poolname>-generated-containerruntime
 			// otherwise, the ctrcfg contains invalid finalizer, do not generate managedKey from finalizers
 			if err != nil {
-				key, err := ctrlcommon.GetManagedKey(pool, nil, managedContainerRuntimeConfigKeyPrefix, "containerruntime", getManagedKeyCtrCfgDeprecated(pool))
+				key, err := commonconfigs.GetManagedKey(pool, nil, managedContainerRuntimeConfigKeyPrefix, "containerruntime", getManagedKeyCtrCfgDeprecated(pool))
 				if err != nil {
 					klog.Infof("skipping error: %v", fmt.Errorf("error generating managedKey for suffix %s: %v", key, err))
 					continue
@@ -343,7 +343,7 @@ func getManagedKeyRegDeprecated(pool *mcfgv1.MachineConfigPool) string {
 }
 
 func getManagedKeyReg(pool *mcfgv1.MachineConfigPool, client mcfgclientset.Interface) (string, error) {
-	return ctrlcommon.GetManagedKey(pool, client, "99", "registries", getManagedKeyRegDeprecated(pool))
+	return commonconfigs.GetManagedKey(pool, client, "99", "registries", getManagedKeyRegDeprecated(pool))
 }
 
 func wrapErrorWithCondition(err error, args ...interface{}) mcfgv1.ContainerRuntimeConfigCondition {

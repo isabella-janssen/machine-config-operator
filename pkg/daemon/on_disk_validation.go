@@ -10,7 +10,7 @@ import (
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	"github.com/google/go-cmp/cmp"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
@@ -20,7 +20,7 @@ func validateOnDiskState(currentConfig *mcfgv1.MachineConfig, systemdPath string
 	// And the rest of the disk state
 	// We want to verify the disk state in the spec version that it was created with,
 	// to remove possibilities of behaviour changes due to translation
-	ignconfigi, err := ctrlcommon.IgnParseWrapper(currentConfig.Spec.Config.Raw)
+	ignconfigi, err := commonconfigs.IgnParseWrapper(currentConfig.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("failed to parse Ignition for validation: %w", err)
 	}
@@ -192,7 +192,7 @@ func checkV3Files(files []ign3types.File) error {
 		if f.Mode != nil {
 			mode = os.FileMode(*f.Mode)
 		}
-		contents, err := ctrlcommon.DecodeIgnitionFileContents(f.Contents.Source, f.Contents.Compression)
+		contents, err := commonconfigs.DecodeIgnitionFileContents(f.Contents.Source, f.Contents.Compression)
 		if err != nil {
 			return fmt.Errorf("couldn't decode file %q: %w", f.Path, err)
 		}
@@ -219,7 +219,7 @@ func checkV2Files(files []ign2types.File) error {
 		if f.Mode != nil {
 			mode = os.FileMode(*f.Mode)
 		}
-		contents, err := ctrlcommon.DecodeIgnitionFileContents(&f.Contents.Source, &f.Contents.Compression)
+		contents, err := commonconfigs.DecodeIgnitionFileContents(&f.Contents.Source, &f.Contents.Compression)
 		if err != nil {
 			return fmt.Errorf("couldn't decode file %q: %w", f.Path, err)
 		}

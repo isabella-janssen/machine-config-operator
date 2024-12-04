@@ -14,7 +14,7 @@ import (
 	"github.com/google/renameio"
 	"k8s.io/klog/v2"
 
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 )
 
 var (
@@ -239,7 +239,7 @@ func writeFiles(files []ign3types.File, skipCertificateWrite bool) error {
 			return fmt.Errorf("found an append section when writing files. Append is not supported")
 		}
 
-		decodedContents, err := ctrlcommon.DecodeIgnitionFileContents(file.Contents.Source, file.Contents.Compression)
+		decodedContents, err := commonconfigs.DecodeIgnitionFileContents(file.Contents.Source, file.Contents.Compression)
 		if err != nil {
 			return fmt.Errorf("could not decode file %q: %w", file.Path, err)
 		}

@@ -12,7 +12,7 @@ import (
 	"k8s.io/klog/v2"
 
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 )
 
 // ensure bootstrapServer implements the
@@ -102,7 +102,7 @@ func (bsc *bootstrapServer) GetConfig(cr poolRequest) (*runtime.RawExtension, er
 	if err != nil {
 		return nil, fmt.Errorf("server: could not unmarshal file %s, err: %w", fileName, err)
 	}
-	ignConf, err := ctrlcommon.ParseAndConvertConfig(mc.Spec.Config.Raw)
+	ignConf, err := commonconfigs.ParseAndConvertConfig(mc.Spec.Config.Raw)
 	if err != nil {
 		return nil, fmt.Errorf("parsing Ignition config failed with error: %w", err)
 	}

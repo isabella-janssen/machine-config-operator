@@ -51,6 +51,7 @@ import (
 	mcfglistersv1 "github.com/openshift/client-go/machineconfiguration/listers/machineconfiguration/v1"
 	apihelpers "github.com/openshift/machine-config-operator/pkg/apihelpers"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	mtmpl "github.com/openshift/machine-config-operator/pkg/controller/template"
 	"github.com/openshift/machine-config-operator/pkg/version"
@@ -153,7 +154,7 @@ func New(
 		templatesDir:  templatesDir,
 		client:        mcfgClient,
 		configClient:  configClient,
-		eventRecorder: ctrlcommon.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-containerruntimeconfigcontroller"})),
+		eventRecorder: commonconfigs.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-containerruntimeconfigcontroller"})),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "machineconfigcontroller-containerruntimeconfigcontroller"}),
@@ -710,8 +711,8 @@ func (ctrl *Controller) syncContainerRuntimeConfig(key string) error {
 		}
 
 		if isNotFound {
-			tempIgnCfg := ctrlcommon.NewIgnConfig()
-			mc, err = ctrlcommon.MachineConfigFromIgnConfig(role, managedKey, tempIgnCfg)
+			tempIgnCfg := commonconfigs.NewIgnConfig()
+			mc, err = commonconfigs.MachineConfigFromIgnConfig(role, managedKey, tempIgnCfg)
 			if err != nil {
 				return ctrl.syncStatusOnly(cfg, err, "could not create MachineConfig from new Ignition config: %v", err)
 			}
@@ -805,7 +806,7 @@ func mergeConfigChanges(origFile *ign3types.File, cfg *mcfgv1.ContainerRuntimeCo
 	if origFile.Contents.Source == nil {
 		return nil, fmt.Errorf("original Container Runtime config is empty")
 	}
-	contents, err := ctrlcommon.DecodeIgnitionFileContents(origFile.Contents.Source, origFile.Contents.Compression)
+	contents, err := commonconfigs.DecodeIgnitionFileContents(origFile.Contents.Source, origFile.Contents.Compression)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode original Container Runtime config: %w", err)
 	}
@@ -981,8 +982,8 @@ func (ctrl *Controller) syncIgnitionConfig(managedKey string, ignFile *ign3types
 		}
 	}
 	if isNotFound {
-		tempIgnCfg := ctrlcommon.NewIgnConfig()
-		mc, err = ctrlcommon.MachineConfigFromIgnConfig(pool.Name, managedKey, tempIgnCfg)
+		tempIgnCfg := commonconfigs.NewIgnConfig()
+		mc, err = commonconfigs.MachineConfigFromIgnConfig(pool.Name, managedKey, tempIgnCfg)
 		if err != nil {
 			return false, fmt.Errorf("could not create MachineConfig from new Ignition config: %w", err)
 		}
@@ -1025,7 +1026,7 @@ func registriesConfigIgnition(templateDir string, controllerConfig *mcfgv1.Contr
 		if originalRegistriesIgn.Contents.Source == nil {
 			return nil, fmt.Errorf("original registries config is empty")
 		}
-		contents, err := ctrlcommon.DecodeIgnitionFileContents(originalRegistriesIgn.Contents.Source, originalRegistriesIgn.Contents.Compression)
+		contents, err := commonconfigs.DecodeIgnitionFileContents(originalRegistriesIgn.Contents.Source, originalRegistriesIgn.Contents.Compression)
 		if err != nil {
 			return nil, fmt.Errorf("could not decode original registries config: %w", err)
 		}
@@ -1038,7 +1039,7 @@ func registriesConfigIgnition(templateDir string, controllerConfig *mcfgv1.Contr
 		if originalPolicyIgn.Contents.Source == nil {
 			return nil, fmt.Errorf("original policy json is empty")
 		}
-		contents, err := ctrlcommon.DecodeIgnitionFileContents(originalPolicyIgn.Contents.Source, originalPolicyIgn.Contents.Compression)
+		contents, err := commonconfigs.DecodeIgnitionFileContents(originalPolicyIgn.Contents.Source, originalPolicyIgn.Contents.Compression)
 		if err != nil {
 			return nil, fmt.Errorf("could not decode original policy json: %w", err)
 		}
@@ -1194,7 +1195,7 @@ func RunImageBootstrap(templateDir string, controllerConfig *mcfgv1.ControllerCo
 		if err != nil {
 			return nil, err
 		}
-		mc, err := ctrlcommon.MachineConfigFromIgnConfig(role, managedKey, registriesIgn)
+		mc, err := commonconfigs.MachineConfigFromIgnConfig(role, managedKey, registriesIgn)
 		if err != nil {
 			return nil, err
 		}
@@ -1268,7 +1269,7 @@ func (ctrl *Controller) addFinalizerToContainerRuntimeConfig(ctrCfg *mcfgv1.Cont
 		// When we update an existing ctrcfg, the generation number increases causing
 		// a resync to happen. When this happens, the mc name is the same, so we don't
 		// want to add duplicate entries to the list of finalizers.
-		if !ctrlcommon.InSlice(mc.Name, ctrCfgTmp.Finalizers) {
+		if !commonconfigs.InSlice(mc.Name, ctrCfgTmp.Finalizers) {
 			ctrCfgTmp.Finalizers = append(ctrCfgTmp.Finalizers, mc.Name)
 		}
 

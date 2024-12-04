@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 
 	"github.com/openshift/client-go/machineconfiguration/clientset/versioned/fake"
 	informers "github.com/openshift/client-go/machineconfiguration/informers/externalversions"
@@ -401,7 +401,7 @@ func TestUpdateMachineConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	//update machineconfig
-	newIgnCfg := ctrlcommon.NewIgnConfig()
+	newIgnCfg := commonconfigs.NewIgnConfig()
 	newRawIgnCfg, err := json.Marshal(newIgnCfg)
 	if err != nil {
 		t.Fatal(err)

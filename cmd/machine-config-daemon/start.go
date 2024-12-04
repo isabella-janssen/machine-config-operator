@@ -14,6 +14,7 @@ import (
 	features "github.com/openshift/api/features"
 	"github.com/openshift/machine-config-operator/internal/clients"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/pkg/daemon"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/cri"
@@ -160,14 +161,14 @@ func runStartCmd(_ *cobra.Command, _ []string) {
 			startOpts.hypershiftDesiredConfigMap,
 		)
 		if err != nil {
-			ctrlcommon.WriteTerminationError(err)
+			commonconfigs.WriteTerminationError(err)
 		}
 
 		ctx.KubeInformerFactory.Start(stopCh)
 		close(ctx.InformersStarted)
 
 		if err := dn.RunHypershift(stopCh, exitCh); err != nil {
-			ctrlcommon.WriteTerminationError(err)
+			commonconfigs.WriteTerminationError(err)
 		}
 		return
 	}
@@ -246,7 +247,7 @@ func runStartCmd(_ *cobra.Command, _ []string) {
 	}
 
 	if err := dn.Run(stopCh, exitCh, errCh); err != nil {
-		ctrlcommon.WriteTerminationError(err)
+		commonconfigs.WriteTerminationError(err)
 		if errors.Is(err, daemon.ErrAuxiliary) {
 			dn.CancelSIGTERM()
 			dn.Close()

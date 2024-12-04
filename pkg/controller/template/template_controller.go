@@ -20,6 +20,7 @@ import (
 	mcfglistersv1 "github.com/openshift/client-go/machineconfiguration/listers/machineconfiguration/v1"
 	mcoResourceApply "github.com/openshift/machine-config-operator/lib/resourceapply"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"k8s.io/klog/v2"
 
@@ -95,7 +96,7 @@ func New(
 		templatesDir:  templatesDir,
 		client:        mcfgClient,
 		kubeClient:    kubeClient,
-		eventRecorder: ctrlcommon.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-templatecontroller"})),
+		eventRecorder: commonconfigs.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-templatecontroller"})),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig[string](
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "machineconfigcontroller-templatecontroller"}),
@@ -658,7 +659,7 @@ func getMachineConfigsForControllerConfig(templatesDir string, config *mcfgv1.Co
 	if err := json.Compact(buf, clusterPullSecretRaw); err != nil {
 		return nil, fmt.Errorf("couldn't compact pullsecret %q: %w", string(clusterPullSecretRaw), err)
 	}
-	tlsMinVersion, tlsCipherSuites := ctrlcommon.GetSecurityProfileCiphersFromAPIServer(apiServer)
+	tlsMinVersion, tlsCipherSuites := commonconfigs.GetSecurityProfileCiphersFromAPIServer(apiServer)
 	rc := &RenderConfig{
 		ControllerConfigSpec: &config.Spec,
 		PullSecret:           string(buf.Bytes()),

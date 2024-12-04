@@ -11,7 +11,7 @@ import (
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	"github.com/fsnotify/fsnotify"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
@@ -290,7 +290,7 @@ func (c *configDriftWatcher) checkMachineConfigForEvent(event fsnotify.Event) er
 
 // Finds the paths for all files in a given MachineConfig.
 func getFilePathsFromMachineConfig(mc *mcfgv1.MachineConfig, systemdPath string) (sets.Set[string], error) {
-	ignConfig, err := ctrlcommon.IgnParseWrapper(mc.Spec.Config.Raw)
+	ignConfig, err := commonconfigs.IgnParseWrapper(mc.Spec.Config.Raw)
 	if err != nil {
 		return sets.Set[string]{}, fmt.Errorf("could not get dirs from ignition config: %w", err)
 	}

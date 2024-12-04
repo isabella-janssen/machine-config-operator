@@ -39,7 +39,7 @@ import (
 
 	mcopinformersv1 "github.com/openshift/client-go/operator/informers/externalversions/operator/v1"
 	mcoplistersv1 "github.com/openshift/client-go/operator/listers/operator/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 )
 
@@ -82,8 +82,8 @@ func (mrs MachineResourceStats) isFinished() bool {
 }
 
 const (
-	// Name of machine api namespace
-	MachineAPINamespace = "openshift-machine-api"
+	// // Name of machine api namespace
+	// MachineAPINamespace = "openshift-machine-api"
 
 	// Key to access stream data from the boot images configmap
 	StreamConfigMapKey = "stream"
@@ -115,7 +115,7 @@ func New(
 		kubeClient:    kubeClient,
 		machineClient: machineClient,
 		mcopClient:    mcopClient,
-		eventRecorder: ctrlcommon.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-machinesetbootimagecontroller"})),
+		eventRecorder: commonconfigs.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigcontroller-machinesetbootimagecontroller"})),
 	}
 
 	mapiMachineSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -488,7 +488,7 @@ func (ctrl *Controller) patchMachineSet(oldMachineSet, newMachineSet *machinev1b
 	if err != nil {
 		return fmt.Errorf("unable to create patch for new machineset: %w", err)
 	}
-	_, err = ctrl.machineClient.MachineV1beta1().MachineSets(MachineAPINamespace).Patch(context.TODO(), oldMachineSet.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	_, err = ctrl.machineClient.MachineV1beta1().MachineSets(commonconsts.MachineAPINamespace).Patch(context.TODO(), oldMachineSet.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to patch new machineset: %w", err)
 	}

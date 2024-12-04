@@ -15,6 +15,7 @@ import (
 
 	"github.com/openshift/machine-config-operator/internal"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	corev1 "k8s.io/api/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -100,7 +101,7 @@ func newNodeWriter(nodeName string, stopCh <-chan struct{}) (NodeWriter, error) 
 		client:           kubeClient.CoreV1().Nodes(),
 		lister:           nodeLister,
 		nodeListerSynced: nodeListerSynced,
-		recorder:         ctrlcommon.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigdaemon", Host: nodeName})),
+		recorder:         commonconfigs.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigdaemon", Host: nodeName})),
 		writer:           make(chan message, defaultWriterQueue),
 		kubeClient:       kubeClient,
 	}

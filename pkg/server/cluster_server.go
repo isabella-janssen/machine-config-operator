@@ -13,7 +13,7 @@ import (
 	mcfginformers "github.com/openshift/client-go/machineconfiguration/informers/externalversions"
 
 	"github.com/openshift/machine-config-operator/internal/clients"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -130,7 +130,7 @@ func (cs *clusterServer) GetConfig(cr poolRequest) (*runtime.RawExtension, error
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch config %s, err: %w", currConf, err)
 	}
-	ignConf, err := ctrlcommon.ParseAndConvertConfig(mc.Spec.Config.Raw)
+	ignConf, err := commonconfigs.ParseAndConvertConfig(mc.Spec.Config.Raw)
 	if err != nil {
 		return nil, fmt.Errorf("parsing Ignition config failed with error: %w", err)
 	}

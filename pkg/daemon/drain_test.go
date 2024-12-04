@@ -8,7 +8,7 @@ import (
 	coreosutils "github.com/coreos/ignition/config/util"
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/vincent-petithory/dataurl"
 )
@@ -460,15 +460,15 @@ location = "mirror.com/repo/test-img-14"
 
 	for idx, test := range tests {
 		t.Run(fmt.Sprintf("case#%d", idx), func(t *testing.T) {
-			oldIgnConfig, err := ctrlcommon.ParseAndConvertConfig(test.oldConfig.Spec.Config.Raw)
+			oldIgnConfig, err := commonconfigs.ParseAndConvertConfig(test.oldConfig.Spec.Config.Raw)
 			if err != nil {
 				t.Errorf("parsing old Ignition config failed: %v", err)
 			}
-			newIgnConfig, err := ctrlcommon.ParseAndConvertConfig(test.newConfig.Spec.Config.Raw)
+			newIgnConfig, err := commonconfigs.ParseAndConvertConfig(test.newConfig.Spec.Config.Raw)
 			if err != nil {
 				t.Errorf("parsing new Ignition config failed: %v", err)
 			}
-			diffFileSet := ctrlcommon.CalculateConfigFileDiffs(&oldIgnConfig, &newIgnConfig)
+			diffFileSet := commonconfigs.CalculateConfigFileDiffs(&oldIgnConfig, &newIgnConfig)
 			drain, err := isDrainRequired(test.actions, diffFileSet, oldIgnConfig, newIgnConfig, false)
 			if !reflect.DeepEqual(test.expectedAction, drain) {
 				t.Errorf("Failed determining drain behavior: expected: %v but result is: %v. Error: %v", test.expectedAction, drain, err)

@@ -28,6 +28,7 @@ import (
 	machineclientset "github.com/openshift/client-go/machine/clientset/versioned"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/test/fixtures"
@@ -144,7 +145,7 @@ func TestKernelArguments(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 			},
 			KernelArguments: []string{"nosmt", "foo=bar", "foo=baz", " baz=test bar=hello world"},
 		},
@@ -234,7 +235,7 @@ func TestKernelType(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 			},
 			KernelType: "realtime",
 		},
@@ -332,7 +333,7 @@ func TestExtensions(t *testing.T) {
 		},
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
-				Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+				Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 			},
 			Extensions: []string{"wasm", "ipsec", "usbguard", "kerberos", "kernel-devel", "sandboxed-containers", "sysstat"},
 		},
@@ -476,7 +477,7 @@ func TestNoReboot(t *testing.T) {
 	initialEtcShadowContents := helpers.ExecCmdOnNode(t, cs, infraNode, "grep", "^core:", "/rootfs/etc/shadow")
 
 	// Adding authorized key for user core
-	testIgnConfig := ctrlcommon.NewIgnConfig()
+	testIgnConfig := commonconfigs.NewIgnConfig()
 	testPasswdHash := "testpass"
 
 	testIgnConfig.Passwd.Users = []ign3types.PasswdUser{
@@ -623,7 +624,7 @@ func TestPoolDegradedOnFailToRender(t *testing.T) {
 	cs := framework.NewClientSet("")
 
 	mcadd := createMCToAddFile("add-a-file", "/etc/mytestconfs", "test")
-	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mcadd.Spec.Config.Raw)
+	ignCfg, err := commonconfigs.ParseAndConvertConfig(mcadd.Spec.Config.Raw)
 	require.Nil(t, err, "failed to parse ignition config")
 	ignCfg.Ignition.Version = "" // invalid, won't render
 	rawIgnCfg := fixtures.MarshalOrDie(ignCfg)
@@ -957,7 +958,7 @@ func sshKeyFileExistsOnNode(t *testing.T, cs *framework.ClientSet, node corev1.N
 func createMCToAddFileForRole(name, role, filename, data string) *mcfgv1.MachineConfig {
 	mcadd := helpers.CreateMC(fmt.Sprintf("%s-%s", name, uuid.NewUUID()), role)
 
-	ignConfig := ctrlcommon.NewIgnConfig()
+	ignConfig := commonconfigs.NewIgnConfig()
 	ignFile := fixtures.CreateIgn3File(filename, "data:,"+data, 420)
 	ignConfig.Storage.Files = append(ignConfig.Storage.Files, ignFile)
 	rawIgnConfig := fixtures.MarshalOrDie(ignConfig)

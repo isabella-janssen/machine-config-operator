@@ -19,6 +19,7 @@ import (
 
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
 )
@@ -93,8 +94,8 @@ func (ctrl *Controller) syncFeatureHandler(key string) error {
 		}
 		isNotFound := errors.IsNotFound(err)
 		if isNotFound {
-			ignConfig := ctrlcommon.NewIgnConfig()
-			mc, err = ctrlcommon.MachineConfigFromIgnConfig(role, managedKey, ignConfig)
+			ignConfig := commonconfigs.NewIgnConfig()
+			mc, err = commonconfigs.MachineConfigFromIgnConfig(role, managedKey, ignConfig)
 			if err != nil {
 				return err
 			}
@@ -216,7 +217,7 @@ func generateKubeConfigIgnFromFeatures(cc *mcfgv1.ControllerConfig, templatesDir
 		return nil, err
 	}
 
-	tempIgnConfig := ctrlcommon.NewIgnConfig()
+	tempIgnConfig := commonconfigs.NewIgnConfig()
 	tempIgnConfig.Storage.Files = append(tempIgnConfig.Storage.Files, *cfgIgn)
 	rawCfgIgn, err := json.Marshal(tempIgnConfig)
 	if err != nil {
@@ -247,8 +248,8 @@ func RunFeatureGateBootstrap(templateDir string, featureGateAccess featuregates.
 			return nil, err
 		}
 
-		ignConfig := ctrlcommon.NewIgnConfig()
-		mc, err := ctrlcommon.MachineConfigFromIgnConfig(role, managedKey, ignConfig)
+		ignConfig := commonconfigs.NewIgnConfig()
+		mc, err := commonconfigs.MachineConfigFromIgnConfig(role, managedKey, ignConfig)
 		if err != nil {
 			return nil, err
 		}

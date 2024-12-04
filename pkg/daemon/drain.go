@@ -13,7 +13,7 @@ import (
 	mcfgalphav1 "github.com/openshift/api/machineconfiguration/v1alpha1"
 	opv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/upgrademonitor"
 	corev1 "k8s.io/api/core/v1"
@@ -142,12 +142,12 @@ func isDrainRequiredForNodeDisruptionActions(actions []opv1.NodeDisruptionPolicy
 // isDrainRequired determines whether node drain is required or not to apply config changes.
 func isDrainRequired(actions, diffFileSet []string, oldIgnConfig, newIgnConfig ign3types.Config, overrideImageRegistryDrain bool) (bool, error) {
 	switch {
-	case ctrlcommon.InSlice(postConfigChangeActionReboot, actions):
+	case commonconfigs.InSlice(postConfigChangeActionReboot, actions):
 		// Node is going to reboot, we definitely want to perform drain
 		return true, nil
-	case ctrlcommon.InSlice(postConfigChangeActionReloadCrio, actions), ctrlcommon.InSlice(postConfigChangeActionRestartCrio, actions):
+	case commonconfigs.InSlice(postConfigChangeActionReloadCrio, actions), commonconfigs.InSlice(postConfigChangeActionRestartCrio, actions):
 		// Drain may or may not be necessary in case of container registry config changes.
-		if ctrlcommon.InSlice(constants.ContainerRegistryConfPath, diffFileSet) {
+		if commonconfigs.InSlice(constants.ContainerRegistryConfPath, diffFileSet) {
 			if overrideImageRegistryDrain {
 				klog.Warningf("Drain was skipped for this image registry update due to the configmap %s being present. This may not be a safe change", constants.ImageRegistryDrainOverrideConfigmap)
 				return false, nil
@@ -159,7 +159,7 @@ func isDrainRequired(actions, diffFileSet []string, oldIgnConfig, newIgnConfig i
 			return !isSafe, nil
 		}
 		return false, nil
-	case ctrlcommon.InSlice(postConfigChangeActionNone, actions):
+	case commonconfigs.InSlice(postConfigChangeActionNone, actions):
 		return false, nil
 	default:
 		// For any unhandled cases, default to drain
@@ -179,12 +179,12 @@ func isDrainRequired(actions, diffFileSet []string, oldIgnConfig, newIgnConfig i
 //nolint:gocyclo
 func isSafeContainerRegistryConfChanges(oldIgnConfig, newIgnConfig ign3types.Config) (bool, error) {
 	// /etc/containers/registries.conf contains config in toml format. Parse the file
-	oldData, err := ctrlcommon.GetIgnitionFileDataByPath(&oldIgnConfig, constants.ContainerRegistryConfPath)
+	oldData, err := commonconfigs.GetIgnitionFileDataByPath(&oldIgnConfig, constants.ContainerRegistryConfPath)
 	if err != nil {
 		return false, fmt.Errorf("failed decoding Data URL scheme string: %w", err)
 	}
 
-	newData, err := ctrlcommon.GetIgnitionFileDataByPath(&newIgnConfig, constants.ContainerRegistryConfPath)
+	newData, err := commonconfigs.GetIgnitionFileDataByPath(&newIgnConfig, constants.ContainerRegistryConfPath)
 	if err != nil {
 		return false, fmt.Errorf("failed decoding Data URL scheme string %w", err)
 	}

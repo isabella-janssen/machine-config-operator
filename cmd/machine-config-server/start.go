@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/pkg/server"
 	"github.com/openshift/machine-config-operator/pkg/version"
 	"github.com/spf13/cobra"
@@ -45,11 +45,11 @@ func runStartCmd(_ *cobra.Command, _ []string) {
 
 	cs, err := server.NewClusterServer(startOpts.kubeconfig, startOpts.apiserverURL)
 	if err != nil {
-		ctrlcommon.WriteTerminationError(err)
+		commonconfigs.WriteTerminationError(err)
 	}
 
 	klog.Infof("Launching server with tls min version: %v & cipher suites %v", rootOpts.tlsminversion, rootOpts.tlsciphersuites)
-	tlsConfig := ctrlcommon.GetGoTLSConfig(rootOpts.tlsminversion, rootOpts.tlsciphersuites)
+	tlsConfig := commonconfigs.GetGoTLSConfig(rootOpts.tlsminversion, rootOpts.tlsciphersuites)
 
 	apiHandler := server.NewServerAPIHandler(cs)
 	secureServer := server.NewAPIServer(apiHandler, rootOpts.sport, false, rootOpts.cert, rootOpts.key, tlsConfig)

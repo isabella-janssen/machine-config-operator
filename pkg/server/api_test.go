@@ -16,7 +16,7 @@ import (
 	"golang.org/x/net/http2"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	"github.com/openshift/machine-config-operator/test/fixtures"
 )
 
@@ -236,7 +236,7 @@ func TestAPIHandler(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/config/does-not-exist", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, fmt.Errorf("not acceptable")
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -250,7 +250,7 @@ func TestAPIHandler(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -265,7 +265,7 @@ func TestAPIHandler(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodHead, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -280,7 +280,7 @@ func TestAPIHandler(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodPost, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -294,7 +294,7 @@ func TestAPIHandler(t *testing.T) {
 			request: setV3_1AcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -309,7 +309,7 @@ func TestAPIHandler(t *testing.T) {
 			request: setV3_2AcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -324,7 +324,7 @@ func TestAPIHandler(t *testing.T) {
 			request: setV3_3AcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -339,7 +339,7 @@ func TestAPIHandler(t *testing.T) {
 			request: setV3_4AcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -374,7 +374,7 @@ func TestHealthzHandler(t *testing.T) {
 			request: httptest.NewRequest(http.MethodGet, "http://testrequest/healthz", nil),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -388,7 +388,7 @@ func TestHealthzHandler(t *testing.T) {
 			request: httptest.NewRequest(http.MethodHead, "http://testrequest/healthz", nil),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -402,7 +402,7 @@ func TestHealthzHandler(t *testing.T) {
 			request: httptest.NewRequest(http.MethodPost, "http://testrequest/healthz", nil),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -432,7 +432,7 @@ func TestDefaultHandler(t *testing.T) {
 			request: httptest.NewRequest(http.MethodGet, "http://testrequest/", nil),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -446,7 +446,7 @@ func TestDefaultHandler(t *testing.T) {
 			request: httptest.NewRequest(http.MethodHead, "http://testrequest/", nil),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -460,7 +460,7 @@ func TestDefaultHandler(t *testing.T) {
 			request: httptest.NewRequest(http.MethodPost, "http://testrequest/", nil),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -490,7 +490,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/config/does-not-exist", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, fmt.Errorf("not acceptable")
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -504,7 +504,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -519,7 +519,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodHead, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -534,7 +534,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodPost, "http://testrequest/config/master", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -548,7 +548,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/healthz", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -562,7 +562,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodHead, "http://testrequest/healthz", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -576,7 +576,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodPost, "http://testrequest/healthz", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -590,7 +590,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodGet, "http://testrequest/", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -604,7 +604,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodHead, "http://testrequest/", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -618,7 +618,7 @@ func TestAPIServer(t *testing.T) {
 			request: setAcceptHeaderOnReq(httptest.NewRequest(http.MethodPost, "http://testrequest/", nil)),
 			serverFunc: func(poolRequest) (*runtime.RawExtension, error) {
 				return &runtime.RawExtension{
-					Raw: fixtures.MarshalOrDie(ctrlcommon.NewIgnConfig()),
+					Raw: fixtures.MarshalOrDie(commonconfigs.NewIgnConfig()),
 				}, nil
 			},
 			checkResponse: func(t *testing.T, response *http.Response) {
@@ -672,7 +672,7 @@ EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, "Hello, client")
 		}),
-		ctrlcommon.GetGoTLSConfig("", nil),
+		commonconfigs.GetGoTLSConfig("", nil),
 	)
 
 	// Configure the TLS testing to allow

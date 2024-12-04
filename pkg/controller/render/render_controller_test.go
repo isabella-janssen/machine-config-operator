@@ -28,7 +28,7 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/client-go/machineconfiguration/clientset/versioned/fake"
 	informers "github.com/openshift/client-go/machineconfiguration/informers/externalversions"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
@@ -72,7 +72,7 @@ func (f *fixture) newController() *Controller {
 	c.mcpListerSynced = alwaysReady
 	c.mcListerSynced = alwaysReady
 	c.ccListerSynced = alwaysReady
-	c.eventRecorder = ctrlcommon.NamespacedEventRecorder(&record.FakeRecorder{})
+	c.eventRecorder = commonconfigs.NamespacedEventRecorder(&record.FakeRecorder{})
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -309,7 +309,7 @@ func TestIgnValidationGenerateRenderedMachineConfig(t *testing.T) {
 
 	// verify that an invalid ignition config (here a config with content and an empty version,
 	// will fail validation
-	ignCfg, err := ctrlcommon.ParseAndConvertConfig(mcs[1].Spec.Config.Raw)
+	ignCfg, err := commonconfigs.ParseAndConvertConfig(mcs[1].Spec.Config.Raw)
 	require.Nil(t, err)
 	ignCfg.Ignition.Version = ""
 	rawIgnCfg, err := json.Marshal(ignCfg)
@@ -320,7 +320,7 @@ func TestIgnValidationGenerateRenderedMachineConfig(t *testing.T) {
 	require.NotNil(t, err)
 
 	// verify that a machine config with no ignition content will not fail validation
-	emptyIgnCfg := ctrlcommon.NewIgnConfig()
+	emptyIgnCfg := commonconfigs.NewIgnConfig()
 	rawEmptyIgnCfg, err := json.Marshal(emptyIgnCfg)
 	require.Nil(t, err)
 	mcs[1].Spec.Config.Raw = rawEmptyIgnCfg

@@ -36,7 +36,7 @@ import (
 	opv1 "github.com/openshift/api/operator/v1"
 
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	pivottypes "github.com/openshift/machine-config-operator/pkg/daemon/pivot/types"
@@ -252,7 +252,7 @@ func (dn *Daemon) performPostConfigChangeNodeDisruptionAction(postConfigChangeAc
 // In the end uncordon node to schedule workload.
 // If at any point an error occurs, we reboot the node so that node has correct configuration.
 func (dn *Daemon) performPostConfigChangeAction(postConfigChangeActions []string, configName string) error {
-	if ctrlcommon.InSlice(postConfigChangeActionReboot, postConfigChangeActions) {
+	if commonconfigs.InSlice(postConfigChangeActionReboot, postConfigChangeActions) {
 		err := upgrademonitor.GenerateAndApplyMachineConfigNodes(
 			&upgrademonitor.Condition{State: mcfgalphav1.MachineConfigNodeUpdatePostActionComplete, Reason: string(mcfgalphav1.MachineConfigNodeUpdateRebooted), Message: fmt.Sprintf("Node will reboot into config %s", configName)},
 			&upgrademonitor.Condition{State: mcfgalphav1.MachineConfigNodeUpdateRebooted, Reason: fmt.Sprintf("%s%s", string(mcfgalphav1.MachineConfigNodeUpdatePostActionComplete), string(mcfgalphav1.MachineConfigNodeUpdateRebooted)), Message: "Upgrade requires a reboot. Currently doing this as the post update action."},
@@ -269,7 +269,7 @@ func (dn *Daemon) performPostConfigChangeAction(postConfigChangeActions []string
 		return dn.reboot(fmt.Sprintf("Node will reboot into config %s", configName))
 	}
 
-	if ctrlcommon.InSlice(postConfigChangeActionNone, postConfigChangeActions) {
+	if commonconfigs.InSlice(postConfigChangeActionNone, postConfigChangeActions) {
 		if dn.nodeWriter != nil {
 			dn.nodeWriter.Eventf(corev1.EventTypeNormal, "SkipReboot", "Config changes do not require reboot.")
 		}
@@ -288,7 +288,7 @@ func (dn *Daemon) performPostConfigChangeAction(postConfigChangeActions []string
 		logSystem("Node has Desired Config %s, skipping reboot", configName)
 	}
 
-	if ctrlcommon.InSlice(postConfigChangeActionReloadCrio, postConfigChangeActions) {
+	if commonconfigs.InSlice(postConfigChangeActionReloadCrio, postConfigChangeActions) {
 		serviceName := constants.CRIOServiceName
 
 		if err := reloadService(serviceName); err != nil {
@@ -317,7 +317,7 @@ func (dn *Daemon) performPostConfigChangeAction(postConfigChangeActions []string
 		logSystem("%s config reloaded successfully! Desired config %s has been applied, skipping reboot", serviceName, configName)
 	}
 
-	if ctrlcommon.InSlice(postConfigChangeActionRestartCrio, postConfigChangeActions) {
+	if commonconfigs.InSlice(postConfigChangeActionRestartCrio, postConfigChangeActions) {
 		cmd := exec.Command(constants.UpdateCATrustCommand)
 		var stderr bytes.Buffer
 		cmd.Stdout = os.Stdout
@@ -369,7 +369,7 @@ func canonicalizeEmptyMC(config *mcfgv1.MachineConfig) *mcfgv1.MachineConfig {
 	if config != nil {
 		return config
 	}
-	newIgnCfg := ctrlcommon.NewIgnConfig()
+	newIgnCfg := commonconfigs.NewIgnConfig()
 	rawNewIgnCfg, err := json.Marshal(newIgnCfg)
 	if err != nil {
 		// This should never happen
@@ -602,20 +602,20 @@ func calculatePostConfigChangeActionFromMCDiffs(diffFileSet []string) (actions [
 	actions = []string{postConfigChangeActionNone}
 	for _, path := range diffFileSet {
 		switch {
-		case ctrlcommon.InSlice(path, filesPostConfigChangeActionNone):
+		case commonconfigs.InSlice(path, filesPostConfigChangeActionNone):
 			continue
 
-		case ctrlcommon.InSlice(path, filesPostConfigChangeActionReloadCrio),
-			ctrlcommon.InSlice(filepath.Dir(path), dirsPostConfigChangeActionReloadCrio):
+		case commonconfigs.InSlice(path, filesPostConfigChangeActionReloadCrio),
+			commonconfigs.InSlice(filepath.Dir(path), dirsPostConfigChangeActionReloadCrio):
 			// Don't override a restart CRIO action
-			if !ctrlcommon.InSlice(postConfigChangeActionRestartCrio, actions) {
+			if !commonconfigs.InSlice(postConfigChangeActionRestartCrio, actions) {
 				actions = []string{postConfigChangeActionReloadCrio}
 			}
 
-		case ctrlcommon.InSlice(path, filesPostConfigChangeActionRestartCrio):
+		case commonconfigs.InSlice(path, filesPostConfigChangeActionRestartCrio):
 			actions = []string{postConfigChangeActionRestartCrio}
 
-		case ctrlcommon.InSlice(filepath.Dir(path), directoriesPostConfigChangeActionNone):
+		case commonconfigs.InSlice(filepath.Dir(path), directoriesPostConfigChangeActionNone):
 			continue
 
 		default:
@@ -632,7 +632,7 @@ func calculatePostConfigChangeNodeDisruptionActionFromMCDiffs(diffSSH bool, diff
 
 	// Step through all file based policies, and build out the actions object
 	for _, diffPath := range diffFileSet {
-		pathFound, actionsFound := ctrlcommon.FindClosestFilePolicyPathMatch(diffPath, clusterPolicies.Files)
+		pathFound, actionsFound := commonconfigs.FindClosestFilePolicyPathMatch(diffPath, clusterPolicies.Files)
 		if pathFound {
 			klog.Infof("NodeDisruptionPolicy %v found for diff file %s", actionsFound, diffPath)
 			actions = append(actions, actionsFound...)
@@ -830,11 +830,11 @@ func (dn *Daemon) updateOnClusterBuild(oldConfig, newConfig *mcfgv1.MachineConfi
 	oldConfigName := oldConfig.GetName()
 	newConfigName := newConfig.GetName()
 
-	oldIgnConfig, err := ctrlcommon.ParseAndConvertConfig(oldConfig.Spec.Config.Raw)
+	oldIgnConfig, err := commonconfigs.ParseAndConvertConfig(oldConfig.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("parsing old Ignition config failed: %w", err)
 	}
-	newIgnConfig, err := ctrlcommon.ParseAndConvertConfig(newConfig.Spec.Config.Raw)
+	newIgnConfig, err := commonconfigs.ParseAndConvertConfig(newConfig.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("parsing new Ignition config failed: %w", err)
 	}
@@ -1071,11 +1071,11 @@ func (dn *Daemon) update(oldConfig, newConfig *mcfgv1.MachineConfig, skipCertifi
 	oldConfigName := oldConfig.GetName()
 	newConfigName := newConfig.GetName()
 
-	oldIgnConfig, err := ctrlcommon.ParseAndConvertConfig(oldConfig.Spec.Config.Raw)
+	oldIgnConfig, err := commonconfigs.ParseAndConvertConfig(oldConfig.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("parsing old Ignition config failed: %w", err)
 	}
-	newIgnConfig, err := ctrlcommon.ParseAndConvertConfig(newConfig.Spec.Config.Raw)
+	newIgnConfig, err := commonconfigs.ParseAndConvertConfig(newConfig.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("parsing new Ignition config failed: %w", err)
 	}
@@ -1108,8 +1108,8 @@ func (dn *Daemon) update(oldConfig, newConfig *mcfgv1.MachineConfig, skipCertifi
 
 	logSystem("Starting update from %s to %s: %+v", oldConfigName, newConfigName, diff)
 
-	diffFileSet := ctrlcommon.CalculateConfigFileDiffs(&oldIgnConfig, &newIgnConfig)
-	diffUnitSet := ctrlcommon.CalculateConfigUnitDiffs(&oldIgnConfig, &newIgnConfig)
+	diffFileSet := commonconfigs.CalculateConfigFileDiffs(&oldIgnConfig, &newIgnConfig)
+	diffUnitSet := commonconfigs.CalculateConfigUnitDiffs(&oldIgnConfig, &newIgnConfig)
 
 	var fg featuregates.FeatureGate
 
@@ -1362,11 +1362,11 @@ func (dn *Daemon) update(oldConfig, newConfig *mcfgv1.MachineConfig, skipCertifi
 // de-dupe the functions.
 // See: https://issues.redhat.com/browse/MCO-810
 func (dn *Daemon) updateHypershift(oldConfig, newConfig *mcfgv1.MachineConfig, diff *machineConfigDiff) (retErr error) {
-	oldIgnConfig, err := ctrlcommon.ParseAndConvertConfig(oldConfig.Spec.Config.Raw)
+	oldIgnConfig, err := commonconfigs.ParseAndConvertConfig(oldConfig.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("parsing old Ignition config failed: %w", err)
 	}
-	newIgnConfig, err := ctrlcommon.ParseAndConvertConfig(newConfig.Spec.Config.Raw)
+	newIgnConfig, err := commonconfigs.ParseAndConvertConfig(newConfig.Spec.Config.Raw)
 	if err != nil {
 		return fmt.Errorf("parsing new Ignition config failed: %w", err)
 	}
@@ -1498,11 +1498,11 @@ func canonicalizeKernelType(kernelType string) string {
 
 // newMachineConfigDiff compares two MachineConfig objects.
 func newMachineConfigDiff(oldConfig, newConfig *mcfgv1.MachineConfig) (*machineConfigDiff, error) {
-	oldIgn, err := ctrlcommon.ParseAndConvertConfig(oldConfig.Spec.Config.Raw)
+	oldIgn, err := commonconfigs.ParseAndConvertConfig(oldConfig.Spec.Config.Raw)
 	if err != nil {
 		return nil, fmt.Errorf("parsing old Ignition config failed with error: %w", err)
 	}
-	newIgn, err := ctrlcommon.ParseAndConvertConfig(newConfig.Spec.Config.Raw)
+	newIgn, err := commonconfigs.ParseAndConvertConfig(newConfig.Spec.Config.Raw)
 	if err != nil {
 		return nil, fmt.Errorf("parsing new Ignition config failed with error: %w", err)
 	}
@@ -1542,7 +1542,7 @@ func newMachineConfigDiff(oldConfig, newConfig *mcfgv1.MachineConfig) (*machineC
 // (/proc/sys/crypto/fips_enabled) and can determine if there is a mismatch
 // between the MachineConfig and the actual on-disk state.
 func reconcilable(oldConfig, newConfig *mcfgv1.MachineConfig) (*machineConfigDiff, error) {
-	if err := ctrlcommon.IsRenderedConfigReconcilable(oldConfig, newConfig); err != nil {
+	if err := commonconfigs.IsRenderedConfigReconcilable(oldConfig, newConfig); err != nil {
 		return nil, fmt.Errorf("configs %s, %s are not reconcilable: %w", oldConfig.Name, newConfig.Name, err)
 	}
 
@@ -1732,7 +1732,7 @@ func (dn *Daemon) generateExtensionsArgs(oldConfig, newConfig *mcfgv1.MachineCon
 	extArgs := []string{"update"}
 
 	if dn.os.IsEL() {
-		extensions := ctrlcommon.SupportedExtensions()
+		extensions := commonconfigs.SupportedExtensions()
 		for _, ext := range added {
 			for _, pkg := range extensions[ext] {
 				extArgs = append(extArgs, "--install", pkg)
@@ -1770,7 +1770,7 @@ func (dn *CoreOSDaemon) applyExtensions(oldConfig, newConfig *mcfgv1.MachineConf
 	}
 
 	// Validate extensions allowlist on RHCOS nodes
-	if err := ctrlcommon.ValidateMachineConfigExtensions(newConfig.Spec); err != nil && dn.os.IsEL() {
+	if err := commonconfigs.ValidateMachineConfigExtensions(newConfig.Spec); err != nil && dn.os.IsEL() {
 		return err
 	}
 
@@ -2495,7 +2495,7 @@ func removeNonIgnitionKeyPathFragments() error {
 	// ignition
 	authKeyFragmentBasename := filepath.Base(constants.RHCOS9SSHKeyPath)
 
-	keyFragmentsDir, err := ctrlcommon.ReadDir(authKeyFragmentDirPath)
+	keyFragmentsDir, err := commonconfigs.ReadDir(authKeyFragmentDirPath)
 	if err == nil {
 		for _, fragment := range keyFragmentsDir {
 			if fragment.Name() != authKeyFragmentBasename {

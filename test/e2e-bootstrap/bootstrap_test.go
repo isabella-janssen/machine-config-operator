@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/machine-config-operator/internal/clients"
 	"github.com/openshift/machine-config-operator/pkg/controller/bootstrap"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	containerruntimeconfig "github.com/openshift/machine-config-operator/pkg/controller/container-runtime-config"
 	kubeletconfig "github.com/openshift/machine-config-operator/pkg/controller/kubelet-config"
 	"github.com/openshift/machine-config-operator/pkg/controller/node"
@@ -667,7 +668,7 @@ func copyDir(src string, dest string) error {
 		return fmt.Errorf("Source " + file.Name() + " is not a directory!")
 	}
 
-	files, err := ctrlcommon.ReadDir(src)
+	files, err := commonconfigs.ReadDir(src)
 	if err != nil {
 		return err
 	}

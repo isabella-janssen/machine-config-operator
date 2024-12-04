@@ -12,6 +12,7 @@ import (
 
 	configclientset "github.com/openshift/client-go/config/clientset/versioned"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
 	corev1 "k8s.io/api/core/v1"
@@ -207,7 +208,7 @@ func New(
 		apiExtClient:  apiExtClient,
 		configClient:  configClient,
 		mcopClient:    mcopClient,
-		eventRecorder: ctrlcommon.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigoperator"})),
+		eventRecorder: commonconfigs.NamespacedEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "machineconfigoperator"})),
 		libgoRecorder: events.NewRecorder(kubeClient.CoreV1().Events(commonconsts.MCONamespace), "machine-config-operator", &corev1.ObjectReference{
 			Kind:       "Deployment",
 			Name:       "machine-config-operator",

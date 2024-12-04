@@ -7,7 +7,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/pkg/version"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +52,7 @@ func RunKubeletBootstrap(templateDir string, kubeletConfigs []*mcfgv1.KubeletCon
 			}
 			if kubeletConfig.Spec.TLSSecurityProfile != nil {
 				// Inject TLS Options from Spec
-				observedMinTLSVersion, observedCipherSuites := ctrlcommon.GetSecurityProfileCiphers(kubeletConfig.Spec.TLSSecurityProfile)
+				observedMinTLSVersion, observedCipherSuites := commonconfigs.GetSecurityProfileCiphers(kubeletConfig.Spec.TLSSecurityProfile)
 				originalKubeConfig.TLSMinVersion = observedMinTLSVersion
 				originalKubeConfig.TLSCipherSuites = observedCipherSuites
 			}
@@ -62,7 +62,7 @@ func RunKubeletBootstrap(templateDir string, kubeletConfigs []*mcfgv1.KubeletCon
 				return nil, err
 			}
 
-			tempIgnConfig := ctrlcommon.NewIgnConfig()
+			tempIgnConfig := commonconfigs.NewIgnConfig()
 			if autoSizingReservedIgnition != nil {
 				tempIgnConfig.Storage.Files = append(tempIgnConfig.Storage.Files, *autoSizingReservedIgnition)
 			}
@@ -86,8 +86,8 @@ func RunKubeletBootstrap(templateDir string, kubeletConfigs []*mcfgv1.KubeletCon
 			kubeletConfig.SetAnnotations(map[string]string{
 				commonconsts.MCNameSuffixAnnotationKey: "",
 			})
-			ignConfig := ctrlcommon.NewIgnConfig()
-			mc, err := ctrlcommon.MachineConfigFromIgnConfig(role, managedKey, ignConfig)
+			ignConfig := commonconfigs.NewIgnConfig()
+			mc, err := commonconfigs.MachineConfigFromIgnConfig(role, managedKey, ignConfig)
 			if err != nil {
 				return nil, fmt.Errorf("could not create MachineConfig from new Ignition config: %w", err)
 			}
@@ -114,7 +114,7 @@ func generateBootstrapManagedKeyKubelet(pool *mcfgv1.MachineConfigPool, managedK
 	if _, ok := managedKeyExist[pool.Name]; ok {
 		return "", fmt.Errorf("Error found multiple KubeletConfigs targeting MachineConfigPool %v. Please apply only one KubeletConfig manifest for each pool during installation", pool.Name)
 	}
-	managedKey, err := ctrlcommon.GetManagedKey(pool, nil, "99", "kubelet", "")
+	managedKey, err := commonconfigs.GetManagedKey(pool, nil, "99", "kubelet", "")
 	if err != nil {
 		return "", err
 	}
