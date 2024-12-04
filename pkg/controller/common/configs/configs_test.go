@@ -1,4 +1,4 @@
-package common
+package configs
 
 import (
 	"reflect"
@@ -13,8 +13,9 @@ import (
 	validate3 "github.com/coreos/ignition/v2/config/validate"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
+
 	"github.com/openshift/machine-config-operator/pkg/controller/common/fixtures"
-	"github.com/openshift/machine-config-operator/test/helpers"
+	testfixtures "github.com/openshift/machine-config-operator/test/fixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -183,14 +184,14 @@ func TestParseAndConvert(t *testing.T) {
 	testIgn2Config.Ignition.Version = "2.2.0"
 
 	// turn v2.2 config into a raw []byte
-	rawIgn := helpers.MarshalOrDie(testIgn2Config)
+	rawIgn := testfixtures.MarshalOrDie(testIgn2Config)
 	// check that it was parsed successfully
 	convertedIgn, err := ParseAndConvertConfig(rawIgn)
 	require.Nil(t, err)
 	assert.Equal(t, testIgn3Config, convertedIgn)
 
 	// turn v3.1 config into a raw []byte
-	rawIgn = helpers.MarshalOrDie(testIgn3Config)
+	rawIgn = testfixtures.MarshalOrDie(testIgn3Config)
 	// check that it was parsed successfully
 	convertedIgn, err = ParseAndConvertConfig(rawIgn)
 	require.Nil(t, err)
@@ -199,7 +200,7 @@ func TestParseAndConvert(t *testing.T) {
 	// Make a valid Ign 3.2 cfg
 	testIgn3Config.Ignition.Version = commonconsts.InternalMCOIgnitionVersion
 	// turn it into a raw []byte
-	rawIgn = helpers.MarshalOrDie(testIgn3Config)
+	rawIgn = testfixtures.MarshalOrDie(testIgn3Config)
 	// check that it was parsed successfully
 	convertedIgn, err = ParseAndConvertConfig(rawIgn)
 	require.Nil(t, err)
@@ -208,7 +209,7 @@ func TestParseAndConvert(t *testing.T) {
 	// Make a valid Ign 3.1 cfg
 	testIgn3Config.Ignition.Version = "3.1.0"
 	// turn it into a raw []byte
-	rawIgn = helpers.MarshalOrDie(testIgn3Config)
+	rawIgn = testfixtures.MarshalOrDie(testIgn3Config)
 	// check that it was parsed successfully back to the default version
 	convertedIgn, err = ParseAndConvertConfig(rawIgn)
 	require.Nil(t, err)
@@ -218,7 +219,7 @@ func TestParseAndConvert(t *testing.T) {
 	// Make a valid Ign 3.0 cfg
 	testIgn3Config.Ignition.Version = "3.0.0"
 	// turn it into a raw []byte
-	rawIgn = helpers.MarshalOrDie(testIgn3Config)
+	rawIgn = testfixtures.MarshalOrDie(testIgn3Config)
 	// check that it was parsed successfully back to the default version
 	convertedIgn, err = ParseAndConvertConfig(rawIgn)
 	require.Nil(t, err)
@@ -228,7 +229,7 @@ func TestParseAndConvert(t *testing.T) {
 	// Make a valid Ign 3.3 cfg
 	testIgn3Config.Ignition.Version = "3.3.0"
 	// turn it into a raw []byte
-	rawIgn = helpers.MarshalOrDie(testIgn3Config)
+	rawIgn = testfixtures.MarshalOrDie(testIgn3Config)
 	// check that it was parsed successfully back to the default version
 	convertedIgn, err = ParseAndConvertConfig(rawIgn)
 	require.Nil(t, err)
@@ -238,7 +239,7 @@ func TestParseAndConvert(t *testing.T) {
 	// Make a valid Ign 3.4 cfg
 	testIgn3Config.Ignition.Version = "3.4.0"
 	// turn it into a raw []byte
-	rawIgn = helpers.MarshalOrDie(testIgn3Config)
+	rawIgn = testfixtures.MarshalOrDie(testIgn3Config)
 	// check that it was parsed successfully back to the default version
 	convertedIgn, err = ParseAndConvertConfig(rawIgn)
 	require.Nil(t, err)
@@ -247,7 +248,7 @@ func TestParseAndConvert(t *testing.T) {
 
 	// Make a bad Ign3 cfg
 	testIgn3Config.Ignition.Version = "21.0.0"
-	rawIgn = helpers.MarshalOrDie(testIgn3Config)
+	rawIgn = testfixtures.MarshalOrDie(testIgn3Config)
 	// check that it failed since this is an invalid cfg
 	convertedIgn, err = ParseAndConvertConfig(rawIgn)
 	require.NotNil(t, err)
@@ -342,7 +343,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 		},
 	}
 
-	machineConfigIgnSSHUser := helpers.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
+	machineConfigIgnSSHUser := testfixtures.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
 		Ignition: ign3types.Ignition{
 			Version: ign3types.MaxVersion.String(),
 		},
@@ -353,7 +354,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 		},
 	}, "ssh", commonconsts.MachineConfigPoolWorker)
 
-	machineConfigIgnPasswdHashUser := helpers.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
+	machineConfigIgnPasswdHashUser := testfixtures.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
 		Ignition: ign3types.Ignition{
 			Version: ign3types.MaxVersion.String(),
 		},
@@ -365,13 +366,13 @@ func TestMergeMachineConfigs(t *testing.T) {
 	}, "passwd", commonconsts.MachineConfigPoolWorker)
 
 	// we added some v3 specific logic for kargs, make sure we didn't break the v2 path
-	machineConfigIgnV2Merge := helpers.CreateMachineConfigFromIgnitionWithMetadata(ign2types.Config{
+	machineConfigIgnV2Merge := testfixtures.CreateMachineConfigFromIgnitionWithMetadata(ign2types.Config{
 		Ignition: ign2types.Ignition{
 			Version: ign2types.MaxVersion.String(),
 		},
 	}, "v2", commonconsts.MachineConfigPoolWorker)
 
-	machineConfigIgn := helpers.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
+	machineConfigIgn := testfixtures.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
 		Ignition: ign3types.Ignition{
 			Version: ign3types.MaxVersion.String(),
 		},
@@ -403,7 +404,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 			OSImageURL:      "overriddenURL",
 			KernelArguments: kargs,
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(ign3types.Config{
+				Raw: testfixtures.MarshalOrDie(ign3types.Config{
 					Ignition: ign3types.Ignition{
 						Version: ign3types.MaxVersion.String(),
 					},
@@ -429,43 +430,43 @@ func TestMergeMachineConfigs(t *testing.T) {
 	testDataOld := "data:,old"
 	testDataNew := "data:,new"
 
-	machineConfigWorker1 := helpers.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
+	machineConfigWorker1 := testfixtures.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
 		Ignition: ign3types.Ignition{
 			Version: ign3types.MaxVersion.String(),
 		},
 		Storage: ign3types.Storage{
 			Files: []ign3types.File{
-				helpers.CreateIgn3File(filePath1, testDataOld, mode),
+				testfixtures.CreateIgn3File(filePath1, testDataOld, mode),
 			},
 		},
 	}, "aaa", commonconsts.MachineConfigPoolWorker)
-	machineConfigWorker2 := helpers.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
+	machineConfigWorker2 := testfixtures.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
 		Ignition: ign3types.Ignition{
 			Version: ign3types.MaxVersion.String(),
 		},
 		Storage: ign3types.Storage{
 			Files: []ign3types.File{
-				helpers.CreateIgn3File(filePath1, testDataNew, mode),
+				testfixtures.CreateIgn3File(filePath1, testDataNew, mode),
 			},
 		},
 	}, "bbb", commonconsts.MachineConfigPoolWorker)
-	machineConfigWorker3 := helpers.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
+	machineConfigWorker3 := testfixtures.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
 		Ignition: ign3types.Ignition{
 			Version: ign3types.MaxVersion.String(),
 		},
 		Storage: ign3types.Storage{
 			Files: []ign3types.File{
-				helpers.CreateIgn3File(filePath2, testDataOld, mode),
+				testfixtures.CreateIgn3File(filePath2, testDataOld, mode),
 			},
 		},
 	}, "ddd", commonconsts.MachineConfigPoolWorker)
-	machineConfigInfra := helpers.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
+	machineConfigInfra := testfixtures.CreateMachineConfigFromIgnitionWithMetadata(ign3types.Config{
 		Ignition: ign3types.Ignition{
 			Version: ign3types.MaxVersion.String(),
 		},
 		Storage: ign3types.Storage{
 			Files: []ign3types.File{
-				helpers.CreateIgn3File(filePath2, testDataNew, mode),
+				testfixtures.CreateIgn3File(filePath2, testDataNew, mode),
 			},
 		},
 	}, "ccc", "infra")
@@ -486,7 +487,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 		Spec: mcfgv1.MachineConfigSpec{
 			KernelArguments: []string{},
 			Config: runtime.RawExtension{
-				Raw: helpers.MarshalOrDie(ign3types.Config{
+				Raw: testfixtures.MarshalOrDie(ign3types.Config{
 					Ignition: ign3types.Ignition{
 						Version: ign3types.MaxVersion.String(),
 					},
@@ -501,7 +502,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 								},
 								Node: ign3types.Node{
 									Path:      filePath1,
-									Overwrite: boolToPtr(true),
+									Overwrite: coreosutils.BoolToPtr(true),
 									User: ign3types.NodeUser{
 										Name: coreosutils.StrToPtr("root"),
 									},
@@ -516,7 +517,7 @@ func TestMergeMachineConfigs(t *testing.T) {
 								},
 								Node: ign3types.Node{
 									Path:      filePath2,
-									Overwrite: boolToPtr(true),
+									Overwrite: coreosutils.BoolToPtr(true),
 									User: ign3types.NodeUser{
 										Name: coreosutils.StrToPtr("root"),
 									},
@@ -652,9 +653,9 @@ func TestSetDefaultFileOverwrite(t *testing.T) {
 	testfiledata := "data:,test"
 	tempFileNoDefault := ign3types.File{Node: ign3types.Node{Path: "/etc/testfileconfig1"},
 		FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: &testfiledata}, Mode: &mode}}
-	tempFileOvewriteTrue := ign3types.File{Node: ign3types.Node{Path: "/etc/testfileconfig1", Overwrite: boolToPtr(true)},
+	tempFileOvewriteTrue := ign3types.File{Node: ign3types.Node{Path: "/etc/testfileconfig1", Overwrite: coreosutils.BoolToPtr(true)},
 		FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: &testfiledata}, Mode: &mode}}
-	tempFileOverwriteFalse := ign3types.File{Node: ign3types.Node{Path: "/etc/testfileconfig2", Overwrite: boolToPtr(false)},
+	tempFileOverwriteFalse := ign3types.File{Node: ign3types.Node{Path: "/etc/testfileconfig2", Overwrite: coreosutils.BoolToPtr(false)},
 		FileEmbedded1: ign3types.FileEmbedded1{Contents: ign3types.Resource{Source: &testfiledata}, Mode: &mode}}
 
 	// Set up two Ignition configs, one with overwrite: no default, overwrite: false (to be passed to MergeMachineConfigs)
@@ -781,7 +782,7 @@ func TestParseAndConvertGzippedConfig(t *testing.T) {
 		},
 		Storage: ign3types.Storage{
 			Files: []ign3types.File{
-				helpers.CreateIgn3File("/etc/hello-worker", "data:,hello%20world%0A", 420),
+				testfixtures.CreateIgn3File("/etc/hello-worker", "data:,hello%20world%0A", 420),
 			},
 		},
 	}

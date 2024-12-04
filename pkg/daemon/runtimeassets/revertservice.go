@@ -8,7 +8,8 @@ import (
 
 	ign3types "github.com/coreos/ignition/v2/config/v3_4/types"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
-	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+	commonconfigs "github.com/openshift/machine-config-operator/pkg/controller/common/configs"
+
 	"sigs.k8s.io/yaml"
 )
 
@@ -66,7 +67,7 @@ func (r *revertService) Ignition() (*ign3types.Config, error) {
 		return nil, err
 	}
 
-	ignConfig := ctrlcommon.NewIgnConfig()
+	ignConfig := commonconfigs.NewIgnConfig()
 	ignConfig.Systemd = ign3types.Systemd{
 		Units: []ign3types.Unit{
 			*out,

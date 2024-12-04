@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	// osLabel is used to identify which type of OS the node has
+	// OSLabel is used to identify which type of OS the node has
 	OSLabel = "kubernetes.io/os"
 )
 

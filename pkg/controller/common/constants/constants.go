@@ -31,6 +31,9 @@ const (
 	// KernelType64kPages denominates the 64k pages kernel
 	KernelType64kPages = "64k-pages"
 
+	// Name of machine api namespace
+	MachineAPINamespace string = "openshift-machine-api"
+
 	// MasterLabel defines the label associated with master node. The master taint uses the same label as taint's key
 	MasterLabel = "node-role.kubernetes.io/master"
 
@@ -49,7 +52,7 @@ const (
 	// APIServerInstanceName is a singleton name for APIServer configuration
 	APIServerInstanceName = "cluster"
 
-	// APIServerInstanceName is a singleton name for APIServer configuration
+	// APIServerBootstrapFileLocation is the bootstrap apiserver file location
 	APIServerBootstrapFileLocation = "/etc/mcs/bootstrap/api-server/api-server.yaml"
 
 	// MachineConfigPoolMaster is the MachineConfigPool name given to the master

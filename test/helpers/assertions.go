@@ -9,6 +9,7 @@ import (
 	mcfgv1alpha1 "github.com/openshift/api/machineconfiguration/v1alpha1"
 	mcfgclientset "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
+	commonconsts "github.com/openshift/machine-config-operator/pkg/controller/common/constants"
 	"github.com/openshift/machine-config-operator/test/framework"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,11 +19,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-)
-
-const (
-	// Importing ctrlcommon will cause a circular import issue. To avoid that, we set / use this constant instead.
-	mcoNamespace string = "openshift-machine-config-operator"
 )
 
 // Holds the basic items needed to perform an assertion on a Kube object. Each
@@ -337,7 +333,7 @@ func (a *Assertions) secretReachesState(name string, stateFunc func(*corev1.Secr
 	defer cancel()
 
 	err := wait.PollUntilContextCancel(ctx, a.getPollInterval(), true, func(ctx context.Context) (bool, error) {
-		secret, err := a.kubeclient.CoreV1().Secrets(mcoNamespace).Get(ctx, name, metav1.GetOptions{})
+		secret, err := a.kubeclient.CoreV1().Secrets(commonconsts.MCONamespace).Get(ctx, name, metav1.GetOptions{})
 		return a.handleStateFuncResult(stateFunc(secret, err))
 	})
 
@@ -353,7 +349,7 @@ func (a *Assertions) configMapReachesState(name string, stateFunc func(*corev1.C
 	defer cancel()
 
 	err := wait.PollUntilContextCancel(ctx, a.getPollInterval(), true, func(ctx context.Context) (bool, error) {
-		cm, err := a.kubeclient.CoreV1().ConfigMaps(mcoNamespace).Get(ctx, name, metav1.GetOptions{})
+		cm, err := a.kubeclient.CoreV1().ConfigMaps(commonconsts.MCONamespace).Get(ctx, name, metav1.GetOptions{})
 		return a.handleStateFuncResult(stateFunc(cm, err))
 	})
 
@@ -369,7 +365,7 @@ func (a *Assertions) podReachesState(podName string, stateFunc func(*corev1.Pod,
 	defer cancel()
 
 	err := wait.PollUntilContextCancel(ctx, a.getPollInterval(), true, func(ctx context.Context) (bool, error) {
-		pod, err := a.kubeclient.CoreV1().Pods(mcoNamespace).Get(ctx, podName, metav1.GetOptions{})
+		pod, err := a.kubeclient.CoreV1().Pods(commonconsts.MCONamespace).Get(ctx, podName, metav1.GetOptions{})
 		return a.handleStateFuncResult(stateFunc(pod, err))
 	})
 
@@ -385,7 +381,7 @@ func (a *Assertions) jobReachesState(jobName string, stateFunc func(*batchv1.Job
 	defer cancel()
 
 	err := wait.PollUntilContextCancel(ctx, a.getPollInterval(), true, func(ctx context.Context) (bool, error) {
-		pod, err := a.kubeclient.BatchV1().Jobs(mcoNamespace).Get(ctx, jobName, metav1.GetOptions{})
+		pod, err := a.kubeclient.BatchV1().Jobs(commonconsts.MCONamespace).Get(ctx, jobName, metav1.GetOptions{})
 		return a.handleStateFuncResult(stateFunc(pod, err))
 	})
 
