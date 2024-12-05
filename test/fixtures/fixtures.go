@@ -45,7 +45,7 @@ func NewMachineConfig(name string, labels map[string]string, osurl string, files
 }
 
 // NewMachineConfig returns a basic machine config with supplied labels, osurl & files added
-func NewMachineConfigWithAnnotation(name string, labels, annotations map[string]string, osurl string, files []ign3types.File) *mcfgv1.MachineConfig { //all tests
+func NewMachineConfigWithAnnotation(name string, labels, annotations map[string]string, osurl string, files []ign3types.File) *mcfgv1.MachineConfig {
 	return NewMachineConfigExtended(
 		name,
 		labels,
@@ -73,7 +73,7 @@ func NewMachineConfigExtended(
 	fips bool,
 	kernelArguments []string,
 	kernelType, osurl string,
-) *mcfgv1.MachineConfig { //all tests
+) *mcfgv1.MachineConfig {
 	if labels == nil {
 		labels = map[string]string{}
 	}
@@ -129,7 +129,7 @@ func NewMachineConfigExtended(
 }
 
 // NewMachineConfigPool returns a MCP with supplied mcSelector, nodeSelector and machineconfig
-func NewMachineConfigPool(name string, mcSelector, nodeSelector *metav1.LabelSelector, currentMachineConfig string) *mcfgv1.MachineConfigPool { //all tests
+func NewMachineConfigPool(name string, mcSelector, nodeSelector *metav1.LabelSelector, currentMachineConfig string) *mcfgv1.MachineConfigPool {
 	return &mcfgv1.MachineConfigPool{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: mcfgv1.SchemeGroupVersion.String(),
@@ -177,7 +177,7 @@ func NewMachineConfigPool(name string, mcSelector, nodeSelector *metav1.LabelSel
 	}
 }
 
-func NewOpaqueSecret(name, namespace, content string) *corev1.Secret { //all tests
+func NewOpaqueSecret(name, namespace, content string) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -192,7 +192,7 @@ func NewOpaqueSecret(name, namespace, content string) *corev1.Secret { //all tes
 }
 
 // CreateMachineConfigFromIgnitionWithMetadata returns a MachineConfig object from an Ignition config, name, and role label
-func CreateMachineConfigFromIgnitionWithMetadata(ignCfg interface{}, name, role string) *mcfgv1.MachineConfig { //all tests
+func CreateMachineConfigFromIgnitionWithMetadata(ignCfg interface{}, name, role string) *mcfgv1.MachineConfig {
 	return &mcfgv1.MachineConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
@@ -207,7 +207,7 @@ func CreateMachineConfigFromIgnitionWithMetadata(ignCfg interface{}, name, role 
 }
 
 // CreateMachineConfigFromIgnition returns a MachineConfig object from an Ignition config passed to it
-func CreateMachineConfigFromIgnition(ignCfg interface{}) *mcfgv1.MachineConfig { //all tests
+func CreateMachineConfigFromIgnition(ignCfg interface{}) *mcfgv1.MachineConfig {
 	return &mcfgv1.MachineConfig{
 		Spec: mcfgv1.MachineConfigSpec{
 			Config: runtime.RawExtension{
@@ -218,7 +218,7 @@ func CreateMachineConfigFromIgnition(ignCfg interface{}) *mcfgv1.MachineConfig {
 }
 
 // MarshalOrDie returns a marshalled interface or panics
-func MarshalOrDie(input interface{}) []byte { //all tests
+func MarshalOrDie(input interface{}) []byte {
 	bytes, err := json.Marshal(input)
 	if err != nil {
 		panic(err)

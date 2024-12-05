@@ -183,4 +183,4 @@ func (m *MachineConfigPoolBuilder) MachineConfigPool() *mcfgv1.MachineConfigPool
 	}
 
 	return mcp
-} // duplicate: in /pkg/controller/build/buildrequest/builder.go and duplicate of vendor
+}
