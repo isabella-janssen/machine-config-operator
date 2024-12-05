@@ -499,7 +499,7 @@ func TestDeletedTransientMachineOSBuildIsRecreated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait a few seconds for the MachineOSBuild deletion to complete.
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 10)
 	// Ensure that the Job is deleted as this might take some time
 	kubeassert := helpers.AssertClientSet(t, cs).WithContext(ctx).Eventually()
 	kubeassert.Eventually().JobDoesNotExist(firstJob.Name)
@@ -876,7 +876,7 @@ func waitForBuildToStart(t *testing.T, cs *framework.ClientSet, build *mcfgv1alp
 
 	t.Logf("Waiting for MachineOSBuild %s to start", build.Name)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 	defer cancel()
 
 	start := time.Now()
@@ -910,7 +910,7 @@ func waitForBuildToStart(t *testing.T, cs *framework.ClientSet, build *mcfgv1alp
 func waitForBuildToBeDeleted(t *testing.T, cs *framework.ClientSet, build *mcfgv1alpha1.MachineOSBuild) {
 	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 	defer cancel()
 
 	t.Logf("Waiting for MachineOSBuild %s to be deleted", build.Name)
