@@ -78,6 +78,7 @@ func runStartCmd(_ *cobra.Command, _ []string) {
 		draincontroller := drain.New(
 			drain.DefaultConfig(),
 			ctrlctx.KubeInformerFactory.Core().V1().Nodes(),
+			ctrlctx.InformerFactory.Machineconfiguration().V1().MachineConfigPools(),
 			ctrlctx.ClientBuilder.KubeClientOrDie("node-update-controller"),
 			ctrlctx.ClientBuilder.MachineConfigClientOrDie("node-update-controller"),
 			ctrlctx.FeatureGateAccess,

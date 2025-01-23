@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	apicfgv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/machine-config-operator/pkg/helpers"
 	"github.com/openshift/machine-config-operator/pkg/upgrademonitor"
 
 	features "github.com/openshift/api/features"
@@ -128,6 +129,7 @@ func (tc upgradeMonitorTestCase) run(t *testing.T) {
 		i.Machineconfiguration().V1().MachineConfigs(),
 		k8sI.Core().V1().Nodes(),
 		i.Machineconfiguration().V1().ControllerConfigs(),
+		i.Machineconfiguration().V1().MachineConfigPools(),
 		f.oclient,
 		false,
 		"",
@@ -136,6 +138,7 @@ func (tc upgradeMonitorTestCase) run(t *testing.T) {
 
 	d.mcListerSynced = alwaysReady
 	d.nodeListerSynced = alwaysReady
+	d.mcpListerSynced = alwaysReady
 
 	i.Start(stopCh)
 	i.WaitForCacheSync(stopCh)
@@ -151,7 +154,14 @@ func (tc upgradeMonitorTestCase) run(t *testing.T) {
 	}
 
 	for _, n := range f.nodeLister {
-		err = upgrademonitor.GenerateAndApplyMachineConfigNodes(tc.parentCondition, tc.childCondition, tc.parentStatus, tc.childStatus, n, d.mcfgClient, d.featureGatesAccessor)
+
+		primaryPool, err := helpers.GetPrimaryPoolForNode(d.mcpLister, n)
+		if err != nil {
+			f.t.Fatalf("Could not determine primary pool for node: %v", err)
+		}
+		var pool string = primaryPool.Name
+
+		err = upgrademonitor.GenerateAndApplyMachineConfigNodes(tc.parentCondition, tc.childCondition, tc.parentStatus, tc.childStatus, n, d.mcfgClient, d.featureGatesAccessor, pool)
 		if err != nil {
 			f.t.Fatalf("Could not generate and apply MCN %v", err)
 		}

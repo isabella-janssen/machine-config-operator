@@ -40,8 +40,9 @@ func GenerateAndApplyMachineConfigNodes(
 	node *corev1.Node,
 	mcfgClient mcfgclientset.Interface,
 	fgAccessor featuregates.FeatureGateAccess,
+	pool string,
 ) error {
-	return generateAndApplyMachineConfigNodes(parentCondition, childCondition, parentStatus, childStatus, node, mcfgClient, nil, nil, fgAccessor)
+	return generateAndApplyMachineConfigNodes(parentCondition, childCondition, parentStatus, childStatus, node, mcfgClient, nil, nil, fgAccessor, pool)
 }
 
 func UpdateMachineConfigNodeStatus(
@@ -54,8 +55,9 @@ func UpdateMachineConfigNodeStatus(
 	imageSetApplyConfig []*machineconfigurationalphav1.MachineConfigNodeStatusPinnedImageSetApplyConfiguration,
 	imageSetSpec []mcfgalphav1.MachineConfigNodeSpecPinnedImageSet,
 	fgAccessor featuregates.FeatureGateAccess,
+	pool string,
 ) error {
-	return generateAndApplyMachineConfigNodes(parentCondition, childCondition, parentStatus, childStatus, node, mcfgClient, imageSetApplyConfig, imageSetSpec, fgAccessor)
+	return generateAndApplyMachineConfigNodes(parentCondition, childCondition, parentStatus, childStatus, node, mcfgClient, imageSetApplyConfig, imageSetSpec, fgAccessor, pool)
 }
 
 // Helper function to convert metav1.Condition to ConditionApplyConfiguration
@@ -89,6 +91,7 @@ func generateAndApplyMachineConfigNodes(
 	imageSetApplyConfig []*machineconfigurationalphav1.MachineConfigNodeStatusPinnedImageSetApplyConfiguration,
 	imageSetSpec []mcfgalphav1.MachineConfigNodeSpecPinnedImageSet,
 	fgAccessor featuregates.FeatureGateAccess,
+	pool string,
 ) error {
 	if fgAccessor == nil || node == nil || parentCondition == nil || mcfgClient == nil {
 		return nil
@@ -100,14 +103,6 @@ func generateAndApplyMachineConfigNodes(
 	}
 	if fg == nil || !fg.Enabled(features.FeatureGateMachineConfigNodes) {
 		return nil
-	}
-
-	var pool string
-	var ok bool
-	if _, ok = node.Labels["node-role.kubernetes.io/worker"]; ok {
-		pool = "worker"
-	} else if _, ok = node.Labels["node-role.kubernetes.io/master"]; ok {
-		pool = "master"
 	}
 
 	// get the existing MCN, or if it DNE create one below
