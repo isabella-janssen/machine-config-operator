@@ -60,7 +60,8 @@ func createPool(cs *framework.ClientSet, poolName string) (*mcfgv1.MachineConfig
 			},
 			NodeSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"node-role.kubernetes.io/" + poolName: "",
+					// Note here that all pool name labels start with node-role.kubernetes.io/
+					"	" + poolName: "",
 				},
 			},
 		},

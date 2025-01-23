@@ -799,6 +799,10 @@ func (ctrl *Controller) getPoolsForNode(node *corev1.Node) ([]*mcfgv1.MachineCon
 	return pools, nil
 }
 
+// func (ctrl *Controller) GetPoolsForNode(node *corev1.Node) ([]*mcfgv1.MachineConfigPool, error) {
+// 	return ctrl.getPoolsForNode(node)
+// }
+
 // getPrimaryPoolForNode uses getPoolsForNode and returns the first one which is the one the node targets
 func (ctrl *Controller) getPrimaryPoolForNode(node *corev1.Node) (*mcfgv1.MachineConfigPool, error) {
 	pools, err := ctrl.getPoolsForNode(node)
@@ -810,6 +814,10 @@ func (ctrl *Controller) getPrimaryPoolForNode(node *corev1.Node) (*mcfgv1.Machin
 	}
 	return pools[0], nil
 }
+
+// func (ctrl *Controller) GetPrimaryPoolForNode(node *corev1.Node) (*mcfgv1.MachineConfigPool, error) {
+// 	return ctrl.getPrimaryPoolForNode(node)
+// }
 
 func (ctrl *Controller) enqueue(pool *mcfgv1.MachineConfigPool) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pool)

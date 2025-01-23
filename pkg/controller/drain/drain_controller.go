@@ -12,6 +12,9 @@ import (
 	"github.com/openshift/client-go/machineconfiguration/clientset/versioned/scheme"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+
+	// nodecontroller "github.com/openshift/machine-config-operator/pkg/controller/node/node_controller.go"
+
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	"github.com/openshift/machine-config-operator/pkg/upgrademonitor"
 
@@ -259,6 +262,7 @@ func (ctrl *Controller) handleErr(err error, key string) {
 }
 
 func (ctrl *Controller) syncNode(key string) error {
+	klog.Error("in syncNode, version 3")
 	startTime := time.Now()
 	klog.V(4).Infof("Started syncing node %q (%v)", key, startTime)
 	defer func() {
@@ -279,6 +283,44 @@ func (ctrl *Controller) syncNode(key string) error {
 	if err != nil {
 		return err
 	}
+
+	// primaryPool := nodecontroller.GetPrimaryPoolForNode(node)
+
+	ctrl.getPrimaryPoolForNode(node)
+	klog.Errorf("in syncNode with primaryPool: %v", primaryPool)
+
+	// Determine the MCP for this node
+	var pool string
+	if _, ok := node.Labels["node-role.kubernetes.io/worker"]; ok {
+		pool = "worker"
+	} else if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
+		pool = "master"
+	} else {
+		pool = "unknown"
+	}
+	klog.Errorf("in syncNode with pool: %v", pool)
+
+	var pools []string
+	var poolName string
+	labels := node.Labels
+	if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
+		pools = append(pools, "master")
+	} else {
+		for key, _ := range labels {
+			if strings.Contains(key, "node-role.kubernetes.io/") {
+				pools = append(pools, strings.ReplaceAll(key, "node-role.kubernetes.io/", ""))
+			}
+		}
+	}
+	klog.Errorf("on line 304 of syncNode with pools value of %v", pools)
+	if len(pools) > 0 {
+		klog.Errorf("MCP value for node %v determined to be %v", node.Name, pools)
+		poolName = strings.Join(pools, ",") //TODO: add back comma
+	} else {
+		klog.Errorf("could not determine MCP value for node %v", node.Name)
+		return err
+	}
+	klog.Errorf("in syncNode with poolName: %v", poolName)
 
 	desiredState := node.Annotations[daemonconsts.DesiredDrainerAnnotationKey]
 	if desiredState == node.Annotations[daemonconsts.LastAppliedDrainerAnnotationKey] {
@@ -360,6 +402,24 @@ func (ctrl *Controller) syncNode(key string) error {
 	ctrlcommon.UpdateStateMetric(ctrlcommon.MCCSubControllerState, "machine-config-controller-drain", desiredVerb, node.Name)
 	return nil
 }
+
+// // getPoolsForNode chooses the MachineConfigPools that should be used for a given node.
+// // It disambiguates in the case where e.g. a node has both master/worker roles applied,
+// // and where a custom role may be used. It returns a slice of all the pools the node belongs to.
+// // It also ignores the Windows nodes.
+// func (ctrl *Controller) getPoolsForNode(node *corev1.Node) ([]*mcfgv1.MachineConfigPool, error) {
+// 	pools, metric, err := helpers.GetPoolsForNode(ctrl.mcpLister, node)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if pools == nil {
+// 		return nil, nil
+// 	}
+// 	if metric != nil {
+// 		ctrlcommon.MCCPoolAlert.WithLabelValues(node.Name).Set(float64(*metric))
+// 	}
+// 	return pools, nil
+// }
 
 func (ctrl *Controller) drainNode(node *corev1.Node, drainer *drain.Helper) error {
 	// First check if we have an ongoing drain
