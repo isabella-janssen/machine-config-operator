@@ -709,15 +709,17 @@ func (dn *Daemon) syncNode(key string) error {
 		return nil
 	}
 
-	primaryPool, err := helpers.GetPrimaryPoolForNode(dn.mcpLister, dn.node)
+	primaryPool, err := helpers.GetPrimaryPoolForNode(dn.mcpLister, node)
 	if err != nil {
 		klog.Errorf("Error getting primary pool for node: %v", err)
+		return err
 	}
 	var pool string = primaryPool.Name
 
 	if node.Annotations[constants.MachineConfigDaemonPostConfigAction] == constants.MachineConfigDaemonStateRebooting {
 		klog.Info("Detected Rebooting Annotation, applying MCN.")
-		err := upgrademonitor.GenerateAndApplyMachineConfigNodes(
+
+		err = upgrademonitor.GenerateAndApplyMachineConfigNodes(
 			&upgrademonitor.Condition{State: mcfgalphav1.MachineConfigNodeUpdatePostActionComplete, Reason: string(mcfgalphav1.MachineConfigNodeUpdateRebooted), Message: "Node has rebooted"},
 			&upgrademonitor.Condition{State: mcfgalphav1.MachineConfigNodeUpdateRebooted, Reason: fmt.Sprintf("%s%s", string(mcfgalphav1.MachineConfigNodeUpdatePostActionComplete), string(mcfgalphav1.MachineConfigNodeUpdateRebooted)), Message: "Upgrade required a reboot. Completed this as the post update action."},
 			metav1.ConditionTrue,
@@ -2241,6 +2243,7 @@ func (dn *Daemon) updateConfigAndState(state *stateAndConfigs) (bool, bool, erro
 	if inDesiredConfig {
 		// Great, we've successfully rebooted for the desired config,
 		// let's mark it done!
+
 		primaryPool, err := helpers.GetPrimaryPoolForNode(dn.mcpLister, dn.node)
 		if err != nil {
 			klog.Errorf("Error getting primary pool for node: %v", err)
