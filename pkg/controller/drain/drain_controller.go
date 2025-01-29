@@ -12,8 +12,10 @@ import (
 	"github.com/openshift/client-go/machineconfiguration/clientset/versioned/scheme"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
+
+	// nodecontroller "github.com/openshift/machine-config-operator/pkg/controller/node/node_controller.go"
+
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
-	"github.com/openshift/machine-config-operator/pkg/helpers"
 	"github.com/openshift/machine-config-operator/pkg/upgrademonitor"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,14 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	mcfginformersv1 "github.com/openshift/client-go/machineconfiguration/informers/externalversions/machineconfiguration/v1"
-	mcfglistersv1 "github.com/openshift/client-go/machineconfiguration/listers/machineconfiguration/v1"
 	corev1 "k8s.io/api/core/v1"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientsetv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisterv1 "k8s.io/client-go/listers/core/v1"
-
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -102,9 +101,6 @@ type Controller struct {
 	nodeLister       corelisterv1.NodeLister
 	nodeListerSynced cache.InformerSynced
 
-	mcpLister       mcfglistersv1.MachineConfigPoolLister
-	mcpListerSynced cache.InformerSynced
-
 	queue         workqueue.TypedRateLimitingInterface[string]
 	ongoingDrains map[string]time.Time
 
@@ -117,7 +113,6 @@ type Controller struct {
 func New(
 	cfg Config,
 	nodeInformer coreinformersv1.NodeInformer,
-	mcpInformer mcfginformersv1.MachineConfigPoolInformer,
 	kubeClient clientset.Interface,
 	mcfgClient mcfgclientset.Interface,
 	fgAccessor featuregates.FeatureGateAccess,
@@ -148,9 +143,6 @@ func New(
 	ctrl.nodeLister = nodeInformer.Lister()
 	ctrl.nodeListerSynced = nodeInformer.Informer().HasSynced
 
-	ctrl.mcpLister = mcpInformer.Lister()
-	ctrl.mcpListerSynced = mcpInformer.Informer().HasSynced
-
 	return ctrl
 }
 
@@ -170,7 +162,7 @@ func (ctrl *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ctrl.queue.ShutDown()
 
-	if !cache.WaitForCacheSync(stopCh, ctrl.nodeListerSynced, ctrl.mcpListerSynced) {
+	if !cache.WaitForCacheSync(stopCh, ctrl.nodeListerSynced) {
 		return
 	}
 
@@ -270,6 +262,7 @@ func (ctrl *Controller) handleErr(err error, key string) {
 }
 
 func (ctrl *Controller) syncNode(key string) error {
+	klog.Error("in syncNode, version 3")
 	startTime := time.Now()
 	klog.V(4).Infof("Started syncing node %q (%v)", key, startTime)
 	defer func() {
@@ -290,6 +283,44 @@ func (ctrl *Controller) syncNode(key string) error {
 	if err != nil {
 		return err
 	}
+
+	// // primaryPool := nodecontroller.GetPrimaryPoolForNode(node)
+
+	// ctrl.getPrimaryPoolForNode(node)
+	// klog.Errorf("in syncNode with primaryPool: %v", primaryPool)
+
+	// // Determine the MCP for this node
+	// var pool string
+	// if _, ok := node.Labels["node-role.kubernetes.io/worker"]; ok {
+	// 	pool = "worker"
+	// } else if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
+	// 	pool = "master"
+	// } else {
+	// 	pool = "unknown"
+	// }
+	// klog.Errorf("in syncNode with pool: %v", pool)
+
+	// var pools []string
+	// var poolName string
+	// labels := node.Labels
+	// if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
+	// 	pools = append(pools, "master")
+	// } else {
+	// 	for key, _ := range labels {
+	// 		if strings.Contains(key, "node-role.kubernetes.io/") {
+	// 			pools = append(pools, strings.ReplaceAll(key, "node-role.kubernetes.io/", ""))
+	// 		}
+	// 	}
+	// }
+	// klog.Errorf("on line 304 of syncNode with pools value of %v", pools)
+	// if len(pools) > 0 {
+	// 	klog.Errorf("MCP value for node %v determined to be %v", node.Name, pools)
+	// 	poolName = strings.Join(pools, ",") //TODO: add back comma
+	// } else {
+	// 	klog.Errorf("could not determine MCP value for node %v", node.Name)
+	// 	return err
+	// }
+	// klog.Errorf("in syncNode with poolName: %v", poolName)
 
 	desiredState := node.Annotations[daemonconsts.DesiredDrainerAnnotationKey]
 	if desiredState == node.Annotations[daemonconsts.LastAppliedDrainerAnnotationKey] {
@@ -316,12 +347,6 @@ func (ctrl *Controller) syncNode(key string) error {
 		Ctx:    context.TODO(),
 	}
 
-	primaryPool, err := helpers.GetPrimaryPoolForNode(ctrl.mcpLister, node)
-	if err != nil {
-		klog.Errorf("Error getting primary pool for node: %v", err)
-	}
-	var pool string = primaryPool.Name
-
 	desiredVerb := strings.Split(desiredState, "-")[0]
 	switch desiredVerb {
 	case daemonconsts.DrainerStateUncordon:
@@ -335,7 +360,6 @@ func (ctrl *Controller) syncNode(key string) error {
 				node,
 				ctrl.client,
 				ctrl.featureGatesAccessor,
-				pool,
 			)
 			if nErr != nil {
 				klog.Errorf("Error making MCN for Uncordon failure: %v", err)
@@ -351,7 +375,6 @@ func (ctrl *Controller) syncNode(key string) error {
 			node,
 			ctrl.client,
 			ctrl.featureGatesAccessor,
-			pool,
 		)
 		if err != nil {
 			klog.Errorf("Error making MCN for UnCordon success: %v", err)
@@ -380,6 +403,24 @@ func (ctrl *Controller) syncNode(key string) error {
 	return nil
 }
 
+// // getPoolsForNode chooses the MachineConfigPools that should be used for a given node.
+// // It disambiguates in the case where e.g. a node has both master/worker roles applied,
+// // and where a custom role may be used. It returns a slice of all the pools the node belongs to.
+// // It also ignores the Windows nodes.
+// func (ctrl *Controller) getPoolsForNode(node *corev1.Node) ([]*mcfgv1.MachineConfigPool, error) {
+// 	pools, metric, err := helpers.GetPoolsForNode(ctrl.mcpLister, node)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if pools == nil {
+// 		return nil, nil
+// 	}
+// 	if metric != nil {
+// 		ctrlcommon.MCCPoolAlert.WithLabelValues(node.Name).Set(float64(*metric))
+// 	}
+// 	return pools, nil
+// }
+
 func (ctrl *Controller) drainNode(node *corev1.Node, drainer *drain.Helper) error {
 	// First check if we have an ongoing drain
 	// This is currently stored in the object itself as a map but,
@@ -406,12 +447,6 @@ func (ctrl *Controller) drainNode(node *corev1.Node, drainer *drain.Helper) erro
 		break
 	}
 
-	primaryPool, err := helpers.GetPrimaryPoolForNode(ctrl.mcpLister, node)
-	if err != nil {
-		return err
-	}
-	var pool string = primaryPool.Name
-
 	if !isOngoingDrain {
 		ctrl.logNode(node, "cordoning")
 		// perform cordon
@@ -423,7 +458,6 @@ func (ctrl *Controller) drainNode(node *corev1.Node, drainer *drain.Helper) erro
 				node,
 				ctrl.client,
 				ctrl.featureGatesAccessor,
-				pool,
 			)
 			if Nerr != nil {
 				klog.Errorf("Error making MCN for Cordon Failure: %v", Nerr)
@@ -438,7 +472,6 @@ func (ctrl *Controller) drainNode(node *corev1.Node, drainer *drain.Helper) erro
 			node,
 			ctrl.client,
 			ctrl.featureGatesAccessor,
-			pool,
 		)
 		if err != nil {
 			klog.Errorf("Error making MCN for Cordon Success: %v", err)
@@ -447,7 +480,7 @@ func (ctrl *Controller) drainNode(node *corev1.Node, drainer *drain.Helper) erro
 
 	// Attempt drain
 	ctrl.logNode(node, "initiating drain")
-	err = upgrademonitor.GenerateAndApplyMachineConfigNodes(
+	err := upgrademonitor.GenerateAndApplyMachineConfigNodes(
 		&upgrademonitor.Condition{State: v1alpha1.MachineConfigNodeUpdateExecuted, Reason: string(v1alpha1.MachineConfigNodeUpdateDrained), Message: "Draining Node as part of update executed phase"},
 		&upgrademonitor.Condition{State: v1alpha1.MachineConfigNodeUpdateDrained, Reason: fmt.Sprintf("%s%s", string(v1alpha1.MachineConfigNodeUpdateExecuted), string(v1alpha1.MachineConfigNodeUpdateDrained)), Message: fmt.Sprintf("Draining node. The drain will not be complete until desired drainer %s matches current drainer %s", node.Annotations[daemonconsts.DesiredDrainerAnnotationKey], node.Annotations[daemonconsts.LastAppliedDrainerAnnotationKey])},
 		metav1.ConditionUnknown,
@@ -455,7 +488,6 @@ func (ctrl *Controller) drainNode(node *corev1.Node, drainer *drain.Helper) erro
 		node,
 		ctrl.client,
 		ctrl.featureGatesAccessor,
-		pool,
 	)
 	if err != nil {
 		klog.Errorf("Error making MCN for Drain beginning: %v", err)
@@ -485,7 +517,6 @@ func (ctrl *Controller) drainNode(node *corev1.Node, drainer *drain.Helper) erro
 			node,
 			ctrl.client,
 			ctrl.featureGatesAccessor,
-			pool,
 		)
 		if nErr != nil {
 			klog.Errorf("Error making MCN for Drain failure: %v", nErr)
@@ -502,7 +533,6 @@ func (ctrl *Controller) drainNode(node *corev1.Node, drainer *drain.Helper) erro
 		node,
 		ctrl.client,
 		ctrl.featureGatesAccessor,
-		pool,
 	)
 	if err != nil {
 		klog.Errorf("Error making MCN for Drain success: %v", err)
