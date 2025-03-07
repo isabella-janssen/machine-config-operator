@@ -724,6 +724,18 @@ func GetNodesByRole(cs *framework.ClientSet, role string) ([]corev1.Node, error)
 	return nodes.Items, nil
 }
 
+// //  Get filterd labels from a labels map
+// func GetMCPLabels(labels map[string]string, role string) ([]corev1.Node, error) {
+// 	listOptions := metav1.ListOptions{
+// 		LabelSelector: labels.SelectorFromSet(labels.Set{fmt.Sprintf("node-role.kubernetes.io/%s", role): ""}).String(),
+// 	}
+// 	nodes, err := cs.CoreV1Interface.Nodes().List(context.TODO(), listOptions)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return nodes.Items, nil
+// }
+
 // CreateMCP create a machine config pool with name mcpName
 // it will also use mcpName as the label selector, so any node you want to be included
 // in the pool should have a label node-role.kubernetes.io/mcpName = ""

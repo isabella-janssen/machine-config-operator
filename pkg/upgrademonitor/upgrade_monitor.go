@@ -3,6 +3,7 @@ package upgrademonitor
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	features "github.com/openshift/api/features"
 	machineconfigurationalphav1 "github.com/openshift/client-go/machineconfiguration/applyconfigurations/machineconfiguration/v1alpha1"
@@ -17,6 +18,7 @@ import (
 	applyconfigurationsmeta "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/klog/v2"
 
+	// nd "github.com/openshift/machine-config-operator/pkg/controller/node/node_controller"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
 )
 
@@ -90,6 +92,7 @@ func generateAndApplyMachineConfigNodes(
 	imageSetSpec []mcfgalphav1.MachineConfigNodeSpecPinnedImageSet,
 	fgAccessor featuregates.FeatureGateAccess,
 ) error {
+	klog.Error("In generateAndApplyMachineConfigNodes, release version 4.")
 	if fgAccessor == nil || node == nil || parentCondition == nil || mcfgClient == nil {
 		return nil
 	}
@@ -102,17 +105,66 @@ func generateAndApplyMachineConfigNodes(
 		return nil
 	}
 
-	var pool string
-	var ok bool
-	if _, ok = node.Labels["node-role.kubernetes.io/worker"]; ok {
-		pool = "worker"
-	} else if _, ok = node.Labels["node-role.kubernetes.io/master"]; ok {
-		pool = "master"
+	// var ok bool
+	var pools []string
+	var poolName string
+	labels := node.Labels
+	// if _, ok = node.Labels["node-role.kubernetes.io/master"]; ok {
+	// 	pools = append(pools, "master")
+	// } else if _, ok = node.Labels["node-role.kubernetes.io/worker"]; ok {
+	// 	pools = append(pools, "worker")
+
+	// 	// Check for custom pools for worker nodes
+	// 	for key, _ := range labels {
+	// 		if strings.Contains(key, "node-role.kubernetes.io/") && key != "node-role.kubernetes.io/worker" {
+	// 			pools = append(pools, strings.ReplaceAll(key, "node-role.kubernetes.io/", ""))
+	// 		}
+	// 	}
+	// }
+	for key, _ := range labels {
+		if strings.Contains(key, "node-role.kubernetes.io/") {
+			pools = append(pools, strings.ReplaceAll(key, "node-role.kubernetes.io/", ""))
+		}
 	}
+	klog.Errorf("on line 129 with pools value of %v", pools)
+	if len(pools) > 0 {
+		klog.Errorf("MCP value for node %v determined to be %v", node.Name, pools)
+		poolName = strings.Join(pools, "") //TODO: add back comma
+	} else {
+		klog.Errorf("could not determine MCP value for node %v", node.Name)
+		return err
+	}
+	// var poolName string = strings.Join(pools, ", ")
+
+	// klog.Errorf("in generateAndApplyMachineConfigNodes with pools: %v", pools)
+	// klog.Errorf("in generateAndApplyMachineConfigNodes with pools (percent q): %q", pools)
+	klog.Errorf("on line 129 with poolName value: %v", poolName)
+
+	// var pool string
+	// pools := controller.GetPoolsForNode(node)
+	// GetPoolNamesForNode
+	// klog.Errorf("pools: %v", pools)
+
+	// var pool string
+	// // klog.Errorf("node.Labels: %v", node.Labels)
+
+	// // labels := node.Labels
+	// // for key, _ := range labels {
+	// // 	if strings.Contains(key, "node-role.kubernetes.io/") {
+	// // 		pool += `,`
+	// // 	}
+	// // }
+
+	// if _, ok = node.Labels["node-role.kubernetes.io/worker"]; ok {
+	// 	pool = "worker"
+	// } else if _, ok = node.Labels["node-role.kubernetes.io/master"]; ok {
+	// 	pool = "master"
+	// }
 
 	// get the existing MCN, or if it DNE create one below
 	mcNode, needNewMCNode := createOrGetMachineConfigNode(mcfgClient, node)
 	newMCNode := mcNode.DeepCopy()
+	klog.Errorf("on line 167 with newMCNode.Spec.Pool.Name: %v", newMCNode.Spec.Pool.Name)
 	newParentCondition := metav1.Condition{
 		Type:               string(parentCondition.State),
 		Status:             parentStatus,
@@ -254,13 +306,26 @@ func generateAndApplyMachineConfigNodes(
 	// if the update is compatible, we can set the desired to the one being used in the update
 	// this happens either if we get prepared == true OR literally any other parent condition, since if we get past prepared, then the desiredConfig is correct.
 	if newParentCondition.Type == string(mcfgalphav1.MachineConfigNodeUpdatePrepared) && newParentCondition.Status == metav1.ConditionTrue || newParentCondition.Type != string(mcfgalphav1.MachineConfigNodeUpdatePrepared) && node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey] != "" {
+		klog.Error("on line 309, in compatible if")
 		newMCNode.Status.ConfigVersion.Desired = node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey]
 	} else if newMCNode.Status.ConfigVersion.Desired == "" {
+		klog.Error("on line 309, in not compatible if")
 		newMCNode.Status.ConfigVersion.Desired = NotYetSet
 	}
 
+	// update the MCP value in the MCN if valid
+	if poolName != "" {
+		klog.Error("on line 318")
+		newMCNode.Spec.Pool.Name = poolName
+	} else {
+		klog.Error("on line 321")
+		klog.Errorf("could not determine updates MCP value for node %v", node.Name)
+	}
+	klog.Errorf("on line 167 with updated newMCNode.Spec.Pool.Name: %v", newMCNode.Spec.Pool.Name)
+
 	// if we do not need a new MCN, generate the apply configurations for this object
 	if !needNewMCNode {
+		klog.Error("on line 327 in if for !needNewMCNode")
 		statusconfigVersionApplyConfig := machineconfigurationalphav1.MachineConfigNodeStatusMachineConfigVersion().WithDesired(newMCNode.Status.ConfigVersion.Desired)
 		if node.Annotations[daemonconsts.CurrentMachineConfigAnnotationKey] != "" {
 			statusconfigVersionApplyConfig = statusconfigVersionApplyConfig.WithCurrent(newMCNode.Status.ConfigVersion.Current)
@@ -294,6 +359,7 @@ func generateAndApplyMachineConfigNodes(
 			return err
 		}
 	} else if node.Status.Phase != corev1.NodePending && node.Status.Phase != corev1.NodePhase("Provisioning") {
+		klog.Error("on line 361 in else if for !needNewMCNode")
 		// there are cases where we get here before the MCO has settled and applied all of the MCnodes.
 		newMCNode.Spec.ConfigVersion = mcfgalphav1.MachineConfigNodeSpecMachineConfigVersion{
 			Desired: node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey],
@@ -302,7 +368,9 @@ func generateAndApplyMachineConfigNodes(
 			newMCNode.Spec.ConfigVersion.Desired = NotYetSet
 		}
 		newMCNode.Name = node.Name
-		newMCNode.Spec.Pool = mcfgalphav1.MCOObjectReference{Name: pool}
+		// newMCNode.Spec.Pool = mcfgalphav1.MCOObjectReference{Name: pool}
+		klog.Error("in else condition on line 371")
+		newMCNode.Spec.Pool = mcfgalphav1.MCOObjectReference{Name: poolName}
 		newMCNode.Spec.Node = mcfgalphav1.MCOObjectReference{Name: node.Name}
 		if imageSetSpec != nil {
 			newMCNode.Spec.PinnedImageSets = imageSetSpec
@@ -316,7 +384,8 @@ func generateAndApplyMachineConfigNodes(
 	}
 	// if this is the first time we are applying the MCN and the node is ready, set the config version probably
 	if node.Status.Phase != corev1.NodePending && node.Status.Phase != corev1.NodePhase("Provisioning") && newMCNode.Spec.ConfigVersion.Desired == "NotYetSet" {
-		err = GenerateAndApplyMachineConfigNodeSpec(fgAccessor, pool, node, mcfgClient)
+		klog.Error("on line 387")
+		err = GenerateAndApplyMachineConfigNodeSpec(fgAccessor, poolName, node, mcfgClient)
 		if err != nil {
 			klog.Errorf("Error making MCN spec for Update Compatible: %v", err)
 		}
@@ -400,14 +469,17 @@ func GenerateAndApplyMachineConfigNodeSpec(fgAccessor featuregates.FeatureGateAc
 	return nil
 }
 
-// createOrGetMachineConfigNode gets the named MCN or returns a boolean indicating we need to create one
+// createOrGetMachineConfigNode gets the named MCN or returns a boolean indicating whether we need to create one
 func createOrGetMachineConfigNode(mcfgClient mcfgclientset.Interface, node *corev1.Node) (*mcfgalphav1.MachineConfigNode, bool) {
+	klog.Error("in createOrGetMachineConfigNode")
 	mcNode, err := mcfgClient.MachineconfigurationV1alpha1().MachineConfigNodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 	if mcNode.Name == "" || (err != nil && apierrors.IsNotFound(err)) {
+		klog.Error("in createOrGetMachineConfigNode on line 477, will be returning true as needing a new MCN")
 		klog.Errorf("error getting existing MCN: %v", err)
 		return mcNode, true
 	}
 
+	klog.Error("in createOrGetMachineConfigNode on line 482, will be returning false as NOT needing a new MCN")
 	return mcNode, false
 }
 
