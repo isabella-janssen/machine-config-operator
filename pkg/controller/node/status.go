@@ -67,8 +67,10 @@ func (ctrl *Controller) syncStatusOnly(pool *mcfgv1.MachineConfigPool) error {
 	return err
 }
 
+// `calculateStatus` calculates the MachineConfigPoolStatus object for the desired MCP
+//
 //nolint:gocyclo,gosec
-func (ctrl *Controller) calculateStatus(mcs []*mcfgv1.MachineConfigNode, cconfig *mcfgv1.ControllerConfig, pool *mcfgv1.MachineConfigPool, nodes []*corev1.Node, mosc *mcfgv1.MachineOSConfig, mosb *mcfgv1.MachineOSBuild) mcfgv1.MachineConfigPoolStatus {
+func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfig *mcfgv1.ControllerConfig, pool *mcfgv1.MachineConfigPool, nodes []*corev1.Node, mosc *mcfgv1.MachineOSConfig, mosb *mcfgv1.MachineOSBuild) mcfgv1.MachineConfigPoolStatus {
 	certExpirys := []mcfgv1.CertExpiry{}
 	if cconfig != nil {
 		for _, cert := range cconfig.Status.ControllerCertificates {
@@ -82,49 +84,54 @@ func (ctrl *Controller) calculateStatus(mcs []*mcfgv1.MachineConfigNode, cconfig
 			}
 		}
 	}
-	machineCount := int32(len(nodes))
-	poolSynchronizer := newPoolSynchronizer(machineCount)
 
+	// Get total machine count and initialize pool synchronizer for MCP
+	totalMachineCount := int32(len(nodes))
+	poolSynchronizer := newPoolSynchronizer(totalMachineCount)
+
+	// Determine if pool is layered and enabled feature gates
 	isLayeredPool := ctrl.isLayeredPool(mosc, mosb)
-
-	var degradedMachines, readyMachines, updatedMachines, unavailableMachines, updatingMachines []*corev1.Node
-	degradedReasons := []string{}
 	pisIsEnabled := ctrl.fgHandler.Enabled(features.FeatureGatePinnedImages)
-	pinnedImageSetsDegraded := false
+	imageModeReportingIsEnabled := ctrl.fgHandler.Enabled(features.FeatureGateImageModeStatusReporting)
 
-	// if we represent updating properly here, we will also represent updating properly in the CO
-	// so this solves the cordoning RFE and the upgradeable RFE
-	// updating == updatePrepared, updateExecuted, updatedComplete, postAction, cordoning, draining
-	// updated == nodeResumed, updated
-	// ready == nodeResumed, updated
-	// unavailable == draining, cordoned
-	// degraded == if the condition.Reason == error
-	// this ensures that a MCP only enters Upgradeable==False if the node actually needs to upgrade to the new MC
-	for _, state := range mcs {
+	// Update the number of degraded, updated, and updating machines from conditions in the MCNs
+	// for the nodes in the associated MCP.
+	var degradedMachines, updatedMachines, updatingMachines []*corev1.Node
+	degradedReasons := []string{}
+	pinnedImageSetsDegraded := false
+	for _, mcn := range mcns {
+		// Get the node associated with the MCN
 		var ourNode *corev1.Node
 		for _, n := range nodes {
-			if state.Name == n.Name {
+			if mcn.Name == n.Name {
 				ourNode = n
 				break
 			}
 		}
 		if ourNode == nil {
-			klog.Errorf("Could not find specified node %s", state.Name)
+			klog.Errorf("Could not find specified node %s", mcn.Name)
 		}
-		if len(state.Status.Conditions) == 0 {
+
+		// If the MCN Conditions list is empty, the MCN is not ready and cannot be used to determine the MCP status
+		if len(mcn.Status.Conditions) == 0 {
 			// not ready yet
 			break
 		}
+
+		// If the PIS feature gate is enabled, update the PIS reference in the PoolSynchronizer object
 		if pisIsEnabled {
-			if isPinnedImageSetsUpdated(state) {
+			if isPinnedImageSetsUpdated(mcn) {
 				poolSynchronizer.SetUpdated(mcfgv1.PinnedImageSets)
 			}
 		}
-		for _, cond := range state.Status.Conditions {
+
+		// Loop through the MCN conditions to determine if the associated node is updating, updated, or degraded
+		for _, cond := range mcn.Status.Conditions {
 			// populate the degradedReasons from the MachineConfigNodeNodeDegraded condition
 			if mcfgv1.StateProgress(cond.Type) == mcfgv1.MachineConfigNodeNodeDegraded && cond.Status == metav1.ConditionTrue {
 				degradedMachines = append(degradedMachines, ourNode)
 				degradedReasons = append(degradedReasons, fmt.Sprintf("Node %s is reporting: %q", ourNode.Name, cond.Message))
+				// TODO: understand if node can be updating or updated in addition to being degraded
 				break
 			}
 			/*
@@ -144,85 +151,68 @@ func (ctrl *Controller) calculateStatus(mcs []*mcfgv1.MachineConfigNode, cconfig
 						break
 					}
 			*/
-			/*
-				// TODO: (djoshy) Rework this block to use MCN conditions correctly. See: https://issues.redhat.com/browse/MCO-1228
 
-				// Specifically, the main concerns for the following block are:
-				// (i) Why are only unknown conditions being evaluated? Shouldn't True/False conditions be used?
-				// (ii) Multiple conditions can be unknown at the same time, resulting in certain machines being double counted
-
-				// Some background:
-				// The MCN conditions are used to feed MCP statuses if the machine counts add up correctly to the total node count.
-				// If this check fails, node conditions are used to determine machine counts. The MCN counts calculated in this block
-				// seem incorrect most of the time, so the controller almost always defaults to using the node condition based counts.
-				// On occasion, the MCN counts cause a false positive in aformentioned check, resulting in invalid values for the MCP
-				// statuses. Commenting out this block will force the controller to always use node condition based counts to feed the
-				// MCP status.
-
-
-				if cond.Status == metav1.ConditionUnknown {
-					// This switch case will cause a node to be double counted, maybe use a hash for node count
-					switch mcfgv1.StateProgress(cond.Type) {
-					case mcfgv1.MachineConfigNodeUpdatePrepared:
-						updatingMachines = append(updatedMachines, ourNode) //nolint:gocritic
-					case mcfgv1.MachineConfigNodeUpdateExecuted:
-						updatingMachines = append(updatingMachines, ourNode)
-					case mcfgv1.MachineConfigNodeUpdatePostActionComplete:
-						updatingMachines = append(updatingMachines, ourNode)
-					case mcfgv1.MachineConfigNodeUpdateComplete:
-						updatingMachines = append(updatingMachines, ourNode)
-					case mcfgv1.MachineConfigNodeResumed:
-						updatingMachines = append(updatedMachines, ourNode) //nolint:gocritic
-						readyMachines = append(readyMachines, ourNode)
-					// Note (ijanssen): `MachineConfigNodeUpdateCompatible` was removed with MCO-1543. This case will need to be replaced/removed when working on MCO-1228.
-					case mcfgv1.MachineConfigNodeUpdateCompatible:
-						updatingMachines = append(updatedMachines, ourNode) //nolint:gocritic
-					case mcfgv1.MachineConfigNodeUpdateDrained:
-						unavailableMachines = append(unavailableMachines, ourNode)
-						updatingMachines = append(updatingMachines, ourNode)
-					case mcfgv1.MachineConfigNodeUpdateCordoned:
-						unavailableMachines = append(unavailableMachines, ourNode)
-						updatingMachines = append(updatingMachines, ourNode)
-					case mcfgv1.MachineConfigNodeUpdated:
-						updatedMachines = append(updatedMachines, ourNode)
-						readyMachines = append(readyMachines, ourNode)
-					}
+			// If the ImageModeStatusReporting feature gate is enabled, the updating and updated machine
+			// counts in the MCP status should be populated from MCN conditions
+			if imageModeReportingIsEnabled {
+				// A node is considered "updated" when the following are true:
+				// 	- The desired and current config versions and current and desired images are equal,
+				// 	  which is only met in the MCN when the `Updated` status is `True`.
+				// 	- The MCN's desired config version matches the MCP's desired config version. Note
+				// 	  that this check is required to ensure no regressions occur in migrating to the
+				// 	  MCN driven MCP updates.
+				if mcfgv1.StateProgress(cond.Type) == mcfgv1.MachineConfigNodeUpdated && cond.Status == metav1.ConditionTrue &&
+					mcn.Spec.ConfigVersion.Desired == pool.Spec.Configuration.Name {
+					updatedMachines = append(updatedMachines, ourNode)
+				} else {
+					updatingMachines = append(updatingMachines, ourNode)
 				}
-			*/
+				break
+			}
 		}
 	}
+
+	// Calculate degraded, updated, and updating machine counts as determined by the MCN conditions,
+	// and get the total machine count.
 	degradedMachineCount := int32(len(degradedMachines))
 	updatedMachineCount := int32(len(updatedMachines))
-	unavailableMachineCount := int32(len(unavailableMachines))
 	updatingMachineCount := int32(len(updatingMachines))
-	readyMachineCount := int32(len(readyMachines))
 
-	// this is # 1 priority, get the upgrade states actually reporting
-	if degradedMachineCount+readyMachineCount+unavailableMachineCount+updatingMachineCount != int32(len(nodes)) {
+	// TODO (ijanssen): once we are comfortable with the implementation, we can probably remove this check
+	// TODO: understand if a machine can be considered updating & degraded?
+	// In a standard update case, the total number of machines should equal the sum of the updating and updated nodes.
+	// However, when one or more machines is degraded, the non-degraded machines may not be condidered updated or
+	// updating, so the different machine statuses will not total the number of nodes.
+	if (imageModeReportingIsEnabled && updatedMachineCount+updatingMachineCount != totalMachineCount && degradedMachineCount == 0) || // handle case when ImageModeStatusReporting is enabled & machine counts do not reconcile
+		!imageModeReportingIsEnabled { // use historically existing functionality when ImageModeStatusReporting is not enabled
+		// When we get here and image mode status reporting is enabled, it means the machine counts were determined
+		// incorrectly. Recording an event means we can track that the functionality is not implemented correctly.
+		if imageModeReportingIsEnabled {
+			ctrl.eventRecorder.Eventf(pool, corev1.EventTypeWarning, "MachineCountFail", "ImageModeStatusReporting feature gate is enabled and machine counts did not reconcile for MCP %s. Got updated count of %v, updating count of %v, and degraded count of %v.", pool.Name, updatedMachineCount, updatingMachineCount, degradedMachineCount)
+		}
 
+		// Get correct updated & degraded machine counts
 		updatedMachines = getUpdatedMachines(pool, nodes, mosc, mosb, isLayeredPool)
 		updatedMachineCount = int32(len(updatedMachines))
-
-		readyMachines = getReadyMachines(pool, nodes, mosc, mosb, isLayeredPool)
-		readyMachineCount = int32(len(readyMachines))
-
-		unavailableMachines = getUnavailableMachines(nodes, pool)
-		unavailableMachineCount = int32(len(unavailableMachines))
-
 		degradedMachines = getDegradedMachines(nodes)
 		degradedMachineCount = int32(len(degradedMachines))
+	} else { // TODO: remove post debugging
+		ctrl.eventRecorder.Eventf(pool, corev1.EventTypeNormal, "MachineCountSuccess", "ImageModeStatusReporting feature gate is enabled and machine counts were correctly determined for MCP %s.", pool.Name)
 	}
 
-	for _, n := range degradedMachines {
-		reason, ok := n.Annotations[daemonconsts.MachineConfigDaemonReasonAnnotationKey]
-		if ok && reason != "" {
-			degradedReasons = append(degradedReasons, fmt.Sprintf("Node %s is reporting: %q", n.Name, reason))
-		}
-	}
+	// Get ready & unavailable machine counts
+	// Note that since the MCN does not, contain kubelet information for a node, as of implementing
+	// MCO-1506 for 4.20, the ready and unavailable machine counts cannot be determined by their
+	// condition information. Rather, it must be determined by node properties.
+	readyMachines := getReadyMachines(pool, nodes, mosc, mosb, isLayeredPool)
+	readyMachineCount := int32(len(readyMachines))
+	unavailableMachines := getUnavailableMachines(nodes, pool)
+	unavailableMachineCount := int32(len(unavailableMachines))
 
+	// Update MCP status with machine counts
 	status := mcfgv1.MachineConfigPoolStatus{
 		ObservedGeneration:      pool.Generation,
-		MachineCount:            machineCount,
+		MachineCount:            totalMachineCount,
 		UpdatedMachineCount:     updatedMachineCount,
 		ReadyMachineCount:       readyMachineCount,
 		UnavailableMachineCount: unavailableMachineCount,
@@ -240,20 +230,23 @@ func (ctrl *Controller) calculateStatus(mcs []*mcfgv1.MachineConfigNode, cconfig
 				UpdatedMachineCount:     syncStatus.UpdatedMachineCount,
 				ReadyMachineCount:       int64(readyMachineCount),
 				UnavailableMachineCount: int64(unavailableMachineCount),
-				AvailableMachineCount:   int64(machineCount - unavailableMachineCount),
+				AvailableMachineCount:   int64(totalMachineCount - unavailableMachineCount),
 			},
 		}
 	}
 
+	// Update MCP status configuation & conditions
 	status.Configuration = pool.Status.Configuration
-
 	conditions := pool.Status.Conditions
 	status.Conditions = append(status.Conditions, conditions...)
 
-	allUpdated := updatedMachineCount == machineCount &&
-		readyMachineCount == machineCount &&
+	// Determine if all machines are update
+	// 	- If all machines are updated, set "Updated" condition to true and "Updating" condition to false
+	// 	- If all machines not updated, set "Updated" condition to false and "Updating" condition to false
+	// 	  if the pool is paused or true if the pool is not paused and the PIS is not degraded
+	allUpdated := updatedMachineCount == totalMachineCount &&
+		readyMachineCount == totalMachineCount &&
 		unavailableMachineCount == 0
-
 	if allUpdated {
 		//TODO: update api to only have one condition regarding status of update.
 		updatedMsg := fmt.Sprintf("All nodes are updated with %s", getPoolUpdateLine(pool, mosc, isLayeredPool))
@@ -278,8 +271,10 @@ func (ctrl *Controller) calculateStatus(mcs []*mcfgv1.MachineConfigNode, cconfig
 		}
 	}
 
+	// If the MachineOSConfig is not nil, image mode is enabled and the MCP status should be handled
+	// according to its and the MachineOSBuild's statuses
 	if mosc != nil && !pool.Spec.Paused {
-		// MOSC exists but MOSB doesn't exist yet -> change MCP to update
+		// MOSC exists but MOSB doesn't exist yet -> change MCP to updating
 		if mosb == nil {
 			updating := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolUpdating, corev1.ConditionTrue, "", fmt.Sprintf("Pool is waiting for a new OS image build to start (mosc: %s)", mosc.Name))
 			apihelpers.SetMachineConfigPoolCondition(&status, *updating)
@@ -293,6 +288,15 @@ func (ctrl *Controller) calculateStatus(mcs []*mcfgv1.MachineConfigNode, cconfig
 		}
 	}
 
+	// Create degrade message by aggregating degraded reasons from all degraded machines
+	for _, n := range degradedMachines {
+		reason, ok := n.Annotations[daemonconsts.MachineConfigDaemonReasonAnnotationKey]
+		if ok && reason != "" {
+			degradedReasons = append(degradedReasons, fmt.Sprintf("Node %s is reporting: %q", n.Name, reason))
+		}
+	}
+
+	// Update degrade condition
 	var nodeDegraded bool
 	var nodeDegradedMessage string
 	for _, m := range degradedMachines {
@@ -307,7 +311,7 @@ func (ctrl *Controller) calculateStatus(mcs []*mcfgv1.MachineConfigNode, cconfig
 			sdegraded := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolPinnedImageSetsDegraded, corev1.ConditionTrue, "one or more pinned image set is reporting degraded", strings.Join(degradedReasons, ", "))
 			apihelpers.SetMachineConfigPoolCondition(&status, *sdegraded)
 		}
-	} else {
+	} else { // TODO: ijanssen: see if render degraded makes things degraded still even though the degraded machine count is not > 0
 		sdegraded := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolNodeDegraded, corev1.ConditionFalse, "", "")
 		apihelpers.SetMachineConfigPoolCondition(&status, *sdegraded)
 	}
