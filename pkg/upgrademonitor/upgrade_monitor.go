@@ -368,8 +368,6 @@ func GenerateAndApplyMachineConfigNodeSpec(fgAccessor featuregates.FeatureGateAc
 	newMCNode.Spec.ConfigVersion = mcfgv1.MachineConfigNodeSpecMachineConfigVersion{
 		Desired: node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey],
 	}
-	klog.Errorf("in GenerateAndApplyMachineConfigNodeSpec with node %v and newMCNode.Spec.ConfigVersion.Desired %v", node.Name, newMCNode.Spec.ConfigVersion.Desired)
-	klog.Errorf("in GenerateAndApplyMachineConfigNodeSpec with node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey] %v", node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey])
 	// Set desired config to NotYetSet if the annotation is empty to satisfy API validation
 	if newMCNode.Spec.ConfigVersion.Desired == "" {
 		newMCNode.Spec.ConfigVersion.Desired = NotYetSet

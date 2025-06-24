@@ -1231,17 +1231,6 @@ func (ctrl *Controller) updateCandidateNode(mosc *mcfgv1.MachineOSConfig, mosb *
 			lns.SetDesiredStateFromMachineOSConfig(mosc, mosb)
 		}
 
-		// // Update the MCN spec to reflect the updated desired config annotation
-		// klog.Errorf("setting the desired config in `updateCandidateNode`")
-		// newNode, err := ctrl.kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		// if err != nil {
-		// 	return err
-		// }
-		// err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(ctrl.fgAcessor, pool.Name, newNode, ctrl.client)
-		// if err != nil {
-		// 	return fmt.Errorf("error updating MCN spec for node %s: %w", newNode.Name, err)
-		// }
-
 		// Set the desired state to match the pool.
 
 		newData, err := json.Marshal(lns.Node())
