@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/machine-config-operator/pkg/constants"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	daemonconsts "github.com/openshift/machine-config-operator/pkg/daemon/constants"
+	"github.com/openshift/machine-config-operator/pkg/upgrademonitor"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -1220,6 +1221,17 @@ func (ctrl *Controller) updateCandidateNode(mosc *mcfgv1.MachineOSConfig, mosb *
 			lns.SetDesiredStateFromPool(pool)
 		} else {
 			lns.SetDesiredStateFromMachineOSConfig(mosc, mosb)
+		}
+
+		// Update the MCN spec to reflect the updated desired config annotation
+		klog.Errorf("setting the desired config in `updateCandidateNode`")
+		newNode, err := ctrl.kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(ctrl.fgAcessor, pool.Name, newNode, ctrl.client)
+		if err != nil {
+			return fmt.Errorf("error updating MCN spec for node %s: %w", newNode.Name, err)
 		}
 
 		// Set the desired state to match the pool.
