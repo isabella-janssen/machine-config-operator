@@ -1087,17 +1087,17 @@ func (dn *Daemon) updateOnClusterLayering(oldConfig, newConfig *mcfgv1.MachineCo
 //
 //nolint:gocyclo
 func (dn *Daemon) update(oldConfig, newConfig *mcfgv1.MachineConfig, skipCertificateWrite, firstBoot bool) (retErr error) {
-  // Get MCP associated with node
+	// Get MCP associated with node
 	pool, err := helpers.GetPrimaryPoolNameForMCN(dn.mcpLister, dn.node)
 	if err != nil {
 		return err
 	}
-	//  update the MCN spec
-	err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(dn.featureGatesAccessor, pool, dn.node, dn.mcfgClient)
-	if err != nil {
-		return fmt.Errorf("error updating MCN spec for node %s: %w", dn.node.Name, err)
-	}
-  
+	// //  update the MCN spec
+	// err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(dn.featureGatesAccessor, pool, dn.node, dn.mcfgClient)
+	// if err != nil {
+	// 	return fmt.Errorf("error updating MCN spec for node %s: %w", dn.node.Name, err)
+	// }
+
 	oldConfig = canonicalizeEmptyMC(oldConfig)
 
 	if dn.nodeWriter != nil {

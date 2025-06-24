@@ -680,6 +680,14 @@ func (ctrl *Controller) updateNode(old, cur interface{}) {
 			if ok {
 				changedMsg = fmt.Sprintf("changed annotation %s = %s", anno, newValue)
 				controlPlaneChangedMsg = fmt.Sprintf("Node %s now has %s=%s", curNode.Name, anno, newValue)
+				// If the desired annotation has changed, update the value in the associated MCN
+				// TODO: test this on OCL-type event; does it need to consider both the desired config & desired image?
+				if anno == daemonconsts.DesiredMachineConfigAnnotationKey {
+					err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(ctrl.fgAcessor, pool.Name, curNode, ctrl.client)
+					if err != nil {
+						klog.Errorf("error updating MCN spec for node %s: %v", curNode.Name, err)
+					}
+				}
 			} else {
 				changedMsg = fmt.Sprintf("lost annotation %s", anno)
 				controlPlaneChangedMsg = fmt.Sprintf("Node %s no longer has %s", curNode.Name, anno)
@@ -1223,16 +1231,16 @@ func (ctrl *Controller) updateCandidateNode(mosc *mcfgv1.MachineOSConfig, mosb *
 			lns.SetDesiredStateFromMachineOSConfig(mosc, mosb)
 		}
 
-		// Update the MCN spec to reflect the updated desired config annotation
-		klog.Errorf("setting the desired config in `updateCandidateNode`")
-		newNode, err := ctrl.kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(ctrl.fgAcessor, pool.Name, newNode, ctrl.client)
-		if err != nil {
-			return fmt.Errorf("error updating MCN spec for node %s: %w", newNode.Name, err)
-		}
+		// // Update the MCN spec to reflect the updated desired config annotation
+		// klog.Errorf("setting the desired config in `updateCandidateNode`")
+		// newNode, err := ctrl.kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		// if err != nil {
+		// 	return err
+		// }
+		// err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(ctrl.fgAcessor, pool.Name, newNode, ctrl.client)
+		// if err != nil {
+		// 	return fmt.Errorf("error updating MCN spec for node %s: %w", newNode.Name, err)
+		// }
 
 		// Set the desired state to match the pool.
 
