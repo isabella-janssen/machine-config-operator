@@ -681,7 +681,6 @@ func (ctrl *Controller) updateNode(old, cur interface{}) {
 				changedMsg = fmt.Sprintf("changed annotation %s = %s", anno, newValue)
 				controlPlaneChangedMsg = fmt.Sprintf("Node %s now has %s=%s", curNode.Name, anno, newValue)
 				// If the desired annotation has changed, update the value in the associated MCN
-				// TODO: test this on OCL-type event; does it need to consider both the desired config & desired image?
 				if anno == daemonconsts.DesiredMachineConfigAnnotationKey {
 					err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(ctrl.fgAcessor, pool.Name, curNode, ctrl.client)
 					if err != nil {

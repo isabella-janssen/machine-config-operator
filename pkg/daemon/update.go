@@ -878,11 +878,12 @@ func (dn *Daemon) updateOnClusterLayering(oldConfig, newConfig *mcfgv1.MachineCo
 		dn.reportMachineNodeDegradeStatus(retErr, pool)
 	}()
 
-	//  update the MCN spec
-	err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(dn.featureGatesAccessor, pool, dn.node, dn.mcfgClient)
-	if err != nil {
-		return fmt.Errorf("error updating MCN spec for node %s: %w", dn.node.Name, err)
-	}
+	// TODO: See if desired config version still is set of OCL update
+	// //  update the MCN spec
+	// err = upgrademonitor.GenerateAndApplyMachineConfigNodeSpec(dn.featureGatesAccessor, pool, dn.node, dn.mcfgClient)
+	// if err != nil {
+	// 	return fmt.Errorf("error updating MCN spec for node %s: %w", dn.node.Name, err)
+	// }
 
 	oldIgnConfig, err := ctrlcommon.ParseAndConvertConfig(oldConfig.Spec.Config.Raw)
 	if err != nil {
