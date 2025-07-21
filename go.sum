@@ -589,8 +589,6 @@ github.com/opencontainers/selinux v1.11.1 h1:nHFvthhM0qY8/m+vfhJylliSshm8G1jJ2jD
 github.com/opencontainers/selinux v1.11.1/go.mod h1:E5dMC3VPuVvVHDYmi78qvhJp8+M586T4DlDRYpFkyec=
 github.com/openshift-eng/openshift-tests-extension v0.0.0-20250711173707-dc2a20e5a5f8 h1:D+Qga9nujuIcrAjcAuKPukoUcVBl6ZDEbtgNLgKKlgY=
 github.com/openshift-eng/openshift-tests-extension v0.0.0-20250711173707-dc2a20e5a5f8/go.mod h1:6gkP5f2HL0meusT0Aim8icAspcD1cG055xxBZ9yC68M=
-github.com/openshift/api v0.0.0-20250710004639-926605d3338b h1:A8OY6adT2aZNp7tsGsilHuQ3RqhzrFx5dzGr/UwXfJg=
-github.com/openshift/api v0.0.0-20250710004639-926605d3338b/go.mod h1:SPLf21TYPipzCO67BURkCfK6dcIIxx0oNRVWaOyRcXM=
 github.com/openshift/api v0.0.0-20250721175746-5205e2799627 h1:QjmHW8dNtgx5c4nwFgLRfy1qyopGNfjZyZmJDAdLTUQ=
 github.com/openshift/api v0.0.0-20250721175746-5205e2799627/go.mod h1:SPLf21TYPipzCO67BURkCfK6dcIIxx0oNRVWaOyRcXM=
 github.com/openshift/client-go v0.0.0-20250710075018-396b36f983ee h1:tOtrrxfDEW8hK3eEsHqxsXurq/D6LcINGfprkQC3hqY=
@@ -643,8 +641,6 @@ github.com/openshift/kubernetes/staging/src/k8s.io/pod-security-admission v0.0.0
 github.com/openshift/kubernetes/staging/src/k8s.io/pod-security-admission v0.0.0-20250716113245-b94367cabf3e/go.mod h1:+UmuDIUnxxGlHHQvFhdg4s1XMRX+MBU1n70IYo18IOk=
 github.com/openshift/kubernetes/staging/src/k8s.io/sample-apiserver v0.0.0-20250716113245-b94367cabf3e h1:edNgRWGEdZculmiISrUvYO0kORmedM1TYc3us0Zvh00=
 github.com/openshift/kubernetes/staging/src/k8s.io/sample-apiserver v0.0.0-20250716113245-b94367cabf3e/go.mod h1:umdoAPEnjFAF+Lrk8/wMGbxUAjRvgsC+szWYUHluvqs=
-github.com/openshift/library-go v0.0.0-20250710130336-73c7662bc565 h1:DtyzonCpVZxqYp4rp2cCRwBTEXZWw5fX9YE0tCM5hi8=
-github.com/openshift/library-go v0.0.0-20250710130336-73c7662bc565/go.mod h1:tptKNust9MdRI0p90DoBSPHIrBa9oh+Rok59tF0vT8c=
 github.com/openshift/library-go v0.0.0-20250711143941-47604345e7ea h1:0BNis5UGo5Z7J9GtRY1nw/pt8hWxIZqvfqnqH3eV5cs=
 github.com/openshift/library-go v0.0.0-20250711143941-47604345e7ea/go.mod h1:tptKNust9MdRI0p90DoBSPHIrBa9oh+Rok59tF0vT8c=
 github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20250416174521-4eb003743b54 h1:ehXndVZfIk/fo18YJCMJ+6b8HL8tzqjP7yWgchMnfCc=
@@ -1155,8 +1151,6 @@ k8s.io/kms v0.33.2 h1:GFwNXX4CZGQCg9DPOaJi1/+iKidCtB9/OIAGdzRo8FI=
 k8s.io/kms v0.33.2/go.mod h1:C1I8mjFFBNzfUZXYt9FZVJ8MJl7ynFbGgZFbBzkBJ3E=
 k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff h1:/usPimJzUKKu+m+TE36gUyGcf03XZEP0ZIKgKj35LS4=
 k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff/go.mod h1:5jIi+8yX4RIb8wk3XwBo5Pq2ccx4FP10ohkbSKCZoK8=
-k8s.io/utils v0.0.0-20241210054802-24370beab758 h1:sdbE21q2nlQtFh65saZY+rRM6x6aJJI8IUa1AmH/qa0=
-k8s.io/utils v0.0.0-20241210054802-24370beab758/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 h1:hwvWFiBzdWw1FhfY1FooPn3kzWuJ8tmbZBHi4zVsl1Y=
 k8s.io/utils v0.0.0-20250604170112-4c0f3b243397/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 mvdan.cc/gofumpt v0.7.0 h1:bg91ttqXmi9y2xawvkuMXyvAA/1ZGJqYAEGjXuP0JXU=
