@@ -32,9 +32,9 @@ require (
 	github.com/onsi/gomega v1.36.2
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/openshift-eng/openshift-tests-extension v0.0.0-20250711173707-dc2a20e5a5f8
-	github.com/openshift/api v0.0.0-20250710004639-926605d3338b
+	github.com/openshift/api v0.0.0-20250721175746-5205e2799627
 	github.com/openshift/client-go v0.0.0-20250710075018-396b36f983ee
-	github.com/openshift/library-go v0.0.0-20250710130336-73c7662bc565
+	github.com/openshift/library-go v0.0.0-20250711143941-47604345e7ea
 	github.com/openshift/runtime-utils v0.0.0-20230921210328-7bdb5b9c177b
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/zerolog v1.34.0
@@ -53,11 +53,11 @@ require (
 	k8s.io/client-go v0.33.2
 	k8s.io/code-generator v0.33.2
 	k8s.io/component-base v0.33.2
-	k8s.io/cri-api v0.32.1
-	k8s.io/kubectl v0.32.1
-	k8s.io/kubelet v0.32.1
+	k8s.io/cri-api v0.33.2
+	k8s.io/kubectl v0.33.2
+	k8s.io/kubelet v0.33.2
 	k8s.io/kubernetes v0.0.0-00010101000000-000000000000
-	k8s.io/utils v0.0.0-20241210054802-24370beab758
+	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/controller-runtime v0.20.1
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20240522175850-2e9781e9fc60
 )
@@ -207,9 +207,9 @@ require (
 	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	k8s.io/cli-runtime v0.32.1 // indirect
+	k8s.io/cli-runtime v0.33.2 // indirect
 	k8s.io/cloud-provider v0.0.0 // indirect
-	k8s.io/component-helpers v0.32.1 // indirect
+	k8s.io/component-helpers v0.33.2 // indirect
 	k8s.io/controller-manager v0.32.1 // indirect
 	k8s.io/cri-client v0.0.0 // indirect
 	k8s.io/csi-translation-lib v0.0.0 // indirect
@@ -218,7 +218,7 @@ require (
 	k8s.io/kms v0.33.2 // indirect
 	k8s.io/kube-scheduler v0.0.0 // indirect
 	k8s.io/mount-utils v0.0.0 // indirect
-	k8s.io/pod-security-admission v0.0.0 // indirect
+	k8s.io/pod-security-admission v0.33.2 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/kustomize/api v0.19.0 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.19.0 // indirect
