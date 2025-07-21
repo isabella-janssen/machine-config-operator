@@ -52,20 +52,12 @@ var (
 							enableIn(configv1.Default, configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 							mustRegister()
 
-	FeatureGateValidatingAdmissionPolicy = newFeatureGate("ValidatingAdmissionPolicy").
-						reportProblemsToJiraComponent("kube-apiserver").
-						contactPerson("benluddy").
-						productScope(kubernetes).
-						enhancementPR("https://github.com/kubernetes/enhancements/issues/3488").
-						enableIn(configv1.Default, configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
-						mustRegister()
-
 	FeatureGateMutatingAdmissionPolicy = newFeatureGate("MutatingAdmissionPolicy").
 						reportProblemsToJiraComponent("kube-apiserver").
 						contactPerson("benluddy").
 						productScope(kubernetes).
 						enhancementPR("https://github.com/kubernetes/enhancements/issues/3962").
-						enableIn().
+						enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 						mustRegister()
 
 	FeatureGateGatewayAPI = newFeatureGate("GatewayAPI").
@@ -178,14 +170,6 @@ var (
 						enhancementPR("https://github.com/openshift/enhancements/pull/1658").
 						enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 						mustRegister()
-
-	FeatureGateGCPLabelsTags = newFeatureGate("GCPLabelsTags").
-					reportProblemsToJiraComponent("Installer").
-					contactPerson("bhb").
-					productScope(ocpSpecific).
-					enhancementPR(legacyFeatureGateWithoutEnhancement).
-					enableIn(configv1.Default, configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
-					mustRegister()
 
 	FeatureGateAlibabaPlatform = newFeatureGate("AlibabaPlatform").
 					reportProblemsToJiraComponent("cloud-provider").
@@ -481,6 +465,14 @@ var (
 					enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 					mustRegister()
 
+	FeatureGateExternalSnapshotMetadata = newFeatureGate("ExternalSnapshotMetadata").
+						reportProblemsToJiraComponent("Storage / Kubernetes External Components").
+						contactPerson("jdobson").
+						productScope(kubernetes).
+						enhancementPR("https://github.com/kubernetes/enhancements/issues/3314").
+						enableIn(configv1.DevPreviewNoUpgrade).
+						mustRegister()
+
 	FeatureGateExternalOIDC = newFeatureGate("ExternalOIDC").
 				reportProblemsToJiraComponent("authentication").
 				contactPerson("liouk").
@@ -633,14 +625,6 @@ var (
 							enhancementPR(legacyFeatureGateWithoutEnhancement).
 							enableIn(configv1.Default, configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 							mustRegister()
-
-	FeatureGateAWSEFSDriverVolumeMetrics = newFeatureGate("AWSEFSDriverVolumeMetrics").
-						reportProblemsToJiraComponent("Storage / Kubernetes External Components").
-						contactPerson("fbertina").
-						productScope(ocpSpecific).
-						enhancementPR(legacyFeatureGateWithoutEnhancement).
-						enableIn(configv1.Default, configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
-						mustRegister()
 
 	FeatureGateImageStreamImportMode = newFeatureGate("ImageStreamImportMode").
 						reportProblemsToJiraComponent("Multi-Arch").
@@ -804,6 +788,22 @@ var (
 					contactPerson("jcpowermac").
 					productScope(ocpSpecific).
 					enhancementPR("https://github.com/openshift/enhancements/pull/1779").
+					enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
+					mustRegister()
+
+	FeatureGateStoragePerformantSecurityPolicy = newFeatureGate("StoragePerformantSecurityPolicy").
+							reportProblemsToJiraComponent("Storage / Kubernetes External Components").
+							contactPerson("hekumar").
+							productScope(ocpSpecific).
+							enhancementPR("https://github.com/openshift/enhancements/pull/1804").
+							enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
+							mustRegister()
+
+	FeatureGateMultiDiskSetup = newFeatureGate("MultiDiskSetup").
+					reportProblemsToJiraComponent("splat").
+					contactPerson("jcpowermac").
+					productScope(ocpSpecific).
+					enhancementPR("https://github.com/openshift/enhancements/pull/1805").
 					enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 					mustRegister()
 
