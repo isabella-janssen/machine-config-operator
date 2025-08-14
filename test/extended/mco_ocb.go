@@ -219,6 +219,71 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 		logger.Infof("OK!\n")
 	})
 
+	g.It("[OCPFeatureGate:ImageModeStatusReporting]Validate MachineConfigNode properities on On-Cluster Image Mode enabled custom MCP", func() {
+		var (
+			infraMcpName = "infra"
+			moscName      = fmt.Sprintf("test-%s-mosc", infraMcpName)
+		)
+
+		exutil.By("Create custom worker MCP with one worker node")
+		// Create a custom MCP with 1 worker node
+		infraMcp, err := CreateCustomMCP(oc.AsAdmin(), infraMcpName, 1)
+		defer infraMcp.delete()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Error creating a new custom MCP: %s", infraMcpName)
+		logger.Infof("OK!\n")
+
+		exutil.By("Verify custom MCP has the expected worker node")
+		o.Eventually(func() (int, error) {
+			return infraMcp.getMachineCount()
+		}, "5m", "20s").Should(o.Equal(1),
+			"Custom MCP %s should have exactly 1 worker node", infraMcpName)
+		logger.Infof("OK!\n")
+
+		exutil.By("Configure OCB functionality for the custom worker MCP")
+		mosc, err := CreateMachineOSConfigUsingExternalOrInternalRegistry(oc.AsAdmin(), MachineConfigNamespace, moscName, infraMcpName, nil)
+		defer mosc.CleanupAndDelete()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Error creating the MachineOSConfig resource")
+		logger.Infof("OK!\n")
+
+		ValidateSuccessfulMOSC(mosc, nil)
+
+		exutil.By("Verify the custom MCP reports the updated configuration")
+		infraMcp.waitForComplete()
+		logger.Infof("OK!\n")
+
+		exutil.By("Verify the worker node in custom MCP has the new image")
+		nodes, err := infraMcp.GetCoreOsNodes()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Error getting coreos nodes from custom MCP %s", infraMcpName)
+		node := nodes[0]
+		currentImagePullSpec, err := mosc.GetStatusCurrentImagePullSpec()
+		o.Expect(err).NotTo(o.HaveOccurred(), "Error getting current image pull spec from %s", mosc)
+		o.Expect(node.GetCurrentBootOSImage()).To(o.Equal(currentImagePullSpec),
+			"The image installed in node %s should match the MachineOSConfig image", node.GetName())
+		logger.Infof("OK!\n")
+
+		// TODO: Add MCN validation of desired and current config image here
+
+		exutil.By("Remove the MachineOSConfig resource")
+		o.Expect(mosc.CleanupAndDelete()).To(o.Succeed(), "Error cleaning up %s", mosc)
+		logger.Infof("OK!\n")
+		ValidateMOSCIsGarbageCollected(mosc, infraMcp)
+
+		exutil.By("Verify the custom MCP returns to the original configuration after MOSC cleanup")
+		infraMcp.waitForComplete()
+		
+		// Verify the node is back to the original image (not the layered one)
+		o.Eventually(func() string {
+			image, err := node.GetCurrentBootOSImage()
+			o.Expect(err).NotTo(o.HaveOccurred(), "Error getting current boot OS image from node %s", node.GetName())
+			return image
+		}, "10m", "30s").ShouldNot(o.Equal(currentImagePullSpec),
+			"Node %s should not be using the layered image after MOSC cleanup", node.GetName())
+		logger.Infof("OK!\n")
+
+		exutil.AssertAllPodsToBeReady(oc.AsAdmin(), MachineConfigNamespace)
+		logger.Infof("OK!\n")
+	})
+
 })
 
 func testContainerFile(containerFiles []ContainerFile, imageNamespace string, mcp *MachineConfigPool, checkers []Checker, defaultPullSecret bool) {
