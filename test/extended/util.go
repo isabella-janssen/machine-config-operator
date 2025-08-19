@@ -3,10 +3,12 @@ package extended
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,10 +23,17 @@ import (
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 )
 
-// fixturesPath stores a local copy of the embedded resources
 var (
+	// fixturesPath stores a local copy of the embedded resources
 	fixturesPath    = ""
 	fixtureInitLock sync.Once
+
+	// infraMcpName stores the name of a custom `infra` MCP
+	infraMcpName = "infra"
+	// workerMcpName stores the name of the default worker MCP
+	workerMcpName = "worker"
+	// infraMcpName stores the name of the default master MCP
+	masterMcpName = "master"
 )
 
 // PodDisruptionBudget struct is used to handle PodDisruptionBudget resources in OCP
@@ -438,4 +447,35 @@ func IsCompactOrSNOCluster(oc *exutil.CLI) bool {
 	)
 
 	return wMcp.IsEmpty() && len(mcpList.GetAllOrFail()) == 2
+}
+
+func getURLEncodedFileConfig(destinationPath, content, mode string) string {
+	encodedContent := url.PathEscape(content)
+
+	return getFileConfig(destinationPath, "data:,"+encodedContent, mode)
+}
+
+func getFileConfig(destinationPath, source, mode string) string {
+	decimalMode := mode
+	// if octal number we convert it to decimal. Json templates do not accept numbers with a leading zero (octal).
+	// if we don't do this conversion the 'oc process' command will not be able to render the template because {"mode": 0666}
+	//   is not a valid json. Numbers in json cannot start with a leading 0
+	if mode != "" && mode[0] == '0' {
+		// parse the octal string and conver to integer
+		iMode, err := strconv.ParseInt(mode, 8, 64)
+		// get a string with the decimal numeric representation of the mode
+		decimalMode = fmt.Sprintf("%d", os.FileMode(iMode))
+		if err != nil {
+			e2e.Failf("Filer permissions %s cannot be converted to integer", mode)
+		}
+	}
+
+	var fileConfig string
+	if mode == "" {
+		fileConfig = fmt.Sprintf(`{"contents": {"source": "%s"}, "path": "%s"}`, source, destinationPath)
+	} else {
+		fileConfig = fmt.Sprintf(`{"contents": {"source": "%s"}, "path": "%s", "mode": %s}`, source, destinationPath, decimalMode)
+	}
+
+	return fileConfig
 }

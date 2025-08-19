@@ -38,6 +38,20 @@ func (mc *MachineConfig) SetTemplate(template Template) *MachineConfig {
 	return mc
 }
 
+// SetMCOTemplate set a template defined in the MCO testdata folder
+func (mc *MachineConfig) SetMCOTemplate(templateName string) *MachineConfig {
+	mc.Template = *NewMCOTemplate(mc.oc, templateName)
+	return mc
+}
+
+// SetParams set parameters defined in template
+func (mc *MachineConfig) SetParams(params ...string) *MachineConfig {
+	if len(params) > 0 {
+		mc.parameters = append(mc.parameters, params...)
+	}
+	return mc
+}
+
 func (mc *MachineConfig) create() {
 	mc.name = mc.name + "-" + exutil.GetRandomString()
 	params := []string{"-p", "NAME=" + mc.name, "POOL=" + mc.pool}
@@ -75,6 +89,9 @@ func (mc *MachineConfig) create() {
 // TODO: This method should be deleted when we refactor the MC struct to embed the Resource struct. But right now we have no other choice.
 func (mc *MachineConfig) deleteNoWait() error {
 	return mc.Delete()
+}
+
+func (mc *MachineConfig) delete() {
 }
 
 // GetKernelTypeSafe Get the kernelType configured in this MC. If any arror happens it returns an empty string
