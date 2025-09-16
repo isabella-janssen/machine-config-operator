@@ -1,0 +1,76 @@
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: block-custom-mcp-deletion
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - operations: ["DELETE"]
+      apiGroups: ["machineconfiguration.openshift.io"]
+      apiVersions: ["v1"]
+      resources: ["machineconfigpools"]
+  variables:
+  # Get all machines in the openshift-machine-api namespace
+  - name: machines
+    expression: |
+      namespaceObject('openshift-machine-api').subresource('machines').list()
+  # Get all nodes in the cluster
+  - name: nodes
+    expression: |
+      clusterObject('v1', 'Node').list()
+  validations:
+  - expression: |
+      // Only apply to custom MCPs (not master, worker, or any other default pools)
+      !(object.metadata.name in ['master', 'worker']) ?
+        (
+          // Condition 1: Check no machines are still assigned to this MCP
+          // Machines target MCPs through node selectors that match the MCP's node role
+          !variables.machines.exists(machine, 
+            has(machine.spec) && has(machine.spec.providerSpec) && has(machine.spec.providerSpec.value) &&
+            has(machine.spec.providerSpec.value.userDataSecret) &&
+            // Check if machine would create nodes with the role label for this MCP
+            machine.metadata.labels.exists(label, 
+              label == 'machine.openshift.io/cluster-api-machine-role' && 
+              machine.metadata.labels[label] == object.metadata.name
+            )
+          ) &&
+          
+          // Condition 2: Check no eligible nodes are still targeting this MCP's rendered config
+          !variables.nodes.exists(node,
+            // Node must be eligible (not master, not arbiter)
+            !(has(node.metadata.labels['node-role.kubernetes.io/master'])) &&
+            !(has(node.metadata.labels['node-role.kubernetes.io/arbiter'])) &&
+            (
+              // Check if current config targets this MCP's rendered config
+              (has(node.metadata.annotations['machineconfiguration.openshift.io/currentConfig']) &&
+               node.metadata.annotations['machineconfiguration.openshift.io/currentConfig'].startsWith('rendered-' + object.metadata.name + '-')) ||
+              // Check if desired config targets this MCP's rendered config  
+              (has(node.metadata.annotations['machineconfiguration.openshift.io/desiredConfig']) &&
+               node.metadata.annotations['machineconfiguration.openshift.io/desiredConfig'].startsWith('rendered-' + object.metadata.name + '-'))
+            )
+          )
+        ) : true
+    message: |
+      Cannot delete custom MachineConfigPool '{{object.metadata.name}}': 
+      Either machines are still assigned to this pool or eligible nodes are still targeting its rendered configuration.
+      Please ensure all machines are removed from this pool and all nodes have transitioned to a different configuration before deletion.
+    messageExpression: |
+      'Cannot delete custom MachineConfigPool \'' + object.metadata.name + '\': ' +
+      'Either machines are still assigned to this pool or eligible nodes are still targeting its rendered configuration. ' +
+      'Please ensure all machines are removed from this pool and all nodes have transitioned to a different configuration before deletion.'
+
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: block-custom-mcp-deletion-binding
+spec:
+  policyName: block-custom-mcp-deletion
+  validationActions: [Deny]
+  matchResources:
+    resourceRules:
+    - operations: ["DELETE"]
+      apiGroups: ["machineconfiguration.openshift.io"]
+      apiVersions: ["v1"]
+      resources: ["machineconfigpools"]

@@ -1,0 +1,64 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: mcp-deletion-validator
+spec:
+  clientConfig:
+    service:
+      name: machine-config-controller-webhook
+      namespace: openshift-machine-config-operator
+      path: /validate-mcp-deletion
+  rules:
+  - operations: ["DELETE"]
+    apiGroups: ["machineconfiguration.openshift.io"]
+    apiVersions: ["v1"]
+    resources: ["machineconfigpools"]
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: machine-config-controller-webhook
+  namespace: openshift-machine-config-operator
+spec:
+  selector:
+    k8s-app: machine-config-controller
+  ports:
+  - name: webhook
+    port: 9443
+    targetPort: webhook
+    protocol: TCP
+
+---
+# RBAC for the webhook to access machines and nodes
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mcp-deletion-webhook-reader
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["machine.openshift.io"]
+  resources: ["machines"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["machineconfiguration.openshift.io"]
+  resources: ["machineconfigpools"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mcp-deletion-webhook-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mcp-deletion-webhook-reader
+subjects:
+- kind: ServiceAccount
+  name: machine-config-controller
+  namespace: openshift-machine-config-operator
