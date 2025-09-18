@@ -1,11 +1,11 @@
 package common
 
 const (
-	// MCPDeletionFinalizerPrefix is the finalizer added to custom MCPs to prevent unsafe deletion
-	MCPDeletionFinalizerPrefix = "machineconfiguration.openshift.io/mcp-deletion-protection"
+	// MCPDeletionFinalizer is the finalizer added to custom MCPs to prevent unsafe deletion
+	MCPDeletionFinalizer = "machineconfiguration.openshift.io/mcp-deletion-protection"
 )
 
-// GetMCPDeletionFinalizer returns the finalizer name for the given MCP
-func GetMCPDeletionFinalizer(mcpName string) string {
-	return MCPDeletionFinalizerPrefix + "-" + mcpName
+// IsSystemPool returns true if the pool is a system pool (master or worker)
+func IsSystemPool(poolName string) bool {
+	return poolName == "master" || poolName == "worker"
 }

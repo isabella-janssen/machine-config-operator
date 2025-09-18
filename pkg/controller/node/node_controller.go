@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	helpers "github.com/openshift/machine-config-operator/pkg/helpers"
 
 	configv1 "github.com/openshift/api/config/v1"
 	features "github.com/openshift/api/features"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	cligoinformersv1 "github.com/openshift/client-go/config/informers/externalversions/config/v1"
@@ -565,7 +567,10 @@ func (ctrl *Controller) deleteMachineConfigPool(obj interface{}) {
 		}
 	}
 	klog.V(4).Infof("Deleting MachineConfigPool %s", pool.Name)
-	// TODO(abhinavdahiya): handle deletes.
+	
+	// The actual deletion handling is done in syncMachineConfigPool -> handleMCPDeletion
+	// This function is called by the informer when the MCP is deleted from etcd
+	// At this point, finalizers have already been processed and the MCP is gone
 }
 
 // Determine if masters are currently configured as schedulable
@@ -1112,7 +1117,14 @@ func (ctrl *Controller) syncMachineConfigPool(key string) error {
 	}
 
 	if pool.DeletionTimestamp != nil {
-		return ctrl.syncStatusOnly(pool)
+		return ctrl.handleMCPDeletion(pool)
+	}
+
+	// Ensure custom MCPs have deletion protection finalizer
+	if !ctrlcommon.IsSystemPool(pool.Name) {
+		if err := ctrl.ensureFinalizerPresent(pool); err != nil {
+			return fmt.Errorf("failed to ensure finalizer on custom MCP %s: %w", pool.Name, err)
+		}
 	}
 
 	if pool.Spec.Paused {
@@ -1585,4 +1597,226 @@ func (ctrl *Controller) isConfigOrBuildPresent(mosc *mcfgv1.MachineOSConfig, mos
 
 func (ctrl *Controller) isConfigAndBuildPresent(mosc *mcfgv1.MachineOSConfig, mosb *mcfgv1.MachineOSBuild) bool {
 	return (mosc != nil && mosb != nil)
+}
+
+// MCP deletion protection functions
+
+// ensureFinalizerPresent adds the deletion protection finalizer to custom MCPs
+func (ctrl *Controller) ensureFinalizerPresent(pool *mcfgv1.MachineConfigPool) error {
+	// Check if finalizer is already present
+	for _, finalizer := range pool.Finalizers {
+		if finalizer == ctrlcommon.MCPDeletionFinalizer {
+			return nil // Already present
+		}
+	}
+
+	klog.Infof("Adding deletion protection finalizer to custom MachineConfigPool %s", pool.Name)
+	
+	// Add the finalizer
+	return ctrl.addFinalizerToMCP(pool, ctrlcommon.MCPDeletionFinalizer)
+}
+
+// handleMCPDeletion processes MCP deletion requests and validates safety
+func (ctrl *Controller) handleMCPDeletion(pool *mcfgv1.MachineConfigPool) error {
+	// Skip system pools - they don't have our finalizer
+	if ctrlcommon.IsSystemPool(pool.Name) {
+		return ctrl.syncStatusOnly(pool)
+	}
+
+	// Check if our finalizer is present
+	hasOurFinalizer := false
+	for _, finalizer := range pool.Finalizers {
+		if finalizer == ctrlcommon.MCPDeletionFinalizer {
+			hasOurFinalizer = true
+			break
+		}
+	}
+
+	// If our finalizer is not present, just sync status
+	if !hasOurFinalizer {
+		return ctrl.syncStatusOnly(pool)
+	}
+
+	klog.Infof("Processing deletion request for custom MachineConfigPool %s", pool.Name)
+
+	// Validate deletion safety
+	canDelete, blockingReason, err := ctrl.validateMCPDeletionSafety(pool)
+	if err != nil {
+		return fmt.Errorf("failed to validate MCP deletion safety: %w", err)
+	}
+
+	if !canDelete {
+		// Record event explaining why deletion is blocked
+		ctrl.eventRecorder.Eventf(pool, corev1.EventTypeWarning, "DeletionBlocked", 
+			"Cannot delete MachineConfigPool %s: %s", pool.Name, blockingReason)
+		
+		klog.Warningf("Blocking deletion of MachineConfigPool %s: %s", pool.Name, blockingReason)
+		
+		// Still sync status but don't remove finalizer
+		return ctrl.syncStatusOnly(pool)
+	}
+
+	// Safe to delete - remove our finalizer
+	klog.Infof("MachineConfigPool %s is safe to delete, removing finalizer", pool.Name)
+	ctrl.eventRecorder.Eventf(pool, corev1.EventTypeNormal, "DeletionAllowed", 
+		"MachineConfigPool %s is safe to delete", pool.Name)
+	
+	return ctrl.removeFinalizerFromMCP(pool, ctrlcommon.MCPDeletionFinalizer)
+}
+
+// validateMCPDeletionSafety implements the validation rules for MCP deletion
+func (ctrl *Controller) validateMCPDeletionSafety(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
+	// Rule 1: Check if there are any machines still in this MCP
+	hasActiveMachines, machineBlockingReason, err := ctrl.checkForActiveMachines(pool)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to check for active machines: %w", err)
+	}
+	if hasActiveMachines {
+		return false, machineBlockingReason, nil
+	}
+
+	// Rule 2: Check if any eligible nodes are still targeting this MCP's rendered config
+	hasTargetingNodes, nodeBlockingReason, err := ctrl.checkForTargetingNodes(pool)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to check for targeting nodes: %w", err)
+	}
+	if hasTargetingNodes {
+		return false, nodeBlockingReason, nil
+	}
+
+	return true, "", nil
+}
+
+// checkForActiveMachines implements Rule 1: Check for machines still in this MCP
+func (ctrl *Controller) checkForActiveMachines(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
+	// TODO: IMPLEMENT MACHINE CHECKING LOGIC
+	//
+	// This function should:
+	// 1. List all machines in the openshift-machine-api namespace
+	// 2. Check if any machines are configured to create nodes for this MCP
+	// 3. Machines target MCPs through their machine role labels and node selectors
+	//
+	// Implementation steps:
+	// - Create machine client: 
+	//   machineClient, err := machineclient.NewForConfig(ctrl.kubeClient.RESTConfig())
+	//   if err != nil { return false, "", err }
+	// - Use machineClient.MachineV1beta1().Machines("openshift-machine-api").List()
+	// - For each machine, check if machine.Labels["machine.openshift.io/cluster-api-machine-role"] == pool.Name
+	// - OR check if the machine's providerSpec would result in nodes matching this pool's nodeSelector
+	//
+	// Example blocking condition:
+	// return true, fmt.Sprintf("Machines still configured for this pool: %v", machineNames), nil
+	
+	klog.Warningf("TODO: Machine checking not yet implemented for MCP %s - assuming no blocking machines", pool.Name)
+	return false, "", nil
+}
+
+// checkForTargetingNodes implements Rule 2: Check for nodes still targeting this MCP's rendered config
+func (ctrl *Controller) checkForTargetingNodes(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
+	// TODO: IMPLEMENT NODE TARGETING CHECK LOGIC
+	//
+	// This function should:
+	// 1. List all nodes in the cluster
+	// 2. Filter to eligible nodes (non-master, non-arbiter)
+	// 3. Check if any eligible nodes are still targeting this MCP's rendered config
+	//
+	// Implementation steps:
+	// - Use ctrl.kubeClient.CoreV1().Nodes().List() to get all nodes
+	// - For each node, check eligibility:
+	//   * Skip nodes with label "node-role.kubernetes.io/master"
+	//   * Skip nodes with label "node-role.kubernetes.io/arbiter"
+	// - Check node annotations for current/desired config:
+	//   * daemonconsts.CurrentMachineConfigAnnotationKey (machineconfiguration.openshift.io/currentConfig)
+	//   * daemonconsts.DesiredMachineConfigAnnotationKey (machineconfiguration.openshift.io/desiredConfig)
+	// - Check if these configs match the pattern "rendered-{poolName}-*"
+	//
+	// Example implementation:
+	/*
+	nodes, err := ctrl.kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return false, "", fmt.Errorf("failed to list nodes: %w", err)
+	}
+	
+	renderedConfigPrefix := "rendered-" + pool.Name + "-"
+	var blockingNodes []string
+	
+	for _, node := range nodes.Items {
+		// Skip master and arbiter nodes (not eligible for custom MCPs)
+		if _, isMaster := node.Labels["node-role.kubernetes.io/master"]; isMaster {
+			continue
+		}
+		if _, isArbiter := node.Labels["node-role.kubernetes.io/arbiter"]; isArbiter {
+			continue
+		}
+		
+		// Check current config annotation
+		if currentConfig, exists := node.Annotations[daemonconsts.CurrentMachineConfigAnnotationKey]; exists {
+			if strings.HasPrefix(currentConfig, renderedConfigPrefix) {
+				blockingNodes = append(blockingNodes, fmt.Sprintf("%s (current: %s)", node.Name, currentConfig))
+				continue
+			}
+		}
+		
+		// Check desired config annotation
+		if desiredConfig, exists := node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey]; exists {
+			if strings.HasPrefix(desiredConfig, renderedConfigPrefix) {
+				blockingNodes = append(blockingNodes, fmt.Sprintf("%s (desired: %s)", node.Name, desiredConfig))
+				continue
+			}
+		}
+	}
+	
+	if len(blockingNodes) > 0 {
+		return true, fmt.Sprintf("Eligible nodes still targeting this pool's config: %v", blockingNodes), nil
+	}
+	*/
+
+	klog.Warningf("TODO: Node targeting check not yet implemented for MCP %s - assuming no targeting nodes", pool.Name)
+	return false, "", nil
+}
+
+// Helper functions for finalizer management
+
+func (ctrl *Controller) addFinalizerToMCP(pool *mcfgv1.MachineConfigPool, finalizer string) error {
+	// Create a patch to add the finalizer
+	poolCopy := pool.DeepCopy()
+	poolCopy.Finalizers = append(poolCopy.Finalizers, finalizer)
+	
+	return ctrl.patchMCPFinalizers(pool.Name, pool.Finalizers, poolCopy.Finalizers)
+}
+
+func (ctrl *Controller) removeFinalizerFromMCP(pool *mcfgv1.MachineConfigPool, finalizer string) error {
+	// Create a patch to remove the finalizer
+	var newFinalizers []string
+	for _, f := range pool.Finalizers {
+		if f != finalizer {
+			newFinalizers = append(newFinalizers, f)
+		}
+	}
+	
+	return ctrl.patchMCPFinalizers(pool.Name, pool.Finalizers, newFinalizers)
+}
+
+func (ctrl *Controller) patchMCPFinalizers(mcpName string, oldFinalizers, newFinalizers []string) error {
+	// Create a strategic merge patch for the finalizers
+	patch := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"finalizers": newFinalizers,
+		},
+	}
+	
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return fmt.Errorf("failed to marshal patch: %w", err)
+	}
+	
+	_, err = ctrl.client.MachineconfigurationV1().MachineConfigPools().Patch(
+		context.TODO(),
+		mcpName,
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+	
+	return err
 }
