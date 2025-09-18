@@ -178,6 +178,7 @@ func (ctrl *Controller) updateMachineConfigPool(old, cur interface{}) {
 }
 
 func (ctrl *Controller) deleteMachineConfigPool(obj interface{}) {
+	klog.Errorf("in deleteMachineConfigPool, render controller, 181")
 	pool, ok := obj.(*mcfgv1.MachineConfigPool)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
@@ -191,8 +192,17 @@ func (ctrl *Controller) deleteMachineConfigPool(obj interface{}) {
 			return
 		}
 	}
-	klog.V(4).Infof("Deleting MachineConfigPool %s", pool.Name)
-	// TODO(abhinavdahiya): handle deletes.
+	klog.Errorf("Deleting MachineConfigPool %s, render controller, 195", pool.Name)
+
+	// // 1. Check that no nodes are labeled for MCP
+	// // 2. Check that nothing is targeting associated custom rendered MC
+	// // 3. Delete MCP
+	// if pool.Status.MachineCount > 0 {
+	// 	klog.Errorf("MachineConfigPool %s has %s machines. Cannot be deleted until machines are moved to another MCP.", pool.Name, pool.Status.MachineCount)
+	// 	nodes, err := ctrl.getNodesForPool(pool)
+	// 	return
+	// }
+	// // TODO(abhinavdahiya): handle deletes.
 }
 
 func (ctrl *Controller) addMachineConfig(obj interface{}) {
@@ -256,6 +266,7 @@ func (ctrl *Controller) updateMachineConfig(old, cur interface{}) {
 }
 
 func (ctrl *Controller) deleteMachineConfig(obj interface{}) {
+	klog.Errorf("in deleteMachineConfig, render controller, 260")
 	mc, ok := obj.(*mcfgv1.MachineConfig)
 
 	if !ok {

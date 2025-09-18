@@ -551,6 +551,7 @@ func (ctrl *Controller) updateMachineConfigPool(old, cur interface{}) {
 }
 
 func (ctrl *Controller) deleteMachineConfigPool(obj interface{}) {
+	klog.Errorf("in deleteMachineConfigPool, node controller, 554")
 	pool, ok := obj.(*mcfgv1.MachineConfigPool)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
@@ -564,7 +565,42 @@ func (ctrl *Controller) deleteMachineConfigPool(obj interface{}) {
 			return
 		}
 	}
-	klog.V(4).Infof("Deleting MachineConfigPool %s", pool.Name)
+
+	// TODO: check...
+	klog.Errorf("Deleting MachineConfigPool %s, node controller, 568", pool.Name)
+	// 1. Check that no nodes are labeled for MCP
+	// 2. Check that nothing is targeting associated custom rendered MC
+	// If the custom MCP still has machines in it, then it cannot be deleted
+	if pool.Status.MachineCount > 0 {
+		klog.Errorf("MachineConfigPool %s has %s machines. Cannot be deleted until machines are moved to another MCP.", pool.Name, pool.Status.MachineCount)
+		return
+		// // Unlabel nodes still targetted for custom MCP
+		// nodes, err := ctrl.getNodesForPool(pool)
+		// if err != nil {
+		// 	klog.Errorf("error getting nodes from MachineConfigPool %v: %v", pool.Name, err)
+		// }
+		// if len(nodes) > 0 {
+		// 	klog.Errorf("%v nodes still labeled for MachineConfigPool %v", len(nodes), pool.Name)
+
+		// 	// Loop through nodes and unlabel them
+		// 	for _, node := range nodes {
+		// 		klog.Errorf("removing %v MachineConfigPool label from node %v", pool.Name, node)
+
+		// 	}
+		// 	// TODO: change to info level log
+		// 	// unlabel node
+		// }
+		// return
+	}
+	// If any nodes are still targetting the custom MCP's rendered MC config version, the MCP
+	// cannot be deleted
+	oldRenderedMC := pool.Status.Configuration.Name
+	nodes = 
+
+	// TODO(abhinavdahiya): handle deletes.
+	// 1. Check that no nodes are labeled for MCP
+	// 2. Check that nothing is targeting associated custom rendered MC
+	// 3. Delete MCP
 	// TODO(abhinavdahiya): handle deletes.
 }
 
@@ -1248,6 +1284,40 @@ func (ctrl *Controller) getNodesForPool(pool *mcfgv1.MachineConfigPool) ([]*core
 		nodes = append(nodes, n)
 	}
 	return nodes, nil
+}
+
+func (ctrl *Controller) getFilteredNodes(rolesToExclude []string) ([]*corev1.Node, error) {
+	// MasterLabel = "node-role.kubernetes.io/master"
+
+
+	allNodes, err := ctrl.nodeLister.List()
+	if err != nil {
+		klog.Errorf("error getting nodes: %v", err)
+		return nil, err
+	}
+
+	filteredNodes := []*corev1.Node{}
+	for _, n := range allNodes {
+		p, err := ctrl.getPrimaryPoolForNode(n)
+		if err != nil {
+			klog.Warningf("can't get pool for node %q: %v", n.Name, err)
+			continue
+		}
+		if p == nil {
+			continue
+		}
+		if p.Name != pool.Name {
+			continue
+		}
+		nodes = append(nodes, n)
+	}
+	return nodes, nil
+
+	// (object.spec.machineConfigSelector.matchLabels["machineconfiguration.openshift.io/role"] == "master")
+    //         ||
+    //         (object.spec.machineConfigSelector.matchLabels["machineconfiguration.openshift.io/role"] == "worker")
+    //         ||
+    //         (object.spec.machineConfigSelector.matchLabels["machineconfiguration.openshift.io/role"] == "arbiter")
 }
 
 // setClusterConfigAnnotation reads cluster configs set into controllerConfig

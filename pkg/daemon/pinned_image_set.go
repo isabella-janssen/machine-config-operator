@@ -1046,6 +1046,7 @@ func (p *PinnedImageSetManager) updateMachineConfigPool(oldObj, newObj interface
 }
 
 func (p *PinnedImageSetManager) deleteMachineConfigPool(obj interface{}) {
+	klog.Errorf("in deleteMachineConfigPool, pis controller, 1049")
 	pool, ok := obj.(*mcfgv1.MachineConfigPool)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)

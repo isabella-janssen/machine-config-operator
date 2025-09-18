@@ -369,6 +369,7 @@ func (ctrl *Controller) updateMachineConfig(_, cur interface{}) {
 }
 
 func (ctrl *Controller) deleteMachineConfig(obj interface{}) {
+	klog.Errorf("in deleteMachineConfig, template controller, 372")
 	mc, ok := obj.(*mcfgv1.MachineConfig)
 
 	if !ok {

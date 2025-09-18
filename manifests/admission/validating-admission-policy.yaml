@@ -1,0 +1,50 @@
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: block-default-mcp-deletion
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - operations: ["DELETE"]
+      apiGroups: ["machineconfiguration.openshift.io"]
+      apiVersions: ["v1"]
+      resources: ["machineconfigpools"]
+  validations:
+  # Block deletion of default MCPs (master, worker)
+  - expression: |
+      !(object.metadata.name in ['master', 'worker'])
+    message: |
+      Cannot delete default MachineConfigPool. The 'master' and 'worker' pools are required for cluster operation and cannot be deleted.
+    messageExpression: |
+      'Cannot delete default MachineConfigPool \'' + object.metadata.name + '\'. ' +
+      'The \'master\' and \'worker\' pools are required for cluster operation and cannot be deleted.'
+  
+  # For custom MCPs, provide warning about using the webhook for full validation
+  - expression: |
+      object.metadata.name in ['master', 'worker'] || 
+      !has(object.metadata.annotations['machineconfiguration.openshift.io/deletion-policy']) ||
+      object.metadata.annotations['machineconfiguration.openshift.io/deletion-policy'] != 'force-delete'
+    message: |
+      WARNING: ValidatingAdmissionPolicy cannot check for active machines/nodes. 
+      For full validation of custom MCP deletion, ensure the ValidatingAdmissionWebhook is enabled.
+      To force deletion (bypass webhook validation), add annotation: machineconfiguration.openshift.io/deletion-policy=force-delete
+    messageExpression: |
+      object.metadata.name in ['master', 'worker'] ? 
+        ('Cannot delete default MachineConfigPool \'' + object.metadata.name + '\'. Default pools cannot be deleted.') :
+        ('WARNING: Limited validation. To bypass webhook validation, add annotation: machineconfiguration.openshift.io/deletion-policy=force-delete')
+
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: block-default-mcp-deletion-binding
+spec:
+  policyName: block-default-mcp-deletion
+  validationActions: [Deny]
+  matchResources:
+    resourceRules:
+    - operations: ["DELETE"]
+      apiGroups: ["machineconfiguration.openshift.io"]
+      apiVersions: ["v1"]
+      resources: ["machineconfigpools"]

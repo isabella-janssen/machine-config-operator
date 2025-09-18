@@ -1,0 +1,64 @@
+# THIS YAML IS FOR DEMONSTRATION ONLY AND WILL NOT WORK ON YOUR CLUSTER
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: "disallow-mcp-deletion-if-nodes-targeting-policy"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups:   ["machineconfiguration.openshift.io"]
+        apiVersions: ["v1"]
+        resources:   ["machineconfigpools"]
+        operations:  ["DELETE"]
+  variables:
+  - name: nodes
+    expression: "cel.kubernetes.list('v1', 'Node')" # This function is not available on your cluster
+  validations:
+    - expression: >
+        // First, ignore default MCPs.
+        oldObject.metadata.name in ['master', 'worker', 'arbiter'] ? true :
+        (
+          // Check 1: Block if machine count is > 0.
+          !(has(oldObject.status) && has(oldObject.status.machineCount) && oldObject.status.machineCount > 0)
+          &&
+          // Check 2: Block if the pool is updating or degraded.
+          !(has(oldObject.status) && has(oldObject.status.conditions) && oldObject.status.conditions.exists(c, (c.type == 'Updating' || c.type == 'Degraded') && c.status == 'True'))
+          &&
+          // Check 3: Block if any relevant node (not master or arbiter) is still targeting this MCP's rendered config.
+          !has(oldObject.status) || !has(oldObject.status.configuration) || !has(oldObject.status.configuration.name) ? true : (
+            let renderedConfig = oldObject.status.configuration.name;
+            !variables.nodes.exists(node,
+              // FINAL REFINED FILTER:
+              // Exclude nodes that are either master OR arbiter, as they cannot belong to a custom MCP.
+              !(
+                (has(node.metadata.labels) && 'node-role.kubernetes.io/master' in node.metadata.labels) ||
+                (has(node.metadata.labels) && 'node-role.kubernetes.io/arbiter' in node.metadata.labels)
+              )
+              &&
+              // CHECK: Does the node's current or desired config annotation match the rendered config?
+              (
+                (has(node.metadata.annotations) && node.metadata.annotations['machineconfiguration.openshift.io/currentConfig'] == renderedConfig)
+                ||
+                (has(node.metadata.annotations) && node.metadata.annotations['machineconfiguration.openshift.io/desiredConfig'] == renderedConfig)
+              )
+            )
+          )
+        )
+      # Note: messageExpression does not support comments
+      messageExpression: >
+        'Deletion of MachineConfigPool ' + oldObject.metadata.name + ' is blocked. ' +
+        (
+          (has(oldObject.status) && has(oldObject.status.machineCount) && oldObject.status.machineCount > 0) ?
+          'Reason: it still has active machines. ' : ''
+        ) +
+        (
+          (has(oldObject.status) && has(oldObject.status.conditions) && oldObject.status.conditions.exists(c, (c.type == 'Updating' || c.type == 'Degraded') && c.status == 'True')) ?
+          'Reason: it is currently updating or degraded. ' : ''
+        ) +
+        (
+          (has(oldObject.status) && has(oldObject.status.configuration) && has(oldObject.status.configuration.name) &&
+           variables.nodes.exists(node, !( (has(node.metadata.labels) && 'node-role.kubernetes.io/master' in node.metadata.labels) || (has(node.metadata.labels) && 'node-role.kubernetes.io/arbiter' in node.metadata.labels) ) &&
+           ( (has(node.metadata.annotations) && node.metadata.annotations['machineconfiguration.openshift.io/currentConfig'] == oldObject.status.configuration.name) || (has(node.metadata.annotations) && node.metadata.annotations['machineconfiguration.openshift.io/desiredConfig'] == oldObject.status.configuration.name) ) )
+          ) ? 'Reason: one or more nodes are still targeting its rendered config (' + oldObject.status.configuration.name + ').' : ''
+        )

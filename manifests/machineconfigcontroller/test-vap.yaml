@@ -1,0 +1,32 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: "test-cel-list-functionality"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   [""]
+      apiVersions: ["v1"]
+      resources:   ["configmaps"]
+      operations:  ["CREATE"]
+  variables:
+    - name: nodes
+      expression: "cel.kubernetes.list('v1', 'Node')"
+  validations:
+    - expression: "variables.nodes.size() < 5"
+      message: "Test Block: This cluster has 5 or more nodes."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: "test-cel-list-functionality-binding"
+spec:
+  policyName: "test-cel-list-functionality"
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+      - key: "kubernetes.io/metadata.name"
+        operator: NotIn
+        values: ["kube-system", "openshift"]
