@@ -1262,6 +1262,27 @@ func (ctrl *Controller) getNodesForPool(pool *mcfgv1.MachineConfigPool) ([]*core
 	return nodes, nil
 }
 
+// getFilteredNodesForPool filters out nodes that have any of the selectors to exclude
+func (ctrl *Controller) getFilteredNodesForPool(selectorsToExclude []string) ([]*corev1.Node, error) {
+	allNodes, err := ctrl.nodeLister.List(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	filteredNodes := []*corev1.Node{}
+	for _, n := range initialNodes {
+		// Filter out nodes that have any of the selectors to exclude
+		for _, selector := range selectorsToExclude {
+			if n.Labels[selector] != "" {
+				continue
+			}
+		}
+
+		filteredNodes = append(nodes, n)
+	}
+	return filteredNodes, nil
+}
+
 // setClusterConfigAnnotation reads cluster configs set into controllerConfig
 // and add/updates required annotation to node such as ControlPlaneTopology
 // from infrastructure object.
@@ -1689,6 +1710,10 @@ func (ctrl *Controller) validateMCPDeletionSafety(pool *mcfgv1.MachineConfigPool
 
 // checkForActiveMachines implements Rule 1: Check for machines still in this MCP
 func (ctrl *Controller) checkForActiveMachines(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
+	if pool.Status.MachineCount > 0 {
+		return true, fmt.Sprintf("Machines still configured for this pool: %v", pool.MachineCount), nil
+	}
+
 	// TODO: IMPLEMENT MACHINE CHECKING LOGIC
 	//
 	// This function should:
@@ -1707,12 +1732,29 @@ func (ctrl *Controller) checkForActiveMachines(pool *mcfgv1.MachineConfigPool) (
 	// Example blocking condition:
 	// return true, fmt.Sprintf("Machines still configured for this pool: %v", machineNames), nil
 	
-	klog.Warningf("TODO: Machine checking not yet implemented for MCP %s - assuming no blocking machines", pool.Name)
+	// klog.Warningf("TODO: Machine checking not yet implemented for MCP %s - assuming no blocking machines", pool.Name)
 	return false, "", nil
 }
 
-// checkForTargetingNodes implements Rule 2: Check for nodes still targeting this MCP's rendered config
+// checkForTargetingNodes implements Rule 2: Check for nodes still targeting this MCP's rendered 
+// config. It returns true if any nodes are still targeting the custom MCP's rendered config, a 
+// message explaining the node's reason for blocking deletion, and an error, if applicable.
 func (ctrl *Controller) checkForTargetingNodes(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
+	// // Get nodes not labeled as master or arbiter since they are not eligible for custom MCPs
+	// nodes, err := ctrl.getFilteredNodesForPool([]string{"node-role.kubernetes.io/master", "node-role.kubernetes.io/arbiter"})
+	// if err != nil {
+	// 	return false, "", fmt.Errorf("failed to get filtered nodes: %w", err)
+	// }
+
+	// // Check if any nodes are still targeting the custom MCP's rendered config
+	// poolConfigVersion := pool.Status.Configuration.Version
+	// for _, node := range nodes {
+	// 	if node.Annotations[daemonconsts.CurrentMachineConfigAnnotationKey] == poolConfigVersion || node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey] == poolConfigVersion {
+	// 		return true, fmt.Sprintf("Node %s is still targeting the custom MCP's rendered config; current: %s, desired: %s", node.Name, node.Annotations[daemonconsts.CurrentMachineConfigAnnotationKey], node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey]), nil
+	// 	}
+	// }
+
+	
 	// TODO: IMPLEMENT NODE TARGETING CHECK LOGIC
 	//
 	// This function should:
@@ -1731,23 +1773,29 @@ func (ctrl *Controller) checkForTargetingNodes(pool *mcfgv1.MachineConfigPool) (
 	// - Check if these configs match the pattern "rendered-{poolName}-*"
 	//
 	// Example implementation:
-	/*
-	nodes, err := ctrl.kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return false, "", fmt.Errorf("failed to list nodes: %w", err)
-	}
 	
+	// nodes, err := ctrl.kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	// if err != nil {
+	// 	return false, "", fmt.Errorf("failed to list nodes: %w", err)
+	// }
+	
+	// Get nodes not labeled as master or arbiter since they are not eligible for custom MCPs
+	nodes, err := ctrl.getFilteredNodesForPool([]string{"node-role.kubernetes.io/master", "node-role.kubernetes.io/arbiter"})
+	klog.Errorf("nodes: %v", nodes) //TODO: Remove this
+	if err != nil {
+		return false, "", fmt.Errorf("failed to get filtered nodes: %w", err)
+	}
+
 	renderedConfigPrefix := "rendered-" + pool.Name + "-"
 	var blockingNodes []string
-	
 	for _, node := range nodes.Items {
-		// Skip master and arbiter nodes (not eligible for custom MCPs)
-		if _, isMaster := node.Labels["node-role.kubernetes.io/master"]; isMaster {
-			continue
-		}
-		if _, isArbiter := node.Labels["node-role.kubernetes.io/arbiter"]; isArbiter {
-			continue
-		}
+		// // Skip master and arbiter nodes (not eligible for custom MCPs)
+		// if _, isMaster := node.Labels["node-role.kubernetes.io/master"]; isMaster {
+		// 	continue
+		// }
+		// if _, isArbiter := node.Labels["node-role.kubernetes.io/arbiter"]; isArbiter {
+		// 	continue
+		// }
 		
 		// Check current config annotation
 		if currentConfig, exists := node.Annotations[daemonconsts.CurrentMachineConfigAnnotationKey]; exists {
@@ -1769,9 +1817,7 @@ func (ctrl *Controller) checkForTargetingNodes(pool *mcfgv1.MachineConfigPool) (
 	if len(blockingNodes) > 0 {
 		return true, fmt.Sprintf("Eligible nodes still targeting this pool's config: %v", blockingNodes), nil
 	}
-	*/
-
-	klog.Warningf("TODO: Node targeting check not yet implemented for MCP %s - assuming no targeting nodes", pool.Name)
+	
 	return false, "", nil
 }
 
