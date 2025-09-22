@@ -1672,20 +1672,33 @@ func (ctrl *Controller) handleMCPDeletion(pool *mcfgv1.MachineConfigPool) error 
 	}
 
 	if !canDelete {
-		// Record event explaining why deletion is blocked
+		// Record detailed event explaining why deletion is blocked
 		ctrl.eventRecorder.Eventf(pool, corev1.EventTypeWarning, "DeletionBlocked", 
-			"Cannot delete MachineConfigPool %s: %s", pool.Name, blockingReason)
+			"MachineConfigPool %s cannot be deleted: %s. To check status: 'oc get events --field-selector involvedObject.name=%s'", 
+			pool.Name, blockingReason, pool.Name)
 		
-		klog.Warningf("Blocking deletion of MachineConfigPool %s: %s", pool.Name, blockingReason)
+		// Also log a user-friendly message  
+		klog.Warningf("DELETION BLOCKED: MachineConfigPool %s cannot be deleted: %s", pool.Name, blockingReason)
+		klog.Warningf("User action required: The 'oc delete mcp %s' command will remain pending until blocking conditions are resolved", pool.Name)
 		
-		// Still sync status but don't remove finalizer
+		// Add status condition to make the blocking state visible
+		if err := ctrl.addDeletionBlockedCondition(pool, blockingReason); err != nil {
+			klog.Errorf("Failed to add deletion blocked condition: %v", err)
+		}
+		
+		// Still sync status but don't remove finalizer - this keeps the deletion pending
 		return ctrl.syncStatusOnly(pool)
 	}
 
 	// Safe to delete - remove our finalizer
 	klog.Infof("MachineConfigPool %s is safe to delete, removing finalizer", pool.Name)
 	ctrl.eventRecorder.Eventf(pool, corev1.EventTypeNormal, "DeletionAllowed", 
-		"MachineConfigPool %s is safe to delete", pool.Name)
+		"MachineConfigPool %s is safe to delete - finalizer will be removed", pool.Name)
+	
+	// Clear any deletion blocked condition
+	if err := ctrl.clearDeletionBlockedCondition(pool); err != nil {
+		klog.Errorf("Failed to clear deletion blocked condition: %v", err)
+	}
 	
 	return ctrl.removeFinalizerFromMCP(pool, ctrlcommon.MCPDeletionFinalizer)
 }
@@ -1716,7 +1729,9 @@ func (ctrl *Controller) validateMCPDeletionSafety(pool *mcfgv1.MachineConfigPool
 // checkForActiveMachines implements Rule 1: Check for machines still in this MCP
 func (ctrl *Controller) checkForActiveMachines(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
 	if pool.Status.MachineCount > 0 {
-		return true, fmt.Sprintf("MachineConfigPool still has %d machines according to status", pool.Status.MachineCount), nil
+		return true, fmt.Sprintf("MachineConfigPool still has %d machines according to status. "+
+			"To fix: scale down machines targeting this pool or move them to a different pool before deletion", 
+			pool.Status.MachineCount), nil
 	}
 
 	// TODO: IMPLEMENT MACHINE CHECKING LOGIC
@@ -1775,7 +1790,18 @@ func (ctrl *Controller) checkForTargetingNodes(pool *mcfgv1.MachineConfigPool) (
 	}
 	
 	if len(blockingNodes) > 0 {
-		return true, fmt.Sprintf("Eligible nodes still targeting this pool's config: %v", blockingNodes), nil
+		var nodeNames []string
+		for _, nodeInfo := range blockingNodes {
+			// Extract just the node name from "nodeName (current: config)" format
+			parts := strings.SplitN(nodeInfo, " ", 2)
+			nodeNames = append(nodeNames, parts[0])
+		}
+		
+		detailedMessage := fmt.Sprintf("Eligible nodes still targeting this pool's config: %v. "+
+			"To fix: remove the node-role label or wait for nodes to transition to a different config. "+
+			"Node details: %v", nodeNames, blockingNodes)
+			
+		return true, detailedMessage, nil
 	}
 	
 	return false, "", nil
@@ -1825,4 +1851,108 @@ func (ctrl *Controller) patchMCPFinalizers(mcpName string, oldFinalizers, newFin
 	)
 	
 	return err
+}
+
+// addDeletionBlockedCondition adds a condition to the MCP status indicating deletion is blocked
+func (ctrl *Controller) addDeletionBlockedCondition(pool *mcfgv1.MachineConfigPool, reason string) error {
+	// Create a condition indicating deletion is blocked
+	condition := mcfgv1.MachineConfigPoolCondition{
+		Type:               mcfgv1.MachineConfigPoolConditionType("DeletionBlocked"),
+		Status:             corev1.ConditionTrue,
+		Reason:             "UnsafeToDelete",
+		Message:            fmt.Sprintf("Cannot delete MachineConfigPool: %s", reason),
+		LastTransitionTime: metav1.Now(),
+	}
+	
+	// Get fresh copy to avoid conflicts
+	freshPool, err := ctrl.mcpLister.Get(pool.Name)
+	if err != nil {
+		return err
+	}
+	
+	// Update or add the condition
+	updatedConditions := ctrl.updateCondition(freshPool.Status.Conditions, condition)
+	
+	// Patch the status
+	patch := map[string]interface{}{
+		"status": map[string]interface{}{
+			"conditions": updatedConditions,
+		},
+	}
+	
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return fmt.Errorf("failed to marshal status patch: %w", err)
+	}
+	
+	_, err = ctrl.client.MachineconfigurationV1().MachineConfigPools().Patch(
+		context.TODO(),
+		pool.Name,
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+		"status",
+	)
+	
+	return err
+}
+
+// clearDeletionBlockedCondition removes the deletion blocked condition from MCP status
+func (ctrl *Controller) clearDeletionBlockedCondition(pool *mcfgv1.MachineConfigPool) error {
+	// Get fresh copy to avoid conflicts
+	freshPool, err := ctrl.mcpLister.Get(pool.Name)
+	if err != nil {
+		return err
+	}
+	
+	// Remove the DeletionBlocked condition
+	updatedConditions := []mcfgv1.MachineConfigPoolCondition{}
+	for _, condition := range freshPool.Status.Conditions {
+		if condition.Type != mcfgv1.MachineConfigPoolConditionType("DeletionBlocked") {
+			updatedConditions = append(updatedConditions, condition)
+		}
+	}
+	
+	// Only patch if there was a change
+	if len(updatedConditions) == len(freshPool.Status.Conditions) {
+		return nil // No DeletionBlocked condition to remove
+	}
+	
+	// Patch the status  
+	patch := map[string]interface{}{
+		"status": map[string]interface{}{
+			"conditions": updatedConditions,
+		},
+	}
+	
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return fmt.Errorf("failed to marshal status patch: %w", err)
+	}
+	
+	_, err = ctrl.client.MachineconfigurationV1().MachineConfigPools().Patch(
+		context.TODO(),
+		pool.Name,
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+		"status",
+	)
+	
+	return err
+}
+
+// updateCondition updates or adds a condition to the conditions slice
+func (ctrl *Controller) updateCondition(conditions []mcfgv1.MachineConfigPoolCondition, newCondition mcfgv1.MachineConfigPoolCondition) []mcfgv1.MachineConfigPoolCondition {
+	// Look for existing condition of the same type
+	for i, condition := range conditions {
+		if condition.Type == newCondition.Type {
+			// Update existing condition
+			conditions[i] = newCondition
+			return conditions
+		}
+	}
+	
+	// Add new condition
+	return append(conditions, newCondition)
 }
