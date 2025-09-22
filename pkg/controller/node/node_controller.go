@@ -13,7 +13,6 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	features "github.com/openshift/api/features"
-	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	cligoinformersv1 "github.com/openshift/client-go/config/informers/externalversions/config/v1"
@@ -1121,6 +1120,7 @@ func (ctrl *Controller) syncMachineConfigPool(key string) error {
 	}
 
 	// Ensure custom MCPs have deletion protection finalizer
+	// System pools (master, worker, arbiter) are excluded as they already have deletion protections
 	if !ctrlcommon.IsSystemPool(pool.Name) {
 		if err := ctrl.ensureFinalizerPresent(pool); err != nil {
 			return fmt.Errorf("failed to ensure finalizer on custom MCP %s: %w", pool.Name, err)
@@ -1270,15 +1270,20 @@ func (ctrl *Controller) getFilteredNodesForPool(selectorsToExclude []string) ([]
 	}
 
 	filteredNodes := []*corev1.Node{}
-	for _, n := range initialNodes {
-		// Filter out nodes that have any of the selectors to exclude
+	for _, n := range allNodes {
+		// Check if this node should be excluded
+		shouldExclude := false
 		for _, selector := range selectorsToExclude {
-			if n.Labels[selector] != "" {
-				continue
+			if _, exists := n.Labels[selector]; exists {
+				shouldExclude = true
+				break
 			}
 		}
 
-		filteredNodes = append(nodes, n)
+		// Only add if not excluded
+		if !shouldExclude {
+			filteredNodes = append(filteredNodes, n)
+		}
 	}
 	return filteredNodes, nil
 }
@@ -1639,7 +1644,7 @@ func (ctrl *Controller) ensureFinalizerPresent(pool *mcfgv1.MachineConfigPool) e
 
 // handleMCPDeletion processes MCP deletion requests and validates safety
 func (ctrl *Controller) handleMCPDeletion(pool *mcfgv1.MachineConfigPool) error {
-	// Skip system pools - they don't have our finalizer
+	// Skip system pools (master, worker, arbiter) - they don't have our finalizer
 	if ctrlcommon.IsSystemPool(pool.Name) {
 		return ctrl.syncStatusOnly(pool)
 	}
@@ -1711,7 +1716,7 @@ func (ctrl *Controller) validateMCPDeletionSafety(pool *mcfgv1.MachineConfigPool
 // checkForActiveMachines implements Rule 1: Check for machines still in this MCP
 func (ctrl *Controller) checkForActiveMachines(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
 	if pool.Status.MachineCount > 0 {
-		return true, fmt.Sprintf("Machines still configured for this pool: %v", pool.MachineCount), nil
+		return true, fmt.Sprintf("MachineConfigPool still has %d machines according to status", pool.Status.MachineCount), nil
 	}
 
 	// TODO: IMPLEMENT MACHINE CHECKING LOGIC
@@ -1740,63 +1745,18 @@ func (ctrl *Controller) checkForActiveMachines(pool *mcfgv1.MachineConfigPool) (
 // config. It returns true if any nodes are still targeting the custom MCP's rendered config, a 
 // message explaining the node's reason for blocking deletion, and an error, if applicable.
 func (ctrl *Controller) checkForTargetingNodes(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
-	// // Get nodes not labeled as master or arbiter since they are not eligible for custom MCPs
-	// nodes, err := ctrl.getFilteredNodesForPool([]string{"node-role.kubernetes.io/master", "node-role.kubernetes.io/arbiter"})
-	// if err != nil {
-	// 	return false, "", fmt.Errorf("failed to get filtered nodes: %w", err)
-	// }
-
-	// // Check if any nodes are still targeting the custom MCP's rendered config
-	// poolConfigVersion := pool.Status.Configuration.Version
-	// for _, node := range nodes {
-	// 	if node.Annotations[daemonconsts.CurrentMachineConfigAnnotationKey] == poolConfigVersion || node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey] == poolConfigVersion {
-	// 		return true, fmt.Sprintf("Node %s is still targeting the custom MCP's rendered config; current: %s, desired: %s", node.Name, node.Annotations[daemonconsts.CurrentMachineConfigAnnotationKey], node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey]), nil
-	// 	}
-	// }
-
-	
-	// TODO: IMPLEMENT NODE TARGETING CHECK LOGIC
-	//
-	// This function should:
-	// 1. List all nodes in the cluster
-	// 2. Filter to eligible nodes (non-master, non-arbiter)
-	// 3. Check if any eligible nodes are still targeting this MCP's rendered config
-	//
-	// Implementation steps:
-	// - Use ctrl.kubeClient.CoreV1().Nodes().List() to get all nodes
-	// - For each node, check eligibility:
-	//   * Skip nodes with label "node-role.kubernetes.io/master"
-	//   * Skip nodes with label "node-role.kubernetes.io/arbiter"
-	// - Check node annotations for current/desired config:
-	//   * daemonconsts.CurrentMachineConfigAnnotationKey (machineconfiguration.openshift.io/currentConfig)
-	//   * daemonconsts.DesiredMachineConfigAnnotationKey (machineconfiguration.openshift.io/desiredConfig)
-	// - Check if these configs match the pattern "rendered-{poolName}-*"
-	//
-	// Example implementation:
-	
-	// nodes, err := ctrl.kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	// if err != nil {
-	// 	return false, "", fmt.Errorf("failed to list nodes: %w", err)
-	// }
-	
 	// Get nodes not labeled as master or arbiter since they are not eligible for custom MCPs
 	nodes, err := ctrl.getFilteredNodesForPool([]string{"node-role.kubernetes.io/master", "node-role.kubernetes.io/arbiter"})
-	klog.Errorf("nodes: %v", nodes) //TODO: Remove this
 	if err != nil {
 		return false, "", fmt.Errorf("failed to get filtered nodes: %w", err)
 	}
 
+	klog.V(4).Infof("Checking %d eligible nodes for MCP %s targeting", len(nodes), pool.Name)
+
 	renderedConfigPrefix := "rendered-" + pool.Name + "-"
 	var blockingNodes []string
-	for _, node := range nodes.Items {
-		// // Skip master and arbiter nodes (not eligible for custom MCPs)
-		// if _, isMaster := node.Labels["node-role.kubernetes.io/master"]; isMaster {
-		// 	continue
-		// }
-		// if _, isArbiter := node.Labels["node-role.kubernetes.io/arbiter"]; isArbiter {
-		// 	continue
-		// }
-		
+	
+	for _, node := range nodes {
 		// Check current config annotation
 		if currentConfig, exists := node.Annotations[daemonconsts.CurrentMachineConfigAnnotationKey]; exists {
 			if strings.HasPrefix(currentConfig, renderedConfigPrefix) {
@@ -1805,7 +1765,7 @@ func (ctrl *Controller) checkForTargetingNodes(pool *mcfgv1.MachineConfigPool) (
 			}
 		}
 		
-		// Check desired config annotation
+		// Check desired config annotation  
 		if desiredConfig, exists := node.Annotations[daemonconsts.DesiredMachineConfigAnnotationKey]; exists {
 			if strings.HasPrefix(desiredConfig, renderedConfigPrefix) {
 				blockingNodes = append(blockingNodes, fmt.Sprintf("%s (desired: %s)", node.Name, desiredConfig))

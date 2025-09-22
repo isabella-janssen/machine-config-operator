@@ -1263,3 +1263,8 @@ func RequiresRebuild(oldMC, newMC *mcfgv1.MachineConfig) bool {
 		!reflect.DeepEqual(oldMC.Spec.Extensions, newMC.Spec.Extensions) ||
 		!reflect.DeepEqual(oldMC.Spec.KernelArguments, newMC.Spec.KernelArguments)
 }
+
+// IsSystemPool returns true if the pool is a system pool (master, worker, or arbiter)
+func IsSystemPool(poolName string) bool {
+	return poolName == "master" || poolName == "worker" || poolName == "arbiter"
+}

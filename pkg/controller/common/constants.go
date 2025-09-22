@@ -140,6 +140,9 @@ const (
 	// Stub Ignition upgrade related annotation keys
 	StubIgnitionVersionAnnotation   = "machineconfiguration.openshift.io/stub-ignition-upgraded-to"
 	StubIgnitionTimestampAnnotation = "machineconfiguration.openshift.io/stub-ignition-upgraded-at"
+
+	// MCP deletion protection finalizer
+	MCPDeletionFinalizer = "machineconfiguration.openshift.io/mcp-deletion-protection"
 )
 
 // Commonly-used MCO ConfigMap names
