@@ -2540,6 +2540,26 @@ func (dn *Daemon) queueRevertKernelSwap() error {
 	return nil
 }
 
+// hasPinnedImageSetsConfigured checks if the current node's pools have PinnedImageSets configured
+func (dn *Daemon) hasPinnedImageSetsConfigured() (bool, error) {
+	if dn.mcpLister == nil || dn.node == nil {
+		return false, nil
+	}
+
+	pools, _, err := helpers.GetPoolsForNode(dn.mcpLister, dn.node)
+	if err != nil {
+		return false, fmt.Errorf("failed to get pools for node %q: %w", dn.node.Name, err)
+	}
+
+	for _, pool := range pools {
+		if pool.Spec.PinnedImageSets != nil && len(pool.Spec.PinnedImageSets) > 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // updateLayeredOS updates the system OS to the one specified in newConfig
 func (dn *Daemon) updateLayeredOS(config *mcfgv1.MachineConfig) error {
 	newURL := config.Spec.OSImageURL
@@ -2559,11 +2579,20 @@ func (dn *Daemon) updateLayeredOS(config *mcfgv1.MachineConfig) error {
 
 	isOsImagePresent := false
 
-	// not set during firstboot
+	// Only check for local images if PinnedImageSet functionality is being used
+	// and the feature gates are enabled
 	if dn.fgHandler != nil && dn.fgHandler.Enabled(features.FeatureGatePinnedImages) {
-		isOsImagePresent, err = isImagePresent(newURL)
+		hasPinnedImageSets, err := dn.hasPinnedImageSetsConfigured()
 		if err != nil {
-			return err
+			klog.Warningf("Failed to check if node has PinnedImageSets configured: %v", err)
+		} else if hasPinnedImageSets {
+			klog.Infof("Node has PinnedImageSets configured, checking for local OS image")
+			isOsImagePresent, err = isImagePresent(newURL)
+			if err != nil {
+				return err
+			}
+		} else {
+			klog.Infof("Node does not have PinnedImageSets configured, skipping local image check")
 		}
 	}
 
