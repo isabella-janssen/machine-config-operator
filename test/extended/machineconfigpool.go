@@ -826,11 +826,11 @@ func DebugDegradedStatus(mcp *MachineConfigPool) {
 	logger.Infof("END DEBUG")
 }
 
-// `DoesMachineConfigPoolHaveMachinesOriginPort` returns true if the desired MCP, defined by the
+// `DoesMachineConfigPoolHaveMachines` returns true if the desired MCP, defined by the
 // `mcpName` parameter has machines and false otherwise. It also returns an error if one occurs
 // when getting the MCP.
 // TODO (MCO-1960): Replace this function ported from o/origin with a standardized helper.
-func DoesMachineConfigPoolHaveMachinesOriginPort(machineConfigClient *machineconfigclient.Clientset, mcpName string) bool {
+func DoesMachineConfigPoolHaveMachines(machineConfigClient *machineconfigclient.Clientset, mcpName string) bool {
 	// Get desired MCP
 	mcp, mcpErr := machineConfigClient.MachineconfigurationV1().MachineConfigPools().Get(context.TODO(), mcpName, metav1.GetOptions{})
 	o.Expect(mcpErr).NotTo(o.HaveOccurred(), "Error checking for compatible MCPs: %s", mcpErr)
@@ -839,10 +839,10 @@ func DoesMachineConfigPoolHaveMachinesOriginPort(machineConfigClient *machinecon
 	return mcp.Status.MachineCount > 0
 }
 
-// `WaitForMCPToBeReadyOriginPort` waits up to 5 minutes for a pool to be in an updated state with
+// `WaitForMCPToBeReady` waits up to 5 minutes for a pool to be in an updated state with
 // a specified number of ready machines
 // TODO (MCO-1960): Replace this function ported from o/origin with a standardized helper.
-func WaitForMCPToBeReadyOriginPort(machineConfigClient *machineconfigclient.Clientset, poolName string, readyMachineCount int32, oldRenderedMC string) {
+func WaitForMCPToBeReady(machineConfigClient *machineconfigclient.Clientset, poolName string, readyMachineCount int32, oldRenderedMC string) {
 	o.Eventually(func() bool {
 		mcp, err := machineConfigClient.MachineconfigurationV1().MachineConfigPools().Get(context.TODO(), poolName, metav1.GetOptions{})
 		if err != nil {
@@ -850,7 +850,8 @@ func WaitForMCPToBeReadyOriginPort(machineConfigClient *machineconfigclient.Clie
 			return false
 		}
 		// Check if the pool is in an updated state with the correct number of ready machines
-		if IsMachineConfigPoolConditionTrue(mcp.Status.Conditions, mcfgv1.MachineConfigPoolUpdated) && mcp.Status.UpdatedMachineCount == readyMachineCount {
+		if IsMachineConfigPoolConditionTrue(mcp.Status.Conditions, mcfgv1.MachineConfigPoolUpdated) &&
+			(oldRenderedMC != "" || mcp.Status.UpdatedMachineCount == readyMachineCount) {
 			logger.Infof("MCP '%v' has the desired %v ready machines.", poolName, mcp.Status.UpdatedMachineCount)
 			// If an old rendered MC has been provided, make sure the MCP has been updated to a new rendered MC
 			if oldRenderedMC != "" {
@@ -874,14 +875,14 @@ func WaitForMCPToBeReadyOriginPort(machineConfigClient *machineconfigclient.Clie
 	}, 5*time.Minute, 10*time.Second).Should(o.BeTrue(), "Timed out waiting for MCP '%v' to be in 'Updated' state with %v ready machines.", poolName, readyMachineCount)
 }
 
-// `CleanupCustomMCPOriginPort` cleans up a custom MCP if it exists through the following steps:
+// `CleanupCustomMCP` cleans up a custom MCP if it exists through the following steps:
 //  1. Remove the custom MCP role label from the node
 //  2. Wait for the custom MCP to be updated with no ready machines
 //  3. Wait for the node to have a current config version equal to the config version of the worker MCP
 //  4. Remove the custom MCP
 //
 // TODO (MCO-1960): Replace this function ported from o/origin with a standardized helper.
-func CleanupCustomMCPOriginPort(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, customMCPName, nodeName string) error {
+func CleanupCustomMCP(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, customMCPName, nodeName string) error {
 	// Skip this if the custom MCP is already deleted
 	logger.Infof("Checking if MCP `%v` still exists", customMCPName)
 	_, customMcpErr := machineConfigClient.MachineconfigurationV1().MachineConfigPools().Get(context.TODO(), customMCPName, metav1.GetOptions{})
@@ -902,7 +903,7 @@ func CleanupCustomMCPOriginPort(oc *exutil.CLI, machineConfigClient *machineconf
 
 	// Wait for custom MCP to report no ready nodes
 	logger.Infof("Waiting for %v MCP to be updated with %v ready machines.", customMCPName, 0)
-	WaitForMCPToBeReadyOriginPort(machineConfigClient, customMCPName, 0, "")
+	WaitForMCPToBeReady(machineConfigClient, customMCPName, 0, "")
 
 	// Wait for node to have a current config version equal to the worker MCP's config version
 	workerMcp, workerMcpErr := machineConfigClient.MachineconfigurationV1().MachineConfigPools().Get(context.TODO(), "worker", metav1.GetOptions{})
@@ -911,7 +912,7 @@ func CleanupCustomMCPOriginPort(oc *exutil.CLI, machineConfigClient *machineconf
 	}
 	workerMcpConfig := workerMcp.Spec.Configuration.Name
 	logger.Infof("Waiting for %v node to be updated with %v config version.", nodeName, workerMcpConfig)
-	WaitForNodeCurrentConfigOriginPort(oc, nodeName, workerMcpConfig)
+	WaitForNodeCurrentConfig(oc, nodeName, workerMcpConfig)
 
 	// Delete custom MCP
 	logger.Infof("Deleting MCP %v", customMCPName)
@@ -923,10 +924,10 @@ func CleanupCustomMCPOriginPort(oc *exutil.CLI, machineConfigClient *machineconf
 	return nil
 }
 
-// `DeleteMCAndWaitForMCPUpdateOriginPort` deletes the desired MC and waits for the associated MCP
+// `DeleteMCAndWaitForMCPUpdate` deletes the desired MC and waits for the associated MCP
 // to return to an updated state
 // TODO (MCO-1960): Replace this function ported from o/origin with a standardized helper.
-func DeleteMCAndWaitForMCPUpdateOriginPort(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, mcName, mcpName string) {
+func DeleteMCAndWaitForMCPUpdate(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, mcName, mcpName string) {
 	oldRenderedMC := ""
 	// Get the rendered config of the MCP before the MC deletion, if the MCP still exists
 	mcp, mcpErr := machineConfigClient.MachineconfigurationV1().MachineConfigPools().Get(context.TODO(), mcpName, metav1.GetOptions{})
@@ -936,13 +937,28 @@ func DeleteMCAndWaitForMCPUpdateOriginPort(oc *exutil.CLI, machineConfigClient *
 
 	// Delete the provided MC
 	logger.Infof("Deleting MC `%v`.", mcName)
-	mcDeleted, deleteMCErr := DeleteMCByNameOriginPort(oc, machineConfigClient, mcName)
+	mcDeleted, deleteMCErr := DeleteMCByName(oc, machineConfigClient, mcName)
 	o.Expect(deleteMCErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Could not delete MachineConfig `%v`: %v.", mcName, deleteMCErr))
 
 	// Only wait for the MCP to return to an updated state if the MC existed and needed deletion
 	// and if the targeted MCP still exists
 	if mcDeleted && mcpErr == nil {
 		logger.Infof("Waiting for %v MCP to be updated with %v ready machines.", mcpName, 1)
-		WaitForMCPToBeReadyOriginPort(machineConfigClient, mcpName, 1, oldRenderedMC)
+		WaitForMCPToBeReady(machineConfigClient, mcpName, 0, oldRenderedMC)
 	}
+}
+
+// `MCPIsUpdatedToNewConfig` checks whether a MCP has been updated to a new config version by
+// checking if the "Updated" condition in the pool's `Status` is true and if the desired rendered
+// config version in the pool's `Spec` is different from the provided config version.
+// TODO (MCO-1960): Replace this function ported from o/origin with a standardized helper.
+func MCPIsUpdatedToNewConfig(machineConfigClient *machineconfigclient.Clientset, mcpName, originalRenderedConfig string) bool {
+	// Get MCP
+	mcp, mcpErr := machineConfigClient.MachineconfigurationV1().MachineConfigPools().Get(context.TODO(), mcpName, metav1.GetOptions{})
+	o.Expect(mcpErr).NotTo(o.HaveOccurred(), "Error getting MCP `%v`: %s", mcpName, mcpErr)
+
+	// Check that the MCP status is updated & that the referenced config version is not the
+	// original, pre update config version
+	return IsMachineConfigPoolConditionTrue(mcp.Status.Conditions, mcfgv1.MachineConfigPoolUpdated) &&
+		mcp.Spec.Configuration.Name != originalRenderedConfig
 }

@@ -453,9 +453,9 @@ func getReadyNodes(oc *exutil.CLI) (sets.Set[string], error) {
 	return nodeSet, nil
 }
 
-// `GetNodesByRoleOriginPort` gets all nodes labeled with the desired role
+// `GetNodesByRole` gets all nodes labeled with the desired role
 // TODO (MCO-1960): Replace this function ported from o/origin with a standardized helper.
-func GetNodesByRoleOriginPort(oc *exutil.CLI, role string) ([]corev1.Node, error) {
+func GetNodesByRole(oc *exutil.CLI, role string) ([]corev1.Node, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labels.Set{fmt.Sprintf("node-role.kubernetes.io/%s", role): ""}).String(),
 	}
@@ -466,10 +466,10 @@ func GetNodesByRoleOriginPort(oc *exutil.CLI, role string) ([]corev1.Node, error
 	return nodes.Items, nil
 }
 
-// `WaitForNodeCurrentConfigOriginPort` waits up to 5 minutes for a input node to have a current
+// `WaitForNodeCurrentConfig` waits up to 5 minutes for a input node to have a current
 // config equal to the `config` parameter
 // TODO (MCO-1960): Replace this function ported from o/origin with a standardized helper.
-func WaitForNodeCurrentConfigOriginPort(oc *exutil.CLI, nodeName, config string) {
+func WaitForNodeCurrentConfig(oc *exutil.CLI, nodeName, config string) {
 	o.Eventually(func() bool {
 		node, nodeErr := oc.AsAdmin().KubeClient().CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if nodeErr != nil {
