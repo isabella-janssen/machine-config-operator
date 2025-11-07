@@ -129,16 +129,16 @@ func (mc *MachineConfig) GetAuthorizedKeysByUserAsList(user string) ([]string, e
 	return listKeys, err
 }
 
-// `ApplyMachineConfigFixtureOriginPort` applies a MachineConfig fixture
+// `ApplyMachineConfigFixture` applies a MachineConfig fixture
 // TODO (MCO-1960): Replace this function ported from o/origin with a standardized helper.
-func ApplyMachineConfigFixtureOriginPort(oc *exutil.CLI, fixture string) error {
+func ApplyMachineConfigFixture(oc *exutil.CLI, fixture string) error {
 	err := NewMCOTemplate(oc, fixture).Apply()
 	return err
 }
 
-// `DeleteMCByNameOriginPort` deletes the MC with the provided name if it exists in the cluster
+// `DeleteMCByName` deletes the MC with the provided name if it exists in the cluster
 // TODO (MCO-1960): Replace this function ported from o/origin with a standardized helper.
-func DeleteMCByNameOriginPort(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, mcName string) (mcDeleted bool, err error) {
+func DeleteMCByName(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, mcName string) (mcDeleted bool, err error) {
 	// Check if the MC still exists
 	_, getMCErr := machineConfigClient.MachineconfigurationV1().MachineConfigs().Get(context.TODO(), mcName, metav1.GetOptions{})
 	if getMCErr != nil {
@@ -151,6 +151,6 @@ func DeleteMCByNameOriginPort(oc *exutil.CLI, machineConfigClient *machineconfig
 	}
 
 	// Delete the desired MC
-	deleteMCErr := oc.Run("delete").Args("machineconfig", mcName).Execute()
+	deleteMCErr := oc.AsAdmin().Run("delete").Args("machineconfig", mcName).Execute()
 	return true, deleteMCErr
 }
