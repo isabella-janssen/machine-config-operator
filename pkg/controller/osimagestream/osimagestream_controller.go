@@ -8,7 +8,8 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/api/machineconfiguration/v1alpha1"
 	"github.com/openshift/machine-config-operator/pkg/version"
-	"k8s.io/apimachinery/pkg/api/errors"
+	errors2 "github.com/pkg/errors"
+
 	corelisterv1 "k8s.io/client-go/listers/core/v1"
 
 	configinformersv1 "github.com/openshift/client-go/config/informers/externalversions/config/v1"
@@ -24,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
@@ -147,6 +149,14 @@ func (ctrl *Controller) boot() error {
 	defer cancel()
 	osImageStream, err := BuildOsImageStreamRuntime(ctx, secret, cc, image, ctrl.imageStreamFactory)
 	if err != nil {
+		if errors2.Is(err, ErrorNoOSImageStreamAvailable) {
+			// Note: Till the feature is stable and the CoreOS images with the streams embedded have been
+			// running a for a few versions/cycles it's not a bad idea to ignore the situation where
+			// no streams are available and let the cluster run with zero available streams.
+			// TODO @pablintino: Track with a Jira card
+			klog.Warningf("OSImageStreams ended with no available streams. No streams will be added to the cluster.")
+			return nil
+		}
 		return fmt.Errorf("error building the OSImageStream at runtime: %w", err)
 	}
 
@@ -174,7 +184,7 @@ func (ctrl *Controller) boot() error {
 func (ctrl *Controller) getExistingOSImageStream() (*v1alpha1.OSImageStream, error) {
 	osImageStream, err := ctrl.osImageStreamLister.Get(ctrlcommon.ClusterInstanceNameOSImageStream)
 	if err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to retrieve existing OSImageStream: %v", err)
 		}
 		return nil, nil
