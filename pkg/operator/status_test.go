@@ -19,9 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
-	apicfgv1 "github.com/openshift/api/config/v1"
 	configv1 "github.com/openshift/api/config/v1"
-	features "github.com/openshift/api/features"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	opv1 "github.com/openshift/api/operator/v1"
 	fakeconfigclientset "github.com/openshift/client-go/config/clientset/versioned/fake"
@@ -194,14 +192,7 @@ func TestIsMachineConfigPoolConfigurationValid(t *testing.T) {
 				source = append(source, corev1.ObjectReference{Name: s})
 			}
 
-			fgHandler := ctrlcommon.NewFeatureGatesHardcodedHandler(
-				[]apicfgv1.FeatureGateName{
-					features.FeatureGateMachineConfigNodes,
-					features.FeatureGatePinnedImages,
-				},
-				[]apicfgv1.FeatureGateName{},
-			)
-			err := isMachineConfigPoolConfigurationValid(fgHandler, &mcfgv1.MachineConfigPool{
+			err := isMachineConfigPoolConfigurationValid(&mcfgv1.MachineConfigPool{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "dummy-pool",
 				},
@@ -639,7 +630,7 @@ func TestOperatorSyncStatus(t *testing.T) {
 		optr := &Operator{
 			eventRecorder: &record.FakeRecorder{},
 			fgHandler: ctrlcommon.NewFeatureGatesHardcodedHandler(
-				[]configv1.FeatureGateName{features.FeatureGatePinnedImages}, []configv1.FeatureGateName{},
+				[]configv1.FeatureGateName{}, []configv1.FeatureGateName{},
 			),
 		}
 		optr.vStore = newVersionStore()
@@ -729,7 +720,7 @@ func TestInClusterBringUpStayOnErr(t *testing.T) {
 	optr := &Operator{
 		eventRecorder: &record.FakeRecorder{},
 		fgHandler: ctrlcommon.NewFeatureGatesHardcodedHandler(
-			[]configv1.FeatureGateName{features.FeatureGatePinnedImages}, []configv1.FeatureGateName{},
+			[]configv1.FeatureGateName{}, []configv1.FeatureGateName{},
 		),
 	}
 	optr.vStore = newVersionStore()
