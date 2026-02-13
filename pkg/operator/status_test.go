@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 
 	configv1 "github.com/openshift/api/config/v1"
+	features "github.com/openshift/api/features"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	opv1 "github.com/openshift/api/operator/v1"
 	fakeconfigclientset "github.com/openshift/client-go/config/clientset/versioned/fake"
