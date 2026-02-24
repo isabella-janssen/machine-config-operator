@@ -72,6 +72,7 @@ func (a *APIServer) Serve() {
 			klog.Exitf("Machine Config Server exited with error: %v", err)
 		}
 	} else {
+		log.SetLogger(klog.NewKlogr())
 		certWatcher, err := certwatcher.New(a.cert, a.key)
 		if err != nil {
 			klog.Exitf("failed to load serving cert: %v", err)
@@ -80,7 +81,6 @@ func (a *APIServer) Serve() {
 		mcs.TLSConfig.GetCertificate = certWatcher.GetCertificate
 
 		go func() {
-			log.SetLogger(klog.NewKlogr())
 			if err := certWatcher.Start(context.Background()); err != nil {
 				klog.Fatalf("Certificate watcher failed to start: %v", err)
 			}
