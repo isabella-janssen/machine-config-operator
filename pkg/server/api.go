@@ -74,7 +74,7 @@ func (a *APIServer) Serve() {
 		}
 	} else {
 		// log.SetLogger(klog.NewKlogr())
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(35 * time.Second)
 		certWatcher, err := certwatcher.New(a.cert, a.key)
 		if err != nil {
 			klog.Exitf("failed to load serving cert: %v", err)
