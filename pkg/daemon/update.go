@@ -3000,9 +3000,14 @@ func (dn *Daemon) reboot(rationale string) error {
 	if dn.node != nil {
 		Rebooting := make(map[string]string)
 		Rebooting[constants.MachineConfigDaemonPostConfigAction] = constants.MachineConfigDaemonStateRebooting
+		// Store the current boot ID so we can verify the reboot occurred after restart
+		if dn.bootID != "" {
+			Rebooting[constants.PreRebootBootIDAnnotationKey] = dn.bootID
+			klog.Infof("Storing pre-reboot boot ID %s in node annotation", dn.bootID)
+		}
 		_, err := dn.nodeWriter.SetAnnotations(Rebooting)
 		if err != nil {
-			klog.Errorf("Error setting post config action annotation %v", err)
+			klog.Errorf("Error setting reboot annotations: %v", err)
 		}
 	}
 

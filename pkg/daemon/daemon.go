@@ -756,11 +756,39 @@ func (dn *Daemon) syncNode(key string) error {
 	}
 
 	if node.Annotations[constants.MachineConfigDaemonPostConfigAction] == constants.MachineConfigDaemonStateRebooting {
-		klog.Info("Detected Rebooting Annotation, applying MCN.")
-		err := upgrademonitor.GenerateAndApplyMachineConfigNodes(
-			&upgrademonitor.Condition{State: mcfgv1.MachineConfigNodeUpdateRebooted, Reason: string(mcfgv1.MachineConfigNodeUpdateRebooted), Message: "Node has rebooted"},
+		klog.Info("Detected Rebooting Annotation, verifying reboot occurred via boot ID.")
+
+		// Read the pre-reboot boot ID from node annotation
+		rebootOccurred := false
+		rebootStatus := metav1.ConditionUnknown
+		rebootMessage := "Reboot verification failed: boot ID unavailable"
+
+		preRebootBootID := node.Annotations[constants.PreRebootBootIDAnnotationKey]
+		if preRebootBootID == "" {
+			klog.Warning("No pre-reboot boot ID annotation found, cannot verify reboot occurred")
+		} else if dn.bootID == "" {
+			klog.Warning("Current boot ID unavailable, cannot verify reboot occurred")
+		} else {
+			klog.Infof("Pre-reboot boot ID: %s, current boot ID: %s", preRebootBootID, dn.bootID)
+
+			if preRebootBootID != dn.bootID {
+				rebootOccurred = true
+				rebootStatus = metav1.ConditionTrue
+				rebootMessage = "Node has rebooted (boot ID changed)"
+				klog.Info("Boot ID verification successful: reboot occurred")
+			} else {
+				// Boot IDs match - definitively no reboot
+				rebootStatus = metav1.ConditionFalse
+				rebootMessage = "Node has not rebooted (boot ID unchanged)"
+				klog.Warningf("Boot ID unchanged (%s), reboot did not occur", dn.bootID)
+			}
+		}
+
+		// Set the RebootedNode condition based on boot ID verification
+		err = upgrademonitor.GenerateAndApplyMachineConfigNodes(
+			&upgrademonitor.Condition{State: mcfgv1.MachineConfigNodeUpdateRebooted, Reason: string(mcfgv1.MachineConfigNodeUpdateRebooted), Message: rebootMessage},
 			nil,
-			metav1.ConditionTrue,
+			rebootStatus,
 			metav1.ConditionFalse,
 			node,
 			dn.mcfgClient,
@@ -770,12 +798,32 @@ func (dn *Daemon) syncNode(key string) error {
 		if err != nil {
 			klog.Errorf("Error making MCN for Rebooted: %v", err)
 		}
+
+		// Remove the rebooting and pre-reboot boot ID annotations
 		removeRebooting := make(map[string]string)
 		removeRebooting[constants.MachineConfigDaemonPostConfigAction] = ""
+		removeRebooting[constants.PreRebootBootIDAnnotationKey] = ""
 		_, err = dn.nodeWriter.SetAnnotations(removeRebooting)
 		if err != nil {
-			klog.Errorf("Could not unset rebooting Anno: %v", err)
+			klog.Errorf("Could not unset rebooting annotations: %v", err)
+		} else {
+			klog.Info("Successfully removed rebooting and pre-reboot boot ID annotations")
 		}
+
+		// If reboot didn't occur or couldn't be verified, log accordingly
+		if !rebootOccurred {
+			if rebootStatus == metav1.ConditionFalse {
+				klog.Errorf("CRITICAL: Rebooting annotation was set but boot ID unchanged. Node did not reboot as expected.")
+			} else if rebootStatus == metav1.ConditionUnknown {
+				klog.Warningf("Could not verify reboot occurred due to missing boot ID data.")
+			}
+		}
+
+		// Return early to allow the RebootedNode condition to be observed before
+		// processing any new updates. The next reconciliation loop will handle
+		// any pending updates.
+		klog.Info("Reboot handling complete, deferring further updates to next sync cycle")
+		return nil
 	}
 
 	// Deep-copy otherwise we are mutating our cache.

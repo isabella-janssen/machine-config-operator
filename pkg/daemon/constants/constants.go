@@ -87,6 +87,10 @@ const (
 	// to proceed and attempt to "reconcile" to the new "desiredConfig" state regardless.
 	MachineConfigDaemonForceFile = "/run/machine-config-daemon-force"
 
+	// PreRebootBootIDAnnotationKey stores the boot ID before a reboot to verify
+	// that a reboot actually occurred after resuming from a rebooting state.
+	PreRebootBootIDAnnotationKey = "machineconfiguration.openshift.io/pre-reboot-boot-id"
+
 	// coreUser is "core" and currently the only permissible user name
 	CoreUserName  = "core"
 	CoreGroupName = "core"
