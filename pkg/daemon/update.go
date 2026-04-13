@@ -2143,7 +2143,11 @@ func (dn *Daemon) writeUnits(units []ign3types.Unit) error {
 	var disabledUnits []string
 
 	isCoreOSVariant := dn.os.IsCoreOSVariant()
-	systemdUnits, err := dn.listSystemdUnits()
+
+	// Get all unit files on disk (includes both loaded and unloaded units)
+	// This covers units provided by extensions/RPMs that may not be loaded yet.
+	// See: https://issues.redhat.com/browse/OCPBUGS-78524
+	systemdUnitFiles, err := dn.listSystemdUnitFiles()
 	if err != nil {
 		return err
 	}
@@ -2166,10 +2170,13 @@ func (dn *Daemon) writeUnits(units []ign3types.Unit) error {
 		// to not go through.
 
 		if u.Enabled != nil {
-			// Only when a unit has contents should we attempt to enable or disable it.
+			// Only when a unit has contents or a unit file exists should we attempt to enable or disable it.
 			// See: https://issues.redhat.com/browse/OCPBUGS-56648
-			_, unitExists := systemdUnits[u.Name]
-			if unitHasContent(u) || unitExists {
+			// listSystemdUnitFiles() returns all unit files on disk, including those provided by
+			// extensions/RPMs that may not be loaded yet.
+			// See: https://issues.redhat.com/browse/OCPBUGS-78524
+			_, unitFileExists := systemdUnitFiles[u.Name]
+			if unitHasContent(u) || unitFileExists {
 				if *u.Enabled {
 					enabledUnits = append(enabledUnits, u.Name)
 				} else {
@@ -2223,6 +2230,32 @@ func (dn *Daemon) listSystemdUnits() (result map[string]systemddbus.UnitStatus, 
 	}
 	return result, nil
 
+}
+
+// listSystemdUnitFiles returns all unit files on disk, including those that are not currently loaded.
+// This is used to detect units provided by extensions or RPM packages.
+// See: https://issues.redhat.com/browse/OCPBUGS-78524
+func (dn *Daemon) listSystemdUnitFiles() (result map[string]systemddbus.UnitFile, err error) {
+	conn, err := systemddbus.NewSystemdConnectionContext(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to system bus to list unit files: %w", err)
+	}
+	defer func() {
+		conn.Close()
+	}()
+
+	unitFiles, err := conn.ListUnitFilesContext(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list systemd unit files: %w", err)
+	}
+
+	result = make(map[string]systemddbus.UnitFile)
+	for _, unitFile := range unitFiles {
+		// Extract just the filename from the full path
+		unitName := filepath.Base(unitFile.Path)
+		result[unitName] = unitFile
+	}
+	return result, nil
 }
 
 // writeFiles writes the given files to disk.
