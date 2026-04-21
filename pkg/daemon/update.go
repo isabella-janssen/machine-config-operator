@@ -97,6 +97,7 @@ func reloadDaemon() error {
 }
 
 func (dn *Daemon) finishRebootlessUpdate() error {
+	klog.Info("Starting rebootless update process")
 	// Get current state of node, in case of an error reboot
 	state, err := dn.getStateAndConfigs()
 	if err != nil {
