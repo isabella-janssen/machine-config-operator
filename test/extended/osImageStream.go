@@ -2,7 +2,9 @@ package extended
 
 import (
 	"context"
+	"fmt"
 	"slices"
+	"strings"
 
 	g "github.com/onsi/ginkgo/v2"
 	o "github.com/onsi/gomega"
@@ -40,7 +42,64 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 	g.It("Machines, MachineSets, and ControlPlaneMachineSets (if applicable) are labeled with OSStream [apigroup:machineconfiguration.openshift.io]", func() {
 		validateOSStreamClusterLabels(oc)
 	})
+
+	g.It("Boot image controller does not downgrade boot images on non-default OS stream MachineSets [apigroup:machineconfiguration.openshift.io]", func() {
+		validateNoBootImageDowngrade(oc)
+	})
 })
+
+// validateNoBootImageDowngrade verifies that on a cluster installed with a
+// non-default OS stream (e.g., rhel-10), the boot image controller does not
+// downgrade MachineSets to use RHCOS 9 boot images.
+// This is a regression test for OCPBUGS-79522 where the controller attempted to
+// downgrade RHCOS 10 boot images to RHCOS 9.
+func validateNoBootImageDowngrade(oc *exutil.CLI) {
+	machineClient, err := machineclient.NewForConfig(oc.KubeFramework().ClientConfig())
+	o.Expect(err).NotTo(o.HaveOccurred())
+
+	machineSets := getAllMachineSets(machineClient)
+
+	// Find MachineSets installed with a non-default OS stream (e.g., rhel-10)
+	var rhel10MachineSets []machinev1beta1.MachineSet
+	for _, ms := range machineSets.Items {
+		streamLabel, hasLabel := ms.Labels[OSStreamLabelKey]
+		if !hasLabel || streamLabel == "rhel-9" {
+			continue
+		}
+		logger.Infof("Found RHEL 10 MachineSet %s with stream label %s", ms.Name, streamLabel)
+		rhel10MachineSets = append(rhel10MachineSets, ms)
+	}
+
+	if len(rhel10MachineSets) == 0 {
+		g.Skip("No MachineSets with non-default OS stream label found, skipping boot image downgrade check")
+	}
+
+	// Verify no MachineSet has been downgraded to a RHCOS 9 boot image
+	for _, ms := range rhel10MachineSets {
+		o.Expect(ms.Spec.Template.Spec.ProviderSpec.Value).NotTo(o.BeNil(),
+			"MachineSet %s has nil providerSpec", ms.Name)
+		providerSpecRaw := string(ms.Spec.Template.Spec.ProviderSpec.Value.Raw)
+
+		o.Expect(providerSpecRaw).NotTo(o.ContainSubstring("rhcos-9"),
+			"MachineSet %s appears to have been downgraded to a RHCOS 9 boot image", ms.Name)
+		logger.Infof("Confirmed: MachineSet %s is not using a RHCOS 9 boot image", ms.Name)
+	}
+
+	// Verify the controller logs confirm the MachineSets were intentionally skipped
+	logs, err := oc.WithoutNamespace().Run("logs").Args(
+		"-n", MachineConfigNamespace,
+		"-l", "k8s-app=machine-config-controller",
+	).Output()
+	o.Expect(err).NotTo(o.HaveOccurred(), "Error fetching machine-config-controller logs")
+
+	for _, ms := range rhel10MachineSets {
+		expectedMsg := fmt.Sprintf("machineset %s has unsupported stream", ms.Name)
+		o.Expect(strings.Contains(logs, expectedMsg)).To(o.BeTrue(),
+			"Expected machine-config-controller logs to show MachineSet %s was skipped due to non-default stream. "+
+				"The boot image controller may have attempted to reconcile it instead of skipping.", ms.Name)
+		logger.Infof("Confirmed: controller skipped MachineSet %s due to unsupported stream", ms.Name)
+	}
+}
 
 // validateOSStreamClusterLabels checks that the Machine, MachineSet, and
 // ControlPlaneMachineSet (if applicable) resources have OSStream labels
