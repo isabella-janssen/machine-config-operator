@@ -1844,6 +1844,56 @@ func (dn *CoreOSDaemon) applyExtensions(oldConfig, newConfig *mcfgv1.MachineConf
 	return runRpmOstree(args...)
 }
 
+// verifyExtensionPackages verifies that all extension packages specified in the
+// MachineConfig are actually installed in the RPM database after reboot.
+// This addresses OCPBUGS-65645 where rpm-ostree can succeed but packages may not
+// actually be installed due to repo issues, download failures, disk space, etc.
+func (dn *CoreOSDaemon) verifyExtensionPackages(config *mcfgv1.MachineConfig) error {
+	// Only verify on RHCOS/SCOS nodes
+	if !dn.os.IsEL() {
+		return nil
+	}
+
+	// Get the list of extensions from the config
+	extensions := config.Spec.Extensions
+	if len(extensions) == 0 {
+		// No extensions to verify
+		return nil
+	}
+
+	// Map extensions to actual package names using the existing helper
+	expectedPackages, err := ctrlcommon.GetPackagesForSupportedExtensions(extensions)
+	if err != nil {
+		return fmt.Errorf("failed to get packages for extensions: %w", err)
+	}
+
+	klog.Infof("Verifying %d extension packages are installed for config %s", len(expectedPackages), config.GetName())
+
+	// Verify each package is in the RPM database
+	var missingPackages []string
+	for _, pkg := range expectedPackages {
+		// Use chroot to query the host's RPM database
+		cmd := exec.Command("chroot", "/rootfs", "rpm", "-q", pkg)
+		if err := cmd.Run(); err != nil {
+			// Package not found in RPM database
+			missingPackages = append(missingPackages, pkg)
+			klog.Warningf("Extension package %s not found in RPM database", pkg)
+		}
+	}
+
+	if len(missingPackages) > 0 {
+		return fmt.Errorf(
+			"the following extension packages are missing from the RPM database: %v. "+
+				"The rpm-ostree transaction succeeded but packages were not actually installed. "+
+				"Check rpm-ostree logs and repository configuration for errors",
+			missingPackages,
+		)
+	}
+
+	klog.Infof("Successfully verified all %d extension packages are installed", len(expectedPackages))
+	return nil
+}
+
 // switchKernel updates kernel on host with the kernelType specified in MachineConfig.
 // Right now it supports default (traditional), realtime kernel and 64k pages kernel
 func (dn *CoreOSDaemon) switchKernel(oldConfig, newConfig *mcfgv1.MachineConfig) error {

@@ -2368,6 +2368,16 @@ func (dn *Daemon) updateConfigAndState(state *stateAndConfigs) (bool, bool, erro
 		if err != nil {
 			klog.Errorf("Error making MCN for Resumed true: %v", err)
 		}
+
+		// Verify extension packages are actually installed before marking as done
+		// This addresses OCPBUGS-65645 - ensure rpm-ostree requested packages are present
+		if dn.os != nil && dn.os.IsCoreOSVariant() {
+			coreOSDaemon := CoreOSDaemon{dn}
+			if err := coreOSDaemon.verifyExtensionPackages(state.currentConfig); err != nil {
+				return missingODC, inDesiredConfig, fmt.Errorf("extension package verification failed: %w", err)
+			}
+		}
+
 		if state.currentConfig.GetName() == state.desiredConfig.GetName() {
 			klog.Infof("System state unchanged: %s", state.getCurrentName())
 		} else {
