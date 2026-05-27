@@ -52,10 +52,10 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 		if !DoesMachineConfigPoolHaveMachines(machineConfigClient, "worker") {
 			logger.Infof("Cluster has no `worker` machines, running test against the `master` MCP.")
 			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "", false)
+		} else {
+			// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
+			runImageModeMCNTest(oc, machineConfigClient, "infra", "", false)
 		}
-
-		// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
-		runImageModeMCNTest(oc, machineConfigClient, "infra", "", false)
 	})
 
 	// UPDATING
