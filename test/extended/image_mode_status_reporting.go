@@ -41,7 +41,6 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 		extpriv.SkipTestIfOCBIsEnabled(oc)
 	})
 
-	// UPDATING
 	g.It("MachineConfigNode properties should match the associated node properties when OCB is enabled in a custom MCP [apigroup:machineconfiguration.openshift.io]", func() {
 		// Create machine config client for test
 		machineConfigClient, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
@@ -92,10 +91,10 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 		if !DoesMachineConfigPoolHaveMachines(machineConfigClient, "worker") {
 			logger.Infof("Cluster has no `worker` machines, running test against the `master` MCP.")
 			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "90-master-testfile", true)
+		} else {
+			// Run the standard image mode MCN test for a custom MCP named `infra`
+			runImageModeMCNTest(oc, machineConfigClient, "infra", "90-infra-testfile", false)
 		}
-
-		// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
-		runImageModeMCNTest(oc, machineConfigClient, "infra", "90-infra-testfile", false)
 	})
 
 	g.It("MachineConfigPool machine counts should transition correctly on an update in a default MCP [apigroup:machineconfiguration.openshift.io]", func() {
