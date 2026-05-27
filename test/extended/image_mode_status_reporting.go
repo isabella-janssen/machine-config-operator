@@ -41,21 +41,24 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 		extpriv.SkipTestIfOCBIsEnabled(oc)
 	})
 
+	// UPDATING
 	g.It("MachineConfigNode properties should match the associated node properties when OCB is enabled in a custom MCP [apigroup:machineconfiguration.openshift.io]", func() {
 		// Create machine config client for test
 		machineConfigClient, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
 		o.Expect(clientErr).NotTo(o.HaveOccurred(), "Error creating client set for test: %s", clientErr)
 
-		// Skip this test if there are no machines in the worker MCP, as this will mean we cannot
-		// create a custom MCP.
+		// If there are no machines in the worker MCP, we cannot create a custom MCP. In these
+		// cases, run the test against the default `master` MCP.
 		if !DoesMachineConfigPoolHaveMachines(machineConfigClient, "worker") {
-			g.Skip(fmt.Sprintf("Skipping this test since the cluster does not have nodes in the `worker` MCP."))
+			logger.Infof("Cluster has no `worker` machines, running test against the `master` MCP.")
+			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "", false)
 		}
 
 		// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
 		runImageModeMCNTest(oc, machineConfigClient, "infra", "", false)
 	})
 
+	// UPDATING
 	g.It("MachineConfigNode conditions should properly transition on an image based update when OCB is enabled in a custom MCP [apigroup:machineconfiguration.openshift.io]", func() {
 		// Create machine config client for test
 		machineConfigClient, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
@@ -67,19 +70,28 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 			g.Skip(fmt.Sprintf("Skipping this test since the cluster does not have nodes in the `worker` MCP."))
 		}
 
+		// // If there are no machines in the worker MCP, we cannot create a custom MCP. In these
+		// // cases, run the test against the default `master` MCP.
+		// if !DoesMachineConfigPoolHaveMachines(machineConfigClient, "worker") {
+		// 	logger.Infof("Cluster has no `worker` machines, running test against the `master` MCP.")
+		// 	runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "90-master-extension", true)
+		// }
+
 		// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
 		runImageModeMCNTest(oc, machineConfigClient, "infra", "90-infra-extension", true)
 	})
 
+	// UPDATING
 	g.It("MachineConfigNode conditions should properly transition on a non-image based update when OCB is enabled in a custom MCP [apigroup:machineconfiguration.openshift.io]", func() {
 		// Create machine config client for test
 		machineConfigClient, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
 		o.Expect(clientErr).NotTo(o.HaveOccurred(), "Error creating client set for test: %s", clientErr)
 
-		// Skip this test if there are no machines in the worker MCP, as this will mean we cannot
-		// create a custom MCP.
+		// If there are no machines in the worker MCP, we cannot create a custom MCP. In these
+		// cases, run the test against the default `master` MCP.
 		if !DoesMachineConfigPoolHaveMachines(machineConfigClient, "worker") {
-			g.Skip(fmt.Sprintf("Skipping this test since the cluster does not have nodes in the `worker` MCP."))
+			logger.Infof("Cluster has no `worker` machines, running test against the `master` MCP.")
+			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "90-master-testfile", true)
 		}
 
 		// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
@@ -115,7 +127,7 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 // `runImageModeMCNTest` runs through the general flow of validating the MCN of a node for image
 // mode enabled workflows. The steps for the test are as follows:
 //  1. Select a worker node to use throughout the test
-//  2. Validate the starting properties of te MCN associated with the test node
+//  2. Validate the starting properties of the MCN associated with the test node
 //  3. Create a custom MCP named the value of `mcpAndMoscName` and add the test node to it
 //  4. Validate the properties of the MCN associated with the test node
 //  5. Configure on cluster image mode in the custom MCP & validate the MOSC applied successfully
@@ -210,6 +222,78 @@ func runImageModeMCNTest(oc *exutil.CLI, machineConfigClient *machineconfigclien
 
 	exutil.By("Validate the test node has correct MCN properties")
 	err = ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, "worker")
+	o.Expect(err).NotTo(o.HaveOccurred(), "Error validating MCN for node `%s`: %s", nodeToTestName, err)
+	logger.Infof("OK!\n")
+}
+
+// `runImageModeMCNTestDefaultMCP` runs through the general flow of validating the MCN of a node
+// for image mode enabled workflows in a default MCP. The steps for the test are as follows:
+//  1. Select a node in the desired MCP to follow throughout the test
+//  2. Validate the starting properties of the MCN associated with the test node
+//  3. Configure on cluster image mode in the desired MCP & validate the MOSC applied successfully
+//  4. Validate the properties of the MCN associated with the test node
+//  5. If a MachineConfig has been provided, apply it, validate the MCN conditions trasnition
+//     throughout the update, then remove the MC
+//  6. Disable on cluster image mode in the desired MCP & validate the MOSC removal was successful
+//  7. Validate the properties of the MCN associated with the test node
+func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, mcpAndMoscName, mcName string, isImageUpdate bool) {
+	exutil.By("Select a node to follow in this test")
+	mcpNodes, err := GetNodesByRole(oc, mcpAndMoscName)
+	o.Expect(err).NotTo(o.HaveOccurred(), "Error getting nodes from `%v` MCP: %s", mcpAndMoscName, err)
+	o.Expect(len(mcpNodes)).To(o.BeNumerically(">=", 1), "Less than one node in desired pool")
+	nodeToTestName := mcpNodes[0].Name
+	logger.Infof("Using `%s` as node for test", nodeToTestName)
+	logger.Infof("OK!\n")
+
+	exutil.By("Validate node's starting MCN properties")
+	err = ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
+	o.Expect(err).NotTo(o.HaveOccurred(), "Error validating MCN for node `%s`: %s", nodeToTestName, err)
+	logger.Infof("OK!\n")
+
+	exutil.By("Configure OCB functionality for the desired MCP")
+	mosc, err := extpriv.CreateMachineOSConfigUsingExternalOrInternalRegistry(oc.AsAdmin(), MachineConfigNamespace, mcpAndMoscName, mcpAndMoscName, nil)
+	defer extpriv.DisableOCL(mosc)
+	o.Expect(err).NotTo(o.HaveOccurred(), "Error creating the MachineOSConfig resource: %s", err)
+	logger.Infof("OK!\n")
+
+	exutil.By("Validating the MOSC applied successfully")
+	extpriv.ValidateSuccessfulMOSC(mosc, nil)
+	logger.Infof("OK!\n")
+
+	exutil.By("Validate the test node has correct MCN properties")
+	err = ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
+	o.Expect(err).NotTo(o.HaveOccurred(), "Error validating MCN for node `%s`: %s", nodeToTestName, err)
+	logger.Infof("OK!\n")
+
+	// If an MC has been provided, apply it and validate the MCN conditions transition correctly
+	// throughout the update.
+	if mcName != "" {
+		exutil.By("Applying the MC")
+		err = ApplyMachineConfigFixture(oc, mcNameToFixtureMap[mcName])
+		defer DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName)
+		o.Expect(err).NotTo(o.HaveOccurred(), "Error applying MC `%s`: %s", mcName, err)
+		logger.Infof("OK!\n")
+
+		exutil.By("Validating the MCN condition transitions")
+		validateMCNTransitions(machineConfigClient, nodeToTestName, isImageUpdate)
+		logger.Infof("OK!\n")
+
+		exutil.By("Removing the MC")
+		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName)
+		logger.Infof("OK!\n")
+	}
+
+	exutil.By("Remove the MachineOSConfig resource")
+	o.Expect(extpriv.DisableOCL(mosc)).To(o.Succeed(), "Error cleaning up MOSC `%s`", mosc)
+	logger.Infof("OK!\n")
+
+	exutil.By("Validating the MOSC was removed successfully")
+	mcp := extpriv.NewMachineConfigPool(oc.AsAdmin(), mcpAndMoscName)
+	extpriv.ValidateMOSCIsGarbageCollected(mosc, mcp)
+	logger.Infof("OK!\n")
+
+	exutil.By("Validate the test node has correct MCN properties")
+	err = ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
 	o.Expect(err).NotTo(o.HaveOccurred(), "Error validating MCN for node `%s`: %s", nodeToTestName, err)
 	logger.Infof("OK!\n")
 }
