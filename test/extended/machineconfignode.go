@@ -205,7 +205,8 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 	// long for the condition to flip (that would mean something is wrong and would waste time).
 	updatingWaitTime := 1 * time.Minute
 	updatingWaitInterval := 1 * time.Second
-	isSNO, _ := extpriv.IsSNOSafe(oc)
+	isSNO, isSNOErr := extpriv.IsSNOSafe(oc)
+	o.Expect(isSNOErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Error checking if cluster is SNO: %v", isSNOErr))
 	if isImageMode {
 		updatingWaitTime = 25 * time.Minute
 		updatingWaitInterval = 5 * time.Second
@@ -288,15 +289,12 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 		// A node update in SNO can quickly transition through the "AppliedFiles" state and cause
 		// us to catch the update during the node reboot. During reboot, we will get connection
 		// errors and, thus, should not error out on such errors.
-		if isSNO && err != nil && errors.Is(err, syscall.ECONNREFUSED) {
-			logger.Infof("Warning, got connection error detecting AppliedFiles=True.")
-		} else {
-			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for AppliedFiles=True: %v", err))
-		}
-		if !conditionMet {
+		o.Expect(err).To(o.Or(o.BeNil(), o.MatchError(syscall.ECONNREFUSED)), fmt.Sprintf("Error occurred while waiting for AppliedFiles=True: %v", err))
+		if isSNO && !conditionMet {
 			logger.Infof("Warning, could not detect AppliedFiles=True.")
+		} else {
+			o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect AppliedFiles=True.")
 		}
-		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect AppliedFiles=True.")
 	}
 
 	logger.Infof("Waiting for UpdateExecuted=True")
@@ -304,15 +302,12 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 	// A node update in SNO can quickly transition through the "AppliedFiles" state and cause
 	// us to catch the update during the node reboot. During reboot, we will get connection
 	// errors and, thus, should not error out on such errors.
-	if isSNO && err != nil && errors.Is(err, syscall.ECONNREFUSED) {
-		logger.Infof("Warning, got connection error detecting UpdateExecuted=True.")
-	} else {
-		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for UpdateExecuted=True: %v", err))
-	}
-	if !conditionMet {
+	o.Expect(err).To(o.Or(o.BeNil(), o.MatchError(syscall.ECONNREFUSED)), fmt.Sprintf("Error occurred while waiting for UpdateExecuted=True: %v", err))
+	if isSNO && !conditionMet {
 		logger.Infof("Warning, could not detect UpdateExecuted=True.")
+	} else {
+		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect UpdateExecuted=True.")
 	}
-	// o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect UpdateExecuted=True.")
 
 	// On image mode update, check that node transitions through the "ImagePulledFromRegistry" phase
 	if isImageMode {
