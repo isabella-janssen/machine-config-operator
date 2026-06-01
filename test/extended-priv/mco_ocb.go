@@ -311,9 +311,8 @@ func ValidateSuccessfulMOSC(mosc *MachineOSConfig, checkers []Checker) {
 	logger.Infof("OK!\n")
 
 	exutil.By("Check that the  machine-os-builder is using leader election without failing")
-	o.Eventually(func() string {
-		logs, _ := mOSBuilder.Logs()
-		return logs
+	o.Eventually(func() (string, error) {
+		return mOSBuilder.Logs()
 	}, "5m", "10s").Should(o.And(
 		o.MatchRegexp("(?i)"+regexp.QuoteMeta("attempting to acquire leader lease")),
 		o.MatchRegexp("(?i)"+regexp.QuoteMeta("successfully acquired lease"))),

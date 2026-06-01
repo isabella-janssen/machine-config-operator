@@ -402,7 +402,9 @@ func validateMCPMachineCountTransitions(machineConfigClient *machineconfigclient
 		interval = 30 * time.Second
 		// SNO clusters require a longer time to reconcile due to the MCC restart in
 		// reboot-required updates, so allow for more retries.
-		if isSNO, _ := extpriv.IsSNOSafe(oc); isSNO {
+		isSNO, isSNOErr := extpriv.IsSNOSafe(oc)
+		o.Expect(isSNOErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Error checking if cluster is SNO: %v", isSNOErr))
+		if isSNO {
 			logger.Infof("Cluster is SNO, setting higher retry count.")
 			loopCount = 10
 		}
