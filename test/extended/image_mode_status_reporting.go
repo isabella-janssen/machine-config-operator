@@ -54,7 +54,7 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "", false, false)
 		} else {
 			// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
-			runImageModeMCNTest(oc, machineConfigClient, "infra", "", false)
+			runImageModeMCNTestCustomMCP(oc, machineConfigClient, "infra", "", false)
 		}
 	})
 
@@ -71,7 +71,7 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "90-master-extension", true, false)
 		} else {
 			// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
-			runImageModeMCNTest(oc, machineConfigClient, "infra", "90-infra-extension", true)
+			runImageModeMCNTestCustomMCP(oc, machineConfigClient, "infra", "90-infra-extension", true)
 		}
 	})
 
@@ -87,7 +87,7 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "90-master-testfile", false, true)
 		} else {
 			// Run the standard image mode MCN test for a custom MCP named `infra`
-			runImageModeMCNTest(oc, machineConfigClient, "infra", "90-infra-testfile", false)
+			runImageModeMCNTestCustomMCP(oc, machineConfigClient, "infra", "90-infra-testfile", false)
 		}
 	})
 
@@ -117,8 +117,8 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 	})
 })
 
-// `runImageModeMCNTest` runs through the general flow of validating the MCN of a node for image
-// mode enabled workflows. The steps for the test are as follows:
+// `runImageModeMCNTestCustomMCP` runs through the general flow of validating the MCN of a node for
+// image mode enabled workflows in a custom MCP. The steps for the test are as follows:
 //  1. Select a worker node to use throughout the test
 //  2. Validate the starting properties of the MCN associated with the test node
 //  3. Create a custom MCP named the value of `mcpAndMoscName` and add the test node to it
@@ -131,7 +131,7 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 //  9. Validate the properties of the MCN associated with the test node
 //  10. Remove the custom MCP
 //  11. Validate the properties of the MCN associated with the test node
-func runImageModeMCNTest(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, mcpAndMoscName, mcName string, isImageUpdate bool) {
+func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, mcpAndMoscName, mcName string, isImageUpdate bool) {
 	exutil.By("Select a node to follow in this test")
 	workerNodes, err := GetNodesByRole(oc, "worker")
 	o.Expect(err).NotTo(o.HaveOccurred(), "Error getting worker nodes: %s", err)
