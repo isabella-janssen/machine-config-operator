@@ -447,7 +447,6 @@ func ValidateMOSCIsGarbageCollected(mosc *MachineOSConfig, mcp *MachineConfigPoo
 	// On SNO, the operator restarts during the node reboot and earlier sync functions
 	// in the sequential sync chain may fail while the cluster stabilizes, delaying
 	// the machine-os-builder cleanup until the next successful full sync cycle.
-	// o.Eventually(mOSBuilder, "15m", "30s").ShouldNot(Exist(),
 	o.Eventually(mOSBuilder, "5m", "30s").ShouldNot(Exist(),
 		"The machine-os-builder deployment was not removed when the infra pool was unlabeled")
 

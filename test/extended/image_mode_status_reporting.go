@@ -154,7 +154,7 @@ func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineco
 	err = oc.AsAdmin().Run("label").Args(fmt.Sprintf("node/%s", nodeToTestName), fmt.Sprintf("node-role.kubernetes.io/%s=", mcpAndMoscName)).Execute()
 	o.Expect(err).NotTo(o.HaveOccurred(), "Error labeing node `%s` for MCP `%s`: %s", nodeToTestName, mcpAndMoscName, err)
 	// Wait for the new `infra` MCP to be ready
-	WaitForMCPToBeReady(machineConfigClient, mcpAndMoscName, 1, "")
+	WaitForMCPToBeReady(machineConfigClient, mcpAndMoscName, 1, "", 5*time.Minute)
 	logger.Infof("OK!\n")
 
 	exutil.By("Validate node's custom MCP MCN properties")
@@ -182,7 +182,7 @@ func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineco
 	if mcName != "" {
 		exutil.By("Applying the MC")
 		err = ApplyMachineConfigFixture(oc, mcNameToFixtureMap[mcName])
-		defer DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName)
+		defer DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, false)
 		o.Expect(err).NotTo(o.HaveOccurred(), "Error applying MC `%s`: %s", mcName, err)
 		logger.Infof("OK!\n")
 
@@ -191,7 +191,7 @@ func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineco
 		logger.Infof("OK!\n")
 
 		exutil.By("Removing the MC")
-		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName)
+		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, false)
 		logger.Infof("OK!\n")
 	}
 
@@ -272,7 +272,7 @@ func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machinec
 	if mcName != "" {
 		exutil.By("Applying the MC")
 		err = ApplyMachineConfigFixture(oc, mcNameToFixtureMap[mcName])
-		defer DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName)
+		defer DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, true)
 		o.Expect(err).NotTo(o.HaveOccurred(), "Error applying MC `%s`: %s", mcName, err)
 		logger.Infof("OK!\n")
 
@@ -281,7 +281,7 @@ func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machinec
 		logger.Infof("OK!\n")
 
 		exutil.By("Removing the MC")
-		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName)
+		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, true)
 		logger.Infof("OK!\n")
 	}
 
@@ -347,7 +347,7 @@ func runMachineCountTest(machineConfigClient *machineconfigclient.Clientset, oc 
 		// Apply machine config
 		exutil.By("Applying the MC")
 		err = ApplyMachineConfigFixture(oc, mcNameToFixtureMap[mcName])
-		defer DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpName)
+		defer DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpName, false)
 		o.Expect(err).NotTo(o.HaveOccurred(), "Error applying MC `%s`: %s", mcName, err)
 		logger.Infof("OK!\n")
 	} else { // Handle the layered MCP case
