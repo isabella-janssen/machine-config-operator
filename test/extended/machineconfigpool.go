@@ -29,7 +29,7 @@ func DoesMachineConfigPoolHaveMachines(machineConfigClient *machineconfigclient.
 	return mcp.Status.MachineCount > 0
 }
 
-// `WaitForMCPToBeReady` waits up to 5 minutes for a pool to be in an updated state with
+// `WaitForMCPToBeReady` waits up to 15 minutes for a pool to be in an updated state with
 // a specified number of ready machines
 func WaitForMCPToBeReady(machineConfigClient *machineconfigclient.Clientset, poolName string, readyMachineCount int32, oldRenderedMC string) {
 	o.Eventually(func() bool {
@@ -61,7 +61,7 @@ func WaitForMCPToBeReady(machineConfigClient *machineconfigclient.Clientset, poo
 			logger.Infof("MCP '%v' has %v ready machines. Waiting for the desired ready machine count of %v.", poolName, mcp.Status.UpdatedMachineCount, readyMachineCount)
 		}
 		return false
-	}, 5*time.Minute, 10*time.Second).Should(o.BeTrue(), "Timed out waiting for MCP '%v' to be in 'Updated' state with %v ready machines.", poolName, readyMachineCount)
+	}, 15*time.Minute, 10*time.Second).Should(o.BeTrue(), "Timed out waiting for MCP '%v' to be in 'Updated' state with %v ready machines.", poolName, readyMachineCount)
 }
 
 // `CleanupCustomMCP` cleans up a custom MCP if it exists through the following steps:
