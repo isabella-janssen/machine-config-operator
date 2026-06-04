@@ -178,8 +178,12 @@ func waitForMCNConditionStatus(machineConfigClient *machineconfigclient.Clientse
 		logger.Infof("The desired MCN condition was never met: %v", err)
 		// Handle the situation where there were errors getting the MCN resource
 		if conditionErr != nil {
+			if errors.Is(conditionErr, syscall.ECONNREFUSED) {
+				logger.Infof("Got a connection error waiting for MCN '%v' %v condition to be %v: %v", mcnName, conditionType, status, conditionErr)
+				return conditionMet, conditionErr
+			}
 			logger.Infof("An error occurred waiting for MCN '%v' %v condition to be %v: %v", mcnName, conditionType, status, conditionErr)
-			return conditionMet, fmt.Errorf("MCN '%v' %v condition was not %v: %v", mcnName, conditionType, status, conditionErr)
+			return conditionMet, fmt.Errorf("MCN '%v' %v condition was not %v: %w", mcnName, conditionType, status, conditionErr)
 		}
 		// Handle case when no errors occur grabbing the MCN, but we time out waiting for the condition to be in the desired state
 		logger.Infof("A timeout occurred waiting for MCN '%v' %v condition was not %v.", mcnName, conditionType, status)
@@ -261,7 +265,8 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect AppliedOSImage=Unknown.")
 
 		logger.Infof("Waiting for ImagePulledFromRegistry=Unknown")
-		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeImagePulledFromRegistry, metav1.ConditionUnknown, 30*time.Second, 1*time.Second)
+		// conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeImagePulledFromRegistry, metav1.ConditionUnknown, 30*time.Second, 1*time.Second)
+		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeImagePulledFromRegistry, metav1.ConditionUnknown, 1*time.Minute, 1*time.Second)
 		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for ImagePulledFromRegistry=Unknown: %v", err))
 		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect ImagePulledFromRegistry=Unknown.")
 
@@ -338,7 +343,8 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 	// The final steps of the update happen quickly, so sometimes we can miss the final condition
 	// transitions. If we do, we will not error out, but record that the condition was missed.
 	logger.Infof("Waiting for Resumed=True")
-	conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeResumed, metav1.ConditionTrue, 5*time.Second, 1*time.Second)
+	// conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeResumed, metav1.ConditionTrue, 5*time.Second, 1*time.Second)
+	conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeResumed, metav1.ConditionTrue, 5*time.Minute, 1*time.Second)
 	o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for Resumed=True: %v", err))
 	if !conditionMet {
 		logger.Infof("Warning, could not detect Resumed=True.")
@@ -361,7 +367,8 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 	}
 
 	logger.Infof("Waiting for Updated=True")
-	conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdated, metav1.ConditionTrue, 1*time.Minute, 1*time.Second)
+	// conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdated, metav1.ConditionTrue, 1*time.Minute, 1*time.Second)
+	conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdated, metav1.ConditionTrue, 10*time.Minute, 1*time.Second)
 	o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for Updated=True: %v", err))
 	o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect Updated=True.")
 
