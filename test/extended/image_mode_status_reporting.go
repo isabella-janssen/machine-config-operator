@@ -189,12 +189,9 @@ func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineco
 		exutil.By("Validating the MCN condition transitions")
 		validateMCNTransitions(oc, machineConfigClient, nodeToTestName, isImageUpdate, false)
 		logger.Infof("OK!\n")
-
-		exutil.By("Removing the MC")
-		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, false)
-		logger.Infof("OK!\n")
 	}
 
+	// Remove the MOSC before the MC to avoid an unnecessary OCB rebuild.
 	exutil.By("Remove the MachineOSConfig resource")
 	o.Expect(extpriv.DisableOCL(mosc)).To(o.Succeed(), "Error cleaning up MOSC `%s`", mosc)
 	logger.Infof("OK!\n")
@@ -202,6 +199,12 @@ func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineco
 	exutil.By("Validating the `infra` MOSC was removed successfully")
 	extpriv.ValidateMOSCIsGarbageCollected(mosc, infraMcp)
 	logger.Infof("OK!\n")
+
+	if mcName != "" {
+		exutil.By("Removing the MC")
+		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, false)
+		logger.Infof("OK!\n")
+	}
 
 	exutil.By("Validate the node in `infra` MCP has correct MCN properties")
 	err = ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
@@ -279,12 +282,12 @@ func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machinec
 		exutil.By("Validating the MCN condition transitions")
 		validateMCNTransitions(oc, machineConfigClient, nodeToTestName, isImageUpdate, isRebootless)
 		logger.Infof("OK!\n")
-
-		exutil.By("Removing the MC")
-		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, true)
-		logger.Infof("OK!\n")
 	}
 
+	// Remove the MOSC before the MC to avoid an unnecessary OCB rebuild. Removing the
+	// MC while image mode is active would trigger a new image build, consuming additional
+	// disk space that can cause DiskPressure on SNO nodes. By exiting image mode first,
+	// the subsequent MC deletion is a standard non-layered update.
 	exutil.By("Remove the MachineOSConfig resource")
 	o.Expect(extpriv.DisableOCL(mosc)).To(o.Succeed(), "Error cleaning up MOSC `%s`", mosc)
 	logger.Infof("OK!\n")
@@ -293,6 +296,12 @@ func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machinec
 	mcp := extpriv.NewMachineConfigPool(oc.AsAdmin(), mcpAndMoscName)
 	extpriv.ValidateMOSCIsGarbageCollected(mosc, mcp)
 	logger.Infof("OK!\n")
+
+	if mcName != "" {
+		exutil.By("Removing the MC")
+		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, true)
+		logger.Infof("OK!\n")
+	}
 
 	exutil.By("Validate the test node has correct MCN properties")
 	err = ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
