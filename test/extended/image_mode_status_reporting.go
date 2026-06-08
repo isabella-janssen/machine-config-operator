@@ -51,14 +51,13 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 		// cases, run the test against the default `master` MCP.
 		if !DoesMachineConfigPoolHaveMachines(machineConfigClient, "worker") {
 			logger.Infof("Cluster has no `worker` machines, running test against the `master` MCP.")
-			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "", false, false)
+			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "", false)
 		} else {
 			// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
 			runImageModeMCNTestCustomMCP(oc, machineConfigClient, "infra", "", false)
 		}
 	})
 
-	// UPDATING
 	g.It("MachineConfigNode conditions should properly transition on an image based update when OCB is enabled in a custom MCP [apigroup:machineconfiguration.openshift.io]", func() {
 		// Create machine config client for test
 		machineConfigClient, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
@@ -68,7 +67,7 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 		// cases, run the test against the default `master` MCP.
 		if !DoesMachineConfigPoolHaveMachines(machineConfigClient, "worker") {
 			logger.Infof("Cluster has no `worker` machines, running test against the `master` MCP.")
-			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "90-master-extension", true, false)
+			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "90-master-extension", true)
 		} else {
 			// Run the standard image mode MCN test for a custom MCP named `infra` with no MC to apply
 			runImageModeMCNTestCustomMCP(oc, machineConfigClient, "infra", "90-infra-extension", true)
@@ -84,7 +83,7 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 		// cases, run the test against the default `master` MCP.
 		if !DoesMachineConfigPoolHaveMachines(machineConfigClient, "worker") {
 			logger.Infof("Cluster has no `worker` machines, running test against the `master` MCP.")
-			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "90-master-testfile", false, true)
+			runImageModeMCNTestDefaultMCP(oc, machineConfigClient, "master", "90-master-testfile", false)
 		} else {
 			// Run the standard image mode MCN test for a custom MCP named `infra`
 			runImageModeMCNTestCustomMCP(oc, machineConfigClient, "infra", "90-infra-testfile", false)
@@ -180,6 +179,15 @@ func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineco
 	// If an MC has been provided, apply it and validate the MCN conditions transition correctly
 	// throughout the update.
 	if mcName != "" {
+		// If a rebootless (non-image based) update is desired, apply the NodeDisruptionPolicy to prevent reboots.
+		if !isImageUpdate {
+			exutil.By("Applying the NodeDisruptionPolicy")
+			err = ApplyMachineConfigFixture(oc, nodeDisruptionFixture)
+			defer ApplyMachineConfigFixture(oc, nodeDisruptionEmptyFixture)
+			o.Expect(err).NotTo(o.HaveOccurred(), "Error applying the NodeDisruptionPolicy: %s", err)
+			logger.Infof("OK!\n")
+		}
+
 		exutil.By("Applying the MC")
 		err = ApplyMachineConfigFixture(oc, mcNameToFixtureMap[mcName])
 		defer DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, false)
@@ -187,7 +195,7 @@ func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineco
 		logger.Infof("OK!\n")
 
 		exutil.By("Validating the MCN condition transitions")
-		validateMCNTransitions(oc, machineConfigClient, nodeToTestName, isImageUpdate, false)
+		validateMCNTransitions(oc, machineConfigClient, nodeToTestName, isImageUpdate)
 		logger.Infof("OK!\n")
 	}
 
@@ -207,8 +215,9 @@ func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineco
 	}
 
 	exutil.By("Validate the node in `infra` MCP has correct MCN properties")
-	err = ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
-	o.Expect(err).NotTo(o.HaveOccurred(), "Error validating MCN for node `%s`: %s", nodeToTestName, err)
+	o.Eventually(func() error {
+		return ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
+	}, 1*time.Minute, 5*time.Second).Should(o.Succeed(), "Error validating MCN for node `%s`", nodeToTestName)
 	logger.Infof("OK!\n")
 
 	exutil.By("Delete the `infra` MCP")
@@ -232,7 +241,7 @@ func runImageModeMCNTestCustomMCP(oc *exutil.CLI, machineConfigClient *machineco
 //     throughout the update, then remove the MC
 //  6. Disable on cluster image mode in the desired MCP & validate the MOSC removal was successful
 //  7. Validate the properties of the MCN associated with the test node
-func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, mcpAndMoscName, mcName string, isImageUpdate, isRebootless bool) {
+func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, mcpAndMoscName, mcName string, isImageUpdate bool) {
 	exutil.By("Select a node to follow in this test")
 	mcpNodes, err := GetNodesByRole(oc, mcpAndMoscName)
 	o.Expect(err).NotTo(o.HaveOccurred(), "Error getting nodes from `%v` MCP: %s", mcpAndMoscName, err)
@@ -261,18 +270,18 @@ func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machinec
 	o.Expect(err).NotTo(o.HaveOccurred(), "Error validating MCN for node `%s`: %s", nodeToTestName, err)
 	logger.Infof("OK!\n")
 
-	// If a rebootless update is desired, apply the NodeDisruptionPolicy to prevent reboots.
-	if isRebootless {
-		exutil.By("Applying the NodeDisruptionPolicy")
-		err = ApplyMachineConfigFixture(oc, nodeDisruptionFixture)
-		defer ApplyMachineConfigFixture(oc, nodeDisruptionEmptyFixture)
-		o.Expect(err).NotTo(o.HaveOccurred(), "Error applying the NodeDisruptionPolicy: %s", err)
-		logger.Infof("OK!\n")
-	}
-
 	// If an MC has been provided, apply it and validate the MCN conditions transition correctly
 	// throughout the update.
 	if mcName != "" {
+		// If a rebootless (non image-based) update is desired, apply the NodeDisruptionPolicy to prevent reboots.
+		if !isImageUpdate {
+			exutil.By("Applying the NodeDisruptionPolicy")
+			err = ApplyMachineConfigFixture(oc, nodeDisruptionFixture)
+			defer ApplyMachineConfigFixture(oc, nodeDisruptionEmptyFixture)
+			o.Expect(err).NotTo(o.HaveOccurred(), "Error applying the NodeDisruptionPolicy: %s", err)
+			logger.Infof("OK!\n")
+		}
+
 		exutil.By("Applying the MC")
 		err = ApplyMachineConfigFixture(oc, mcNameToFixtureMap[mcName])
 		defer DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, true)
@@ -280,7 +289,7 @@ func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machinec
 		logger.Infof("OK!\n")
 
 		exutil.By("Validating the MCN condition transitions")
-		validateMCNTransitions(oc, machineConfigClient, nodeToTestName, isImageUpdate, isRebootless)
+		validateMCNTransitions(oc, machineConfigClient, nodeToTestName, isImageUpdate)
 		logger.Infof("OK!\n")
 	}
 
@@ -304,18 +313,19 @@ func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machinec
 	}
 
 	exutil.By("Validate the test node has correct MCN properties")
-	err = ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
-	o.Expect(err).NotTo(o.HaveOccurred(), "Error validating MCN for node `%s`: %s", nodeToTestName, err)
+	o.Eventually(func() error {
+		return ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
+	}, 1*time.Minute, 5*time.Second).Should(o.Succeed(), "Error validating MCN for node `%s`", nodeToTestName)
 	logger.Infof("OK!\n")
 }
 
 // `validateMCNTransitions` applies a MC, validates that the MCN conditions properly
 // transition during the update, removes the MC, then validates that the MCN conditions properly
 // transition during the update.
-func validateMCNTransitions(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, nodeToTestName string, isImageUpdate, isRebootless bool) {
+func validateMCNTransitions(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, nodeToTestName string, isImageUpdate bool) {
 	// Validate transition through conditions for MCN
 	exutil.By("Validating the transitions through MCN conditions")
-	ValidateTransitionThroughConditions(oc, machineConfigClient, nodeToTestName, isRebootless, isImageUpdate)
+	ValidateTransitionThroughConditions(oc, machineConfigClient, nodeToTestName, isImageUpdate)
 	logger.Infof("OK!\n")
 
 	// When an update is complete, all conditions other than `Updated` must be false

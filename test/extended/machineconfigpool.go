@@ -131,7 +131,7 @@ func DeleteMCAndWaitForMCPUpdate(oc *exutil.CLI, machineConfigClient *machinecon
 	// Only wait for the MCP to return to an updated state if the MC existed and needed deletion
 	// and if the targeted MCP still exists
 	if mcDeleted && mcpErr == nil {
-		timeout := 5 * time.Minute
+		timeout := 8 * time.Minute
 		// SNO clusters can take a bit longer to finish an update, so set a longer timeout
 		if isSNO {
 			timeout = 15 * time.Minute

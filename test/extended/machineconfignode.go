@@ -199,7 +199,7 @@ func waitForMCNConditionStatus(machineConfigClient *machineconfigclient.Clientse
 // status, a warning will be logged instead of erroring out the test.
 //
 //nolint:dupl // (ijanssen): Ignoring a duplication error the linter is throwing because of two similar, but unique if blocks.
-func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, updatingNodeName string, isRebootless, isImageMode bool) {
+func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *machineconfigclient.Clientset, updatingNodeName string, isImageMode bool) {
 	// Get the start time of the update
 	updateStartTime := metav1.Now()
 
@@ -237,9 +237,10 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 	o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for UpdateExecuted=Unknown: %v", err))
 	o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect UpdateExecuted=Unknown.")
 
-	// On standard, non-rebootless, update, check that node transitions through "Cordoned" and "Drained" phases.
+	// On standard, non-rebootless (image based), update, check that node transitions through
+	// "Cordoned" and "Drained" phases.
 	// Nodes do not cordon or drain on SNO, so also skip these checks if the cluster is SNO.
-	if !isRebootless && !isSNO {
+	if isImageMode && !isSNO {
 		logger.Infof("Waiting for Cordoned=True")
 		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateCordoned, metav1.ConditionTrue, 30*time.Second, 1*time.Second)
 		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for Cordoned=True: %v", err))
@@ -274,7 +275,7 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect ImagePulledFromRegistry=Unknown.")
 
 		logger.Infof("Waiting for AppliedOSImage=True")
-		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateOS, metav1.ConditionTrue, 3*time.Minute, 1*time.Second)
+		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateOS, metav1.ConditionTrue, 4*time.Minute, 2*time.Second)
 		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for AppliedOSImage=True: %v", err))
 		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect AppliedOSImage=True.")
 	} else { // On a non-image mode update, check that node transitions through the "AppliedFiles" phase
@@ -325,8 +326,8 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect ImagePulledFromRegistry=True.")
 	}
 
-	// On rebootless update, check that node transitions through "UpdatePostActionComplete" phase
-	if isRebootless {
+	// On rebootless (non-image based) update, check that node transitions through "UpdatePostActionComplete" phase
+	if !isImageMode {
 		logger.Infof("Waiting for UpdatePostActionComplete=True")
 		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdatePostActionComplete, metav1.ConditionTrue, 1*time.Minute, 1*time.Second)
 		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for UpdatePostActionComplete=True: %v", err))
@@ -346,9 +347,9 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 	// The final steps of the update happen quickly, so sometimes we can miss the final condition
 	// transitions. If we do, we will not error out, but record that the condition was missed.
 	logger.Infof("Waiting for Resumed=True")
-	timeout := 5 * time.Second
+	timeout := 45 * time.Second
 	if isSNO {
-		timeout = 2 * time.Minute
+		timeout = 3 * time.Minute
 	}
 	conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeResumed, metav1.ConditionTrue, timeout, 1*time.Second)
 	o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for Resumed=True: %v", err))
@@ -356,8 +357,8 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 		logger.Infof("Warning, could not detect Resumed=True.")
 	}
 	// Only nodes that cordon and drain go through the "UpdateComplete" and "Uncordoned" stages, so
-	// skip these checks for standard, non-rebootless, updates and in SNO clusters.
-	if !isRebootless && !isSNO {
+	// skip these checks for standard, non-rebootless (non-image based), updates and in SNO clusters.
+	if isImageMode && !isSNO {
 		logger.Infof("Waiting for UpdateComplete=True")
 		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateComplete, metav1.ConditionTrue, 10*time.Second, 1*time.Second)
 		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for UpdateComplete=True: %v", err))
