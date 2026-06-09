@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"syscall"
 	"time"
 
@@ -141,6 +143,17 @@ func checkMCNConditionStatus(mcn *mcfgv1.MachineConfigNode, conditionType mcfgv1
 	return conditionStatus == status
 }
 
+// `isTransientConnectionError` returns true if the error indicates the API server is temporarily
+// unreachable. On SNO this happens during node reboots.
+func isTransientConnectionError(err error) bool {
+	var netErr net.Error
+	return err != nil &&
+		(errors.Is(err, syscall.ECONNREFUSED) ||
+			errors.Is(err, io.EOF) ||
+			errors.Is(err, io.ErrUnexpectedEOF) ||
+			(errors.As(err, &netErr) && netErr.Timeout()))
+}
+
 // `WaitForMCNConditionStatus` waits up to a specified timeout for the desired MCN condition to
 // match the desired status (ex. wait until "Updated" is "False"). If the desired condition is
 // "Unknown," the function will also return true if the condition is "True," which ensures that we
@@ -176,8 +189,8 @@ func waitForMCNConditionStatus(machineConfigClient *machineconfigclient.Clientse
 		logger.Infof("The desired MCN condition was never met: %v", err)
 		// Handle the situation where there were errors getting the MCN resource
 		if conditionErr != nil {
-			if errors.Is(conditionErr, syscall.ECONNREFUSED) {
-				logger.Infof("Got a connection error waiting for MCN '%v' %v condition to be %v: %v", mcnName, conditionType, status, conditionErr)
+			if isTransientConnectionError(conditionErr) {
+				logger.Infof("Got a transient connection error waiting for MCN '%v' %v condition to be %v: %v", mcnName, conditionType, status, conditionErr)
 				return conditionMet, conditionErr
 			}
 			logger.Infof("An error occurred waiting for MCN '%v' %v condition to be %v: %v", mcnName, conditionType, status, conditionErr)
@@ -274,15 +287,19 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 
 		logger.Infof("Waiting for AppliedOSImage=True")
 		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateOS, metav1.ConditionTrue, 4*time.Minute, 2*time.Second)
-		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for AppliedOSImage=True: %v", err))
-		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect AppliedOSImage=True.")
+		if isSNO && isTransientConnectionError(err) {
+			logger.Infof("Warning, got connection error detecting AppliedOSImage=True. The node likely started rebooting.")
+		} else {
+			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for AppliedOSImage=True: %v", err))
+			o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect AppliedOSImage=True.")
+		}
 	} else { // On a non-image mode update, check that node transitions through the "AppliedFiles" phase
 		logger.Infof("Waiting for AppliedFiles=Unknown")
 		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateFiles, metav1.ConditionUnknown, 30*time.Second, 1*time.Second)
 		// A node update in SNO can quickly transition through the "AppliedFiles" state and cause
 		// us to catch the update during the node reboot. During reboot, we will get connection
 		// errors and, thus, should not error out on such errors.
-		if isSNO && err != nil && errors.Is(err, syscall.ECONNREFUSED) {
+		if isSNO && isTransientConnectionError(err) {
 			logger.Infof("Warning, got connection error detecting AppliedFiles=Unknown.")
 		} else {
 			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for AppliedFiles=Unknown: %v", err))
@@ -296,23 +313,23 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 		// A node update in SNO can quickly transition through the "AppliedFiles" state and cause
 		// us to catch the update during the node reboot. During reboot, we will get connection
 		// errors and, thus, should not error out on such errors.
-		o.Expect(err).To(o.Or(o.BeNil(), o.MatchError(syscall.ECONNREFUSED)), fmt.Sprintf("Error occurred while waiting for AppliedFiles=True: %v", err))
-		if isSNO && !conditionMet {
-			logger.Infof("Warning, could not detect AppliedFiles=True.")
+		if isSNO && isTransientConnectionError(err) {
+			logger.Infof("Warning, got connection error detecting AppliedFiles=True. The node likely started rebooting.")
 		} else {
+			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for AppliedFiles=True: %v", err))
 			o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect AppliedFiles=True.")
 		}
 	}
 
 	logger.Infof("Waiting for UpdateExecuted=True")
 	conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateExecuted, metav1.ConditionTrue, 20*time.Second, 1*time.Second)
-	// A node update in SNO can quickly transition through the "AppliedFiles" state and cause
+	// A node update in SNO can quickly transition through the "UpdateExecuted" state and cause
 	// us to catch the update during the node reboot. During reboot, we will get connection
 	// errors and, thus, should not error out on such errors.
-	o.Expect(err).To(o.Or(o.BeNil(), o.MatchError(syscall.ECONNREFUSED)), fmt.Sprintf("Error occurred while waiting for UpdateExecuted=True: %v", err))
-	if isSNO && !conditionMet {
-		logger.Infof("Warning, could not detect UpdateExecuted=True.")
+	if isSNO && isTransientConnectionError(err) {
+		logger.Infof("Warning, got connection error detecting UpdateExecuted=True. The node likely started rebooting.")
 	} else {
+		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for UpdateExecuted=True: %v", err))
 		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect UpdateExecuted=True.")
 	}
 
@@ -320,8 +337,12 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 	if isImageMode {
 		logger.Infof("Waiting for ImagePulledFromRegistry=True")
 		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeImagePulledFromRegistry, metav1.ConditionTrue, 1*time.Minute, 1*time.Second)
-		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for ImagePulledFromRegistry=True: %v", err))
-		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect ImagePulledFromRegistry=True.")
+		if isSNO && isTransientConnectionError(err) {
+			logger.Infof("Warning, got connection error detecting ImagePulledFromRegistry=True. The node likely started rebooting.")
+		} else {
+			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for ImagePulledFromRegistry=True: %v", err))
+			o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect ImagePulledFromRegistry=True.")
+		}
 	}
 
 	// On rebootless (non-image based) update, check that node transitions through "UpdatePostActionComplete" phase
@@ -333,8 +354,12 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 	} else { // On standard, non-rebootless, update, check that node transitions through "RebootedNode" phase
 		logger.Infof("Waiting for RebootedNode=Unknown")
 		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateRebooted, metav1.ConditionUnknown, 15*time.Second, 1*time.Second)
-		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for RebootedNode=Unknown: %v", err))
-		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect RebootedNode=Unknown.")
+		if isSNO && isTransientConnectionError(err) {
+			logger.Infof("Warning, got connection error detecting RebootedNode=Unknown. The node is likely already rebooting.")
+		} else {
+			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for RebootedNode=Unknown: %v", err))
+			o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect RebootedNode=Unknown.")
+		}
 
 		logger.Infof("Waiting for RebootedNode=True")
 		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateRebooted, metav1.ConditionTrue, 10*time.Minute, 1*time.Second)
