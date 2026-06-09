@@ -138,10 +138,6 @@ func getMCNConditionStatus(mcn *mcfgv1.MachineConfigNode, conditionType mcfgv1.S
 // confirm "Updated" is "False")
 func checkMCNConditionStatus(mcn *mcfgv1.MachineConfigNode, conditionType mcfgv1.StateProgress, status metav1.ConditionStatus) bool {
 	conditionStatus := getMCNConditionStatus(mcn, conditionType)
-	if conditionStatus != status && conditionType == mcfgv1.MachineConfigNodeResumed {
-		condition := getMCNCondition(mcn, conditionType)
-		logger.Infof("LastTransitionTime: %v, Message: %v, ObservedGeneration: %v, Reason: %v, Status: %v, Type: %v", condition.LastTransitionTime, condition.Message, condition.ObservedGeneration, condition.Reason, condition.Status, condition.Type)
-	}
 	return conditionStatus == status
 }
 
@@ -171,7 +167,9 @@ func waitForMCNConditionStatus(machineConfigClient *machineconfigclient.Clientse
 		// trough the "Unknown" phase, check if the condition has flipped to `True`.
 		if !conditionMet && status == metav1.ConditionUnknown {
 			conditionMet = checkMCNConditionStatus(workerNodeMCN, conditionType, metav1.ConditionTrue)
-			logger.Infof("MCN '%v' %v condition was %v, missed transition through %v.", mcnName, conditionType, metav1.ConditionTrue, status)
+			if conditionMet {
+				logger.Infof("MCN '%v' %v condition was %v, missed transition through %v.", mcnName, conditionType, metav1.ConditionTrue, status)
+			}
 		}
 		return conditionMet, nil
 	}); err != nil {
