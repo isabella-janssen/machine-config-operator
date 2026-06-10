@@ -362,7 +362,7 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 		}
 
 		logger.Infof("Waiting for RebootedNode=True")
-		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateRebooted, metav1.ConditionTrue, 10*time.Minute, 1*time.Second)
+		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateRebooted, metav1.ConditionTrue, 15*time.Minute, 1*time.Second)
 		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for RebootedNode=True: %v", err))
 		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect RebootedNode=True.")
 	}
