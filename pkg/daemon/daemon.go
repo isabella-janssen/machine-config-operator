@@ -1714,24 +1714,43 @@ func (dn *Daemon) getStateAndConfigs() (*stateAndConfigs, error) {
 	}
 	currentConfig, err := dn.mcLister.Get(currentConfigName)
 	if err != nil {
-		// This is to handle better erroring for https://issues.redhat.com/browse/MCO-466
-		// If the following are true:
-		// - the current config can't be fetched from the lister
-		// - the node is in bootstrap mode
-		// - the current config can be found on disk
-		// then the bootstrap generated MC != in-cluster generated MC due to a variance between install-time manifests
-		// and in-cluster objects. Be more specific about the error in this case.
 		if bootstrapping && apierrors.IsNotFound(err) {
-			currentConfigOnDisk, err := dn.getCurrentConfigOnDisk()
+			// The bootstrap-rendered MC no longer exists in the cluster. This
+			// happens when an operator (e.g. NTO processing a PerformanceProfile)
+			// creates new MachineConfigs after bootstrap, causing the in-cluster
+			// render controller to produce a different rendered MC hash. The
+			// bootstrap-rendered MC was never created as an API object so the MCD
+			// cannot find it. Recover by adopting the pool's current rendered MC
+			// as our starting config so the normal update path can proceed.
+			// See: https://issues.redhat.com/browse/OCPBUGS-78364
+			poolName, poolErr := helpers.GetPrimaryPoolNameForMCN(dn.mcpLister, dn.node)
+			if poolErr != nil {
+				return nil, fmt.Errorf("bootstrap config %s not found and could not determine pool: %w", currentConfigName, poolErr)
+			}
+			mcp, poolErr := dn.mcfgClient.MachineconfigurationV1().MachineConfigPools().Get(context.TODO(), poolName, metav1.GetOptions{})
+			if poolErr != nil {
+				return nil, fmt.Errorf("bootstrap config %s not found and could not get pool %s: %w", currentConfigName, poolName, poolErr)
+			}
+			inClusterMCName := mcp.Spec.Configuration.Name
+			if inClusterMCName == "" {
+				return nil, fmt.Errorf("bootstrap config %s not found and pool %s has no rendered config yet", currentConfigName, poolName)
+			}
+			klog.Infof("Bootstrap config %s not found in cluster; pool %s targets %s. Adopting in-cluster config for bootstrap.", currentConfigName, poolName, inClusterMCName)
+			currentConfig, err = dn.mcLister.Get(inClusterMCName)
 			if err != nil {
-				return nil, fmt.Errorf("error fetching current config on disk during bootstrap: %s, config: %v", err, currentConfigOnDisk)
+				return nil, fmt.Errorf("bootstrap config %s not found and could not get in-cluster config %s: %w", currentConfigName, inClusterMCName, err)
 			}
-			if currentConfigOnDisk.currentConfig.Name != currentConfigName {
-				return nil, fmt.Errorf("error current config %s on disk does not match current config on annotation: %s", currentConfigOnDisk.currentConfig.Name, currentConfigName)
+			currentConfigName = inClusterMCName
+			desiredConfigName = inClusterMCName
+			if _, setErr := dn.nodeWriter.SetAnnotations(map[string]string{
+				constants.CurrentMachineConfigAnnotationKey:  currentConfigName,
+				constants.DesiredMachineConfigAnnotationKey: currentConfigName,
+			}); setErr != nil {
+				return nil, fmt.Errorf("could not update node annotations to in-cluster config %s: %w", currentConfigName, setErr)
 			}
-			return nil, dn.generateBootstrappingMCMismatchError(currentConfigOnDisk, currentConfigName)
+		} else {
+			return nil, err
 		}
-		return nil, err
 	}
 	state, err := getNodeAnnotationExt(dn.node, constants.MachineConfigDaemonStateAnnotationKey, true)
 	if err != nil {
