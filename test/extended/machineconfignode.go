@@ -12,6 +12,7 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	machineconfigclient "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
+	extpriv "github.com/openshift/machine-config-operator/test/extended-priv"
 	exutil "github.com/openshift/machine-config-operator/test/extended-priv/util"
 	logger "github.com/openshift/machine-config-operator/test/extended-priv/util/logext"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -441,4 +442,32 @@ func ValidateMCNScopeImpersonationPathTest(oc *exutil.CLI) {
 	logger.Infof("MCN patch was successfully blocked.")
 	o.Expect(errb.String()).To(o.ContainSubstring("this user must have a \"authentication.kubernetes.io/node-name\" claim"))
 	logger.Infof("Error string contains desired substring.")
+}
+
+// `ValidateMCNPropertiesCustomMCP` checks that MCN properties match the corresponding node properties
+func ValidateMCNPropertiesCustomMCP(oc *exutil.CLI, clientSet *machineconfigclient.Clientset) {
+	// Grab a random node from each default pool
+	workerNode := GetRandomNode(oc, "worker")
+	o.Expect(workerNode.Name).NotTo(o.Equal(""), "Could not get a worker node.")
+
+	// Create MCP
+	_, err := extpriv.CreateCustomMCP(oc.AsAdmin(), "infra", 0)
+	defer CleanupCustomMCP(oc, clientSet, "infra", workerNode.Name)
+	o.Expect(err).NotTo(o.HaveOccurred(), "Error creating a new custom pool `%s`: %s", "infra", err)
+	// Label node
+	err = oc.AsAdmin().Run("label").Args(fmt.Sprintf("node/%s", workerNode.Name), fmt.Sprintf("node-role.kubernetes.io/%s=", "infra")).Execute()
+	o.Expect(err).NotTo(o.HaveOccurred(), "Error labeing node `%s` for MCP `%s`: %s", workerNode.Name, "infra", err)
+	// Wait for the new `infra` MCP to be ready
+	WaitForMCPToBeReady(clientSet, "infra", 1, "")
+	logger.Infof("OK!\n")
+
+	// Get node in custom pool
+	customNodes, customNodeErr := GetNodesByRole(oc, "infra")
+	o.Expect(customNodeErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Could not get node in MCP '%v'.", "infra"))
+	customNode := customNodes[0]
+
+	// Validate MCN for node in custom pool
+	logger.Infof("Validating MCN properties for node in custom '%v' pool.", "infra")
+	mcnErr := ValidateMCNForNode(oc, clientSet, customNode.Name, "infra")
+	o.Expect(mcnErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Error validating MCN properties node in custom pool '%v'.", "infra"))
 }

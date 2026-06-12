@@ -2,15 +2,19 @@ package extended
 
 import (
 	"context"
+	"slices"
 
 	g "github.com/onsi/ginkgo/v2"
+	o "github.com/onsi/gomega"
+	machineconfigclient "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
 	exutil "github.com/openshift/machine-config-operator/test/extended-priv/util"
+	logger "github.com/openshift/machine-config-operator/test/extended-priv/util/logext"
 )
 
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] Should have MCN properties matching associated node properties for nodes in default MCPs [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] Should properly block MCN updates from a MCD that is not the associated one [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] Should properly block MCN updates by impersonation of the MCD SA [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel] //GOOD
-// [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should have MCN properties matching associated node properties for nodes in custom MCPs [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]
+// [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should have MCN properties matching associated node properties for nodes in custom MCPs [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly transition through MCN conditions on rebootless node update [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly update the MCN from the associated MCD [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Suite:openshift/machine-config-operator/disruptive][Disruptive]Should properly report MCN conditions on node degrade [apigroup:machineconfiguration.openshift.io] [Serial]
@@ -51,20 +55,20 @@ var _ = g.Describe("[sig-mco][OCPFeatureGate:MachineConfigNodes]", func() {
 		ValidateMCNScopeImpersonationPathTest(oc)
 	})
 
-	// // The following 3 tests are `Serial` because they makes changes to the cluster that can impact other tests, but still run quickly (< 5 min).
-	// g.It("[Serial]Should have MCN properties matching associated node properties for nodes in custom MCPs [apigroup:machineconfiguration.openshift.io]", func() {
-	// 	// Get the MCPs in this cluster with machines. Since this cluster attempts to create a
-	// 	// custom MCP, the `worker` MCP must have machines for this test.
-	// 	clientSet, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
-	// 	o.Expect(clientErr).NotTo(o.HaveOccurred(), "Error creating client set for test.")
-	// 	poolNames := GetRolesToTest(oc, clientSet)
-	// 	framework.Logf("Validating MCN properties for node(s) in pool(s) '%v'.", poolNames)
-	// 	if !slices.Contains(poolNames, worker) {
-	// 		g.Skip("Skipping this test since this cluster has no machines in the worker MCP, so no custom MCP can be made.")
-	// 	}
+	// The following 3 tests are `Serial` because they makes changes to the cluster that can impact other tests, but still run quickly (< 5 min).
+	g.It("[Serial]Should have MCN properties matching associated node properties for nodes in custom MCPs [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]", func() {
+		// Get the MCPs in this cluster with machines. Since this cluster attempts to create a
+		// custom MCP, the `worker` MCP must have machines for this test.
+		clientSet, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
+		o.Expect(clientErr).NotTo(o.HaveOccurred(), "Error creating client set for test.")
+		poolNames := GetRolesToTest(oc, clientSet)
+		logger.Infof("Validating MCN properties for node(s) in pool(s) '%v'.", poolNames)
+		if !slices.Contains(poolNames, "worker") {
+			g.Skip("Skipping this test since this cluster has no machines in the worker MCP, so no custom MCP can be made.")
+		}
 
-	// 	ValidateMCNPropertiesCustomMCP(oc, infraMCPFixture)
-	// })
+		ValidateMCNPropertiesCustomMCP(oc, clientSet)
+	})
 
 	// g.It("[Serial]Should properly transition through MCN conditions on rebootless node update [apigroup:machineconfiguration.openshift.io]", func() {
 	// 	// Skip this test when the `ImageModeStatusReporting` FeatureGate is enabled, since its
