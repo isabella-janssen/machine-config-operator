@@ -139,23 +139,14 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 				// break since the node cannot be considered updated in addition to degraded
 				break
 			}
-			/*
-				// TODO (ijanssen): This section of code should be implemented as part of OCPBUGS-57177 after OCPBUGS-32745 is addressed.
-				// 	In the current state of the code, the `MachineConfigNodePinnedImageSetsDegraded` condition is wrongly being set to True`
-				// 	even when no unintended functionality is occurring, such as many images taking more than 2 minutes to fetch. Thus, it is
-				//  not wise to degrade an MCP on a PIS degrade while the PIS degrade is not acting as intended. OCPBUGS-57177 has
-				// 	been marked as blocked by OCPBUGS-32745 in Jira, but once the degrade condition is stablilized, this code block should
-				// 	cover the fix for OCPBUGS-57177.
-					// populate the degradedReasons from the MachineConfigNodePinnedImageSetsDegraded condition
-					if pisIsEnabled && mcfgv1.StateProgress(cond.Type) == mcfgv1.MachineConfigNodePinnedImageSetsDegraded && cond.Status == metav1.ConditionTrue {
-						degradedMachines = append(degradedMachines, ourNode)
-						degradedReasons = append(degradedReasons, fmt.Sprintf("Node %s references an invalid PinnedImageSet. See the node's MachineConfigNode resource for details.", ourNode.Name))
-						if mcfgv1.StateProgress(cond.Type) == mcfgv1.MachineConfigNodePinnedImageSetsDegraded {
-							pinnedImageSetsDegraded = true
-						}
-						break
-					}
-			*/
+			// populate the degradedReasons from the MachineConfigNodePinnedImageSetsDegraded condition
+			if mcfgv1.StateProgress(cond.Type) == mcfgv1.MachineConfigNodePinnedImageSetsDegraded && cond.Status == metav1.ConditionTrue {
+				degradedMachines = append(degradedMachines, ourNode)
+				degradedReasons = append(degradedReasons, fmt.Sprintf("Node %s references an invalid PinnedImageSet. See the node's MachineConfigNode resource for details.", ourNode.Name))
+				pinnedImageSetsDegraded = true
+				// break since the node cannot be considered updated in addition to degraded
+				break
+			}
 
 			// If the ImageModeStatusReporting feature gate is enabled, the updated machine count
 			// in the MCP status should be populated from MCN conditions
