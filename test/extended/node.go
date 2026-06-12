@@ -9,6 +9,8 @@ import (
 	"time"
 
 	o "github.com/onsi/gomega"
+	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
+	machineconfigclient "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
 	"github.com/openshift/machine-config-operator/pkg/daemon/constants"
 	exutil "github.com/openshift/machine-config-operator/test/extended-priv/util"
 	logger "github.com/openshift/machine-config-operator/test/extended-priv/util/logext"
@@ -126,6 +128,65 @@ func getRandomNode(oc *exutil.CLI, role string) corev1.Node {
 	// #nosec
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return nodes[rnd.Intn(len(nodes))]
+}
+
+// `WaitForMCPConditionStatus` waits up to the desired timeout for the desired MCP condition to match the desired status (ex. wait until "Updating" is "True")
+func WaitForMCPConditionStatus(oc *exutil.CLI, mcpName string, conditionType mcfgv1.MachineConfigPoolConditionType, status corev1.ConditionStatus, timeout time.Duration, interval time.Duration) error {
+	logger.Infof("Waiting up to %v for MCP '%s' condition '%s' to be '%s'.", timeout, mcpName, conditionType, status)
+	machineConfigClient, err := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
+	o.Expect(err).NotTo(o.HaveOccurred())
+	o.Eventually(func() bool {
+		logger.Infof("Waiting for '%v' MCP's '%v' condition to be '%v'.", mcpName, conditionType, status)
+
+		// Get MCP
+		mcp, mcpErr := machineConfigClient.MachineconfigurationV1().MachineConfigPools().Get(context.TODO(), mcpName, metav1.GetOptions{})
+		if mcpErr != nil {
+			logger.Infof("Failed to grab MCP '%v', error :%v", mcpName, err)
+			return false
+		}
+
+		// Loop through conditions to get check for desired condition type/status combination
+		conditions := mcp.Status.Conditions
+		for _, condition := range conditions {
+			if condition.Type == conditionType {
+				logger.Infof("MCP '%s' condition '%s' status is '%s'", mcp.Name, conditionType, condition.Status)
+				return condition.Status == status
+			}
+		}
+
+		return false
+	}, timeout, interval).Should(o.BeTrue())
+	return nil
+}
+
+// `GetUpdatingNode` returns the updating node, determined by the node targetting a new desired
+// config, when the corresponding MCP starts updating
+func GetUpdatingNode(oc *exutil.CLI, mcpName, originalConfigVersion string) corev1.Node {
+	// Wait for the MCP to start updating
+	o.Expect(WaitForMCPConditionStatus(oc, mcpName, mcfgv1.MachineConfigPoolUpdating, corev1.ConditionTrue, 3*time.Minute, 2*time.Second)).NotTo(o.HaveOccurred(), "Waiting for 'Updating' status change failed.")
+
+	// Get first updating node & return it
+	var updatingNode corev1.Node
+	o.Eventually(func() bool {
+		logger.Infof("Trying to get updating node in '%v' MCP.", mcpName)
+
+		// Get nodes in MCP
+		nodes, nodeErr := GetNodesByRole(oc, mcpName)
+		o.Expect(nodeErr).NotTo(o.HaveOccurred(), "Error getting nodes from %v MCP.", mcpName)
+		o.Expect(nodes).ShouldNot(o.BeEmpty(), "No nodes found for %v MCP.", mcpName)
+
+		// Loop through nodes to see which is targetting a new desired config version
+		for _, node := range nodes {
+			if node.Annotations["machineconfiguration.openshift.io/desiredConfig"] != originalConfigVersion {
+				updatingNode = node
+				return true
+			}
+		}
+
+		return false
+	}, 30*time.Second, 1*time.Second).Should(o.BeTrue())
+
+	return updatingNode
 }
 
 // `WaitForNodeCurrentConfig` waits up to 5 minutes for a input node to have a current

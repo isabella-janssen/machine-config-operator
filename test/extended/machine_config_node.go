@@ -2,6 +2,7 @@ package extended
 
 import (
 	"context"
+	"path/filepath"
 	"slices"
 
 	g "github.com/onsi/ginkgo/v2"
@@ -15,7 +16,7 @@ import (
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] Should properly block MCN updates from a MCD that is not the associated one [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] Should properly block MCN updates by impersonation of the MCD SA [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should have MCN properties matching associated node properties for nodes in custom MCPs [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial] //GOOD
-// [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly transition through MCN conditions on rebootless node update [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]
+// [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly transition through MCN conditions on rebootless node update [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly update the MCN from the associated MCD [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Suite:openshift/machine-config-operator/disruptive][Disruptive]Should properly report MCN conditions on node degrade [apigroup:machineconfiguration.openshift.io] [Serial]
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Suite:openshift/machine-config-operator/disruptive][Disruptive][Slow]Should properly create and remove MCN on node creation and deletion [apigroup:machineconfiguration.openshift.io] [Serial]
@@ -30,8 +31,8 @@ var _ = g.Describe("[sig-mco][OCPFeatureGate:MachineConfigNodes]", func() {
 		// infraMCPFixture                = filepath.Join(MCOMachineConfigPoolBaseDir, "infra-mcp.yaml")
 		// nodeDisruptionFixture          = filepath.Join(MCOMachineConfigurationBaseDir, "nodedisruptionpolicy-rebootless-path.yaml")
 		// nodeDisruptionEmptyFixture     = filepath.Join(MCOMachineConfigurationBaseDir, "managedbootimages-empty.yaml")
-		// customMCFixture                = filepath.Join(MCOMachineConfigBaseDir, "0-infra-mc.yaml")
-		// masterMCFixture                = filepath.Join(MCOMachineConfigBaseDir, "0-master-mc.yaml")
+		customMCFixture = filepath.Join("machineconfigs", "infra-testfile-mc.yaml")
+		masterMCFixture = filepath.Join("machineconfigs", "master-testfile-mc.yaml")
 		// invalidWorkerMCFixture         = filepath.Join(MCOMachineConfigBaseDir, "1-worker-invalid-mc.yaml")
 		// invalidMasterMCFixture         = filepath.Join(MCOMachineConfigBaseDir, "1-master-invalid-mc.yaml")
 		oc = exutil.NewCLI("mco-image-mode-status", exutil.KubeConfigPath()).AsAdmin()
@@ -70,28 +71,28 @@ var _ = g.Describe("[sig-mco][OCPFeatureGate:MachineConfigNodes]", func() {
 		ValidateMCNPropertiesCustomMCP(oc, clientSet)
 	})
 
-	// g.It("[Serial]Should properly transition through MCN conditions on rebootless node update [apigroup:machineconfiguration.openshift.io]", func() {
-	// 	// Skip this test when the `ImageModeStatusReporting` FeatureGate is enabled, since its
-	// 	// regression tests handle the different conditions list.
-	// 	SkipWhenFeatureGateEnabled(oc.AdminConfigClient(), "ImageModeStatusReporting")
+	g.It("[Serial]Should properly transition through MCN conditions on rebootless node update [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]", func() {
+		// Skip this test when the `ImageModeStatusReporting` FeatureGate is enabled, since its
+		// regression tests handle the different conditions list.
+		exutil.SkipWhenFeatureGateEnabled(oc.AdminConfigClient(), "ImageModeStatusReporting")
 
-	// 	// Create client set for test
-	// 	clientSet, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
-	// 	o.Expect(clientErr).NotTo(o.HaveOccurred(), "Error creating client set for test.")
+		// Create client set for test
+		clientSet, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
+		o.Expect(clientErr).NotTo(o.HaveOccurred(), "Error creating client set for test.")
 
-	// 	// Get MCPs to test for cluster
-	// 	poolNames := GetRolesToTest(oc, clientSet)
-	// 	framework.Logf("Validating MCN properties for node(s) in pool(s) '%v'.", poolNames)
+		// Get MCPs to test for cluster
+		poolNames := GetRolesToTest(oc, clientSet)
+		logger.Infof("Validating MCN properties for node(s) in pool(s) '%v'.", poolNames)
 
-	// 	// When the cluster has machines in the "worker" MCP, use a custom MCP to test the update
-	// 	if slices.Contains(poolNames, worker) {
-	// 		framework.Logf("Validating MCN properties in custom MCP.")
-	// 		ValidateMCNConditionTransitionsOnRebootlessUpdate(oc, clientSet, nodeDisruptionFixture, nodeDisruptionEmptyFixture, customMCFixture, infraMCPFixture)
-	// 	} else { // When there are no machines in the "worker" MCP, test the update by applying a MC targeting the "master" MCP
-	// 		framework.Logf("Validating MCN properties in master MCP.")
-	// 		ValidateMCNConditionTransitionsOnRebootlessUpdateMaster(oc, clientSet, nodeDisruptionFixture, nodeDisruptionEmptyFixture, masterMCFixture)
-	// 	}
-	// })
+		// When the cluster has machines in the "worker" MCP, use a custom MCP to test the update
+		if slices.Contains(poolNames, "worker") {
+			logger.Infof("Validating MCN properties in custom MCP.")
+			ValidateMCNConditionTransitionsOnRebootlessUpdate(oc, clientSet, nodeDisruptionFixture, nodeDisruptionEmptyFixture, customMCFixture)
+		} else { // When there are no machines in the "worker" MCP, test the update by applying a MC targeting the "master" MCP
+			logger.Infof("Validating MCN properties in master MCP.")
+			ValidateMCNConditionTransitionsOnRebootlessUpdateMaster(oc, clientSet, nodeDisruptionFixture, nodeDisruptionEmptyFixture, masterMCFixture)
+		}
+	})
 
 	// g.It("[Serial]Should properly update the MCN from the associated MCD [apigroup:machineconfiguration.openshift.io]", func() {
 	// 	ValidateMCNScopeHappyPathTest(oc)

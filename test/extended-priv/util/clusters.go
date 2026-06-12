@@ -7,7 +7,9 @@ import (
 
 	o "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
+	osconfigv1 "github.com/openshift/api/config/v1"
 	clientconfigv1 "github.com/openshift/client-go/config/clientset/versioned"
+	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -115,5 +117,28 @@ func SkipOnHypershift(ctx context.Context, configClient clientconfigv1.Interface
 
 	if infrastructure.Status.ControlPlaneTopology == configv1.ExternalTopologyMode {
 		e2eskipper.Skipf("This test does not apply to Hypershift")
+	}
+}
+
+// `SkipWhenFeatureGateEnabled` skips a test if the desired feature gate provided as a parameter is
+// enabled in the test cluster.
+func SkipWhenFeatureGateEnabled(configClient configv1client.Interface, featureGate osconfigv1.FeatureGateName) {
+	// Get the FeatureGates resource
+	fgs, err := configClient.ConfigV1().FeatureGates().Get(context.TODO(), "cluster", metav1.GetOptions{})
+	o.Expect(err).NotTo(o.HaveOccurred(), "Error getting clsuter FeatureGates.")
+
+	// Loop through the feature gates to see if the desired one is enabled
+	fgEnabled := false
+	for _, fg := range fgs.Status.FeatureGates {
+		for _, enabledFG := range fg.Enabled {
+			if enabledFG.Name == featureGate {
+				fgEnabled = true
+				break
+			}
+		}
+	}
+
+	if fgEnabled {
+		e2eskipper.Skipf("Skipping this test since the `%v` FeatureGate is enabled.", featureGate)
 	}
 }
