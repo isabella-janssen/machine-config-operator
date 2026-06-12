@@ -9,7 +9,7 @@ import (
 
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] Should have MCN properties matching associated node properties for nodes in default MCPs [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] Should properly block MCN updates from a MCD that is not the associated one [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel] //GOOD
-// [sig-mco][OCPFeatureGate:MachineConfigNodes] Should properly block MCN updates by impersonation of the MCD SA [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel]
+// [sig-mco][OCPFeatureGate:MachineConfigNodes] Should properly block MCN updates by impersonation of the MCD SA [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should have MCN properties matching associated node properties for nodes in custom MCPs [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly transition through MCN conditions on rebootless node update [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly update the MCN from the associated MCD [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]
@@ -47,9 +47,9 @@ var _ = g.Describe("[sig-mco][OCPFeatureGate:MachineConfigNodes]", func() {
 		ValidateMCNScopeSadPathTest(oc)
 	})
 
-	// g.It("Should properly block MCN updates by impersonation of the MCD SA [apigroup:machineconfiguration.openshift.io]", func() {
-	// 	ValidateMCNScopeImpersonationPathTest(oc)
-	// })
+	g.It("Should properly block MCN updates by impersonation of the MCD SA [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel]", func() {
+		ValidateMCNScopeImpersonationPathTest(oc)
+	})
 
 	// // The following 3 tests are `Serial` because they makes changes to the cluster that can impact other tests, but still run quickly (< 5 min).
 	// g.It("[Serial]Should have MCN properties matching associated node properties for nodes in custom MCPs [apigroup:machineconfiguration.openshift.io]", func() {

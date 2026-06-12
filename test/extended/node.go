@@ -4,6 +4,7 @@ package extended
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os/exec"
 	"time"
 
@@ -38,6 +39,93 @@ func GetAllNodes(oc *exutil.CLI) ([]corev1.Node, error) {
 		return nil, err
 	}
 	return nodes.Items, nil
+}
+
+func findNodeCondition(status []corev1.NodeCondition, name corev1.NodeConditionType, position int) *corev1.NodeCondition {
+	if position < len(status) {
+		if status[position].Type == name {
+			return &status[position]
+		}
+	}
+	for i := range status {
+		if status[i].Type == name {
+			return &status[i]
+		}
+	}
+	return nil
+}
+
+// `isNodeKubeletReady` determines if a given node's kubelet is ready
+func isNodeKubeletReady(node corev1.Node) bool {
+	for _, condition := range node.Status.Conditions {
+		if condition.Reason == "KubeletReady" && condition.Status == "True" && condition.Type == "Ready" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// `checkMCDState` determines whether the MCD state matches the provided desired state
+func checkMCDState(node corev1.Node, desiredState string) bool {
+	state := node.Annotations["machineconfiguration.openshift.io/state"]
+	return state == desiredState
+}
+
+// `isNodeReady` determines if a given node is ready
+func IsNodeReady(node corev1.Node) bool {
+	// If the node is cordoned, it is not ready.
+	if node.Spec.Unschedulable {
+		return false
+	}
+
+	// If the nodes' kubelet is not ready, it is not ready.
+	if !isNodeKubeletReady(node) {
+		return false
+	}
+
+	// If the nodes' MCD is not done, it is not ready.
+	if !checkMCDState(node, "Done") {
+		return false
+	}
+
+	return true
+}
+
+// `GetRandomNode` gets a random node from with a given role and checks whether the node is ready. If no
+// nodes are ready, it will wait for up to 5 minutes for a node to become available.
+func GetRandomNode(oc *exutil.CLI, role string) corev1.Node {
+	if node := getRandomNode(oc, role); IsNodeReady(node) {
+		return node
+	}
+
+	// If no nodes are ready, wait for up to 5 minutes for one to be ready
+	waitPeriod := time.Minute * 5
+	logger.Infof("No ready nodes found with role '%s', waiting up to %s for a ready node to become available", role, waitPeriod)
+	var targetNode corev1.Node
+	o.Eventually(func() bool {
+		if node := getRandomNode(oc, role); IsNodeReady(node) {
+			targetNode = node
+			return true
+		}
+
+		return false
+	}, 5*time.Minute, 2*time.Second).Should(o.BeTrue())
+
+	return targetNode
+}
+
+// `getRandomNode` gets a random node with a given role
+func getRandomNode(oc *exutil.CLI, role string) corev1.Node {
+	nodes, err := GetNodesByRole(oc, role)
+	o.Expect(err).NotTo(o.HaveOccurred())
+	o.Expect(nodes).ShouldNot(o.BeEmpty())
+
+	// Disable gosec here to avoid throwing
+	// G404: Use of weak random number generator (math/rand instead of crypto/rand)
+	// #nosec
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return nodes[rnd.Intn(len(nodes))]
 }
 
 // `WaitForNodeCurrentConfig` waits up to 5 minutes for a input node to have a current

@@ -2,8 +2,10 @@
 package extended
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os/exec"
 	"time"
 
 	o "github.com/onsi/gomega"
@@ -385,13 +387,10 @@ func ValidateMCNPropertiesByMCPs(oc *exutil.CLI) {
 		logger.Infof("Validating MCN properties for %v node.", poolName)
 
 		// Grab a node in the desired MCP
-		nodes, nodeErr := GetNodesByRole(oc, poolName)
-		o.Expect(nodeErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Error getting node from pool '%v'.", poolName))
-		o.Expect(len(nodes)).To(o.BeNumerically(">=", 1), fmt.Sprintf("Less than one node in pool '%v'.", poolName))
-		o.Expect(nodes[0].Name).NotTo(o.Equal(""), fmt.Sprintf("Could not get a %v node.", poolName))
+		node := GetRandomNode(oc, poolName)
+		o.Expect(node.Name).NotTo(o.Equal(""), fmt.Sprintf("Could not get a %v node.", poolName))
 
-		// Validate MCN for the cluster's node
-		node := nodes[0]
+		// Validate MCN for the MCP's node
 		logger.Infof("Validating MCN properties for the node '%v'.", node.Name)
 		mcnErr := ValidateMCNForNode(oc, clientSet, node.Name, poolName)
 		o.Expect(mcnErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Error validating MCN properties for the node in pool '%v'.", poolName))
@@ -422,5 +421,24 @@ func ValidateMCNScopeSadPathTest(oc *exutil.CLI) {
 	o.Expect(err).To(o.HaveOccurred())
 	logger.Infof("MCN patch was successfully blocked.")
 	o.Expect(cmdOutput).To(o.ContainSubstring("updates to MCN " + targetNode.Name + " can only be done from the MCN's owner node"))
+	logger.Infof("Error string contains desired substring.")
+}
+
+// `ValidateMCNScopeImpersonationPathTest` checks that MCN updates by impersonation of the MCD SA are blocked
+func ValidateMCNScopeImpersonationPathTest(oc *exutil.CLI) {
+	// Grab a random node with a worker role
+	nodeUnderTest := GetRandomNode(oc, "worker")
+	o.Expect(nodeUnderTest.Name).NotTo(o.Equal(""), "Could not get a `worker` node.")
+	logger.Infof("Testing with node '%v'.", nodeUnderTest.Name)
+
+	var errb bytes.Buffer
+	// Attempt to patch the MCN owned by nodeUnderTest by impersonating the MCD SA. This should fail.
+	cmd := exec.Command("oc", "patch", "machineconfignodes", nodeUnderTest.Name, "--type=merge", "-p", "{\"spec\":{\"configVersion\":{\"desired\":\"rendered-worker-test\"}}}", "--as=system:serviceaccount:openshift-machine-config-operator:machine-config-daemon")
+	cmd.Stderr = &errb
+	err := cmd.Run()
+
+	o.Expect(err).To(o.HaveOccurred())
+	logger.Infof("MCN patch was successfully blocked.")
+	o.Expect(errb.String()).To(o.ContainSubstring("this user must have a \"authentication.kubernetes.io/node-name\" claim"))
 	logger.Infof("Error string contains desired substring.")
 }
