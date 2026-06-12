@@ -7,6 +7,7 @@ import (
 
 	o "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
+	clientconfigv1 "github.com/openshift/client-go/config/clientset/versioned"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -102,5 +103,17 @@ func SkipIfCPMSHasUnsupportedOSStreamLabel(oc *CLI) {
 func SkipOnSingleNodeTopology(oc *CLI) {
 	if IsSingleNodeTopology(oc) {
 		e2eskipper.Skipf("This test does not apply to single-node topologies")
+	}
+}
+
+// SkipOnHypershift skips the test if the cluster is Hypershift
+func SkipOnHypershift(ctx context.Context, configClient clientconfigv1.Interface) {
+	infrastructure, err := configClient.ConfigV1().Infrastructures().Get(ctx, "cluster", metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+
+	if infrastructure.Status.ControlPlaneTopology == configv1.ExternalTopologyMode {
+		e2eskipper.Skipf("This test does not apply to Hypershift")
 	}
 }

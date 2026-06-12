@@ -14,6 +14,7 @@ import (
 	logger "github.com/openshift/machine-config-operator/test/extended-priv/util/logext"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
 // `ValidateMCNForNode` validates the MCN of a provided node by checking the following:
@@ -366,4 +367,60 @@ func ConfirmUpdatedMCNStatus(clientSet *machineconfigclient.Clientset, mcnName s
 
 	logger.Infof("Node '%s' update is complete and corresponding MCN is valid.", mcnName)
 	return true
+}
+
+// `ValidateMCNPropertiesByMCPs` checks that MCN properties match the corresponding node properties
+// for a random node in each MCP in the cluster with nodes.
+func ValidateMCNPropertiesByMCPs(oc *exutil.CLI) {
+	// Create client set for test
+	clientSet, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
+	o.Expect(clientErr).NotTo(o.HaveOccurred(), "Error creating client set for test.")
+
+	// Get MCPs to test for cluster
+	poolNames := GetRolesToTest(oc, clientSet)
+	logger.Infof("Validating MCN properties for node(s) in pool(s) '%v'.", poolNames)
+
+	// Validate MCN associated with node in each desired MCP
+	for _, poolName := range poolNames {
+		logger.Infof("Validating MCN properties for %v node.", poolName)
+
+		// Grab a node in the desired MCP
+		nodes, nodeErr := GetNodesByRole(oc, poolName)
+		o.Expect(nodeErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Error getting node from pool '%v'.", poolName))
+		o.Expect(len(nodes)).To(o.BeNumerically(">=", 1), fmt.Sprintf("Less than one node in pool '%v'.", poolName))
+		o.Expect(nodes[0].Name).NotTo(o.Equal(""), fmt.Sprintf("Could not get a %v node.", poolName))
+
+		// Validate MCN for the cluster's node
+		node := nodes[0]
+		logger.Infof("Validating MCN properties for the node '%v'.", node.Name)
+		mcnErr := ValidateMCNForNode(oc, clientSet, node.Name, poolName)
+		o.Expect(mcnErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Error validating MCN properties for the node in pool '%v'.", poolName))
+	}
+}
+
+// `ValidateMCNScopeSadPathTest` checks that MCN updates from a MCD that is not the associated one are
+// blocked. This test skips on SNO clusters.
+func ValidateMCNScopeSadPathTest(oc *exutil.CLI) {
+	// Get all nodes from the cluster
+	nodes, nodesErr := GetAllNodes(oc)
+	o.Expect(nodesErr).NotTo(o.HaveOccurred(), "Error getting nodes from cluster: %v", nodesErr)
+	o.Expect(len(nodes)).To(o.BeNumerically(">", 0), "Got 0 nodes from cluster.")
+
+	// If cluster is SNO (has only one node), skip this test
+	if len(nodes) == 1 {
+		e2eskipper.Skipf("This test does not apply to single-node topologies")
+	}
+
+	// Grab two different nodes, so we don't end up testing and targeting the same node.
+	nodeUnderTest := nodes[0]
+	targetNode := nodes[1]
+	logger.Infof("Testing with nodes '%v' and '%v'.", nodeUnderTest.Name, targetNode.Name)
+
+	// Attempt to patch the MCN owned by targetNode from nodeUnderTest's MCD. This should fail.
+	// This oc command effectively use the service account of the nodeUnderTest's MCD pod, which should only be able to edit nodeUnderTest's MCN.
+	cmdOutput, err := ExecCmdOnNodeWithError(oc, nodeUnderTest, "chroot", "/rootfs", "oc", "patch", "machineconfignodes", targetNode.Name, "--type=merge", "-p", "{\"spec\":{\"configVersion\":{\"desired\":\"rendered-worker-test\"}}}")
+	o.Expect(err).To(o.HaveOccurred())
+	logger.Infof("MCN patch was successfully blocked.")
+	o.Expect(cmdOutput).To(o.ContainSubstring("updates to MCN " + targetNode.Name + " can only be done from the MCN's owner node"))
+	logger.Infof("Error string contains desired substring.")
 }
