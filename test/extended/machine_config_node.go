@@ -94,9 +94,9 @@ var _ = g.Describe("[sig-mco][OCPFeatureGate:MachineConfigNodes]", func() {
 		}
 	})
 
-	// g.It("[Serial]Should properly update the MCN from the associated MCD [apigroup:machineconfiguration.openshift.io]", func() {
-	// 	ValidateMCNScopeHappyPathTest(oc)
-	// })
+	g.It("[Serial]Should properly update the MCN from the associated MCD [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]", func() {
+		ValidateMCNScopeHappyPathTest(oc)
+	})
 
 	// // This test is `Disruptive` because it degrades a node.
 	// g.It("[Suite:openshift/machine-config-operator/disruptive][Disruptive]Should properly report MCN conditions on node degrade [apigroup:machineconfiguration.openshift.io]", func() {

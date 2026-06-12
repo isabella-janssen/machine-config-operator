@@ -444,6 +444,27 @@ func ValidateMCNScopeImpersonationPathTest(oc *exutil.CLI) {
 	logger.Infof("Error string contains desired substring.")
 }
 
+// `ValidateMCNScopeHappyPathTest` checks that MCN updates from the associated MCD are allowed
+func ValidateMCNScopeHappyPathTest(oc *exutil.CLI) {
+	// Grab a random node with a worker role
+	nodeUnderTest := GetRandomNode(oc, "worker")
+	o.Expect(nodeUnderTest.Name).NotTo(o.Equal(""), "Could not get a `worker` node.")
+	logger.Infof("Testing with node '%v'.", nodeUnderTest.Name)
+
+	// Get node's starting desired version
+	nodeDesiredConfig := nodeUnderTest.Annotations["machineconfiguration.openshift.io/desiredConfig"]
+
+	// Attempt to patch the MCN owned by nodeUnderTest from nodeUnderTest's MCD. This should succeed.
+	// This oc command effectively use the service account of the nodeUnderTest's MCD pod, which should only be able to edit nodeUnderTest's MCN.
+	ExecCmdOnNode(oc, nodeUnderTest, "chroot", "/rootfs", "oc", "patch", "machineconfignodes", nodeUnderTest.Name, "--type=merge", "-p", "{\"spec\":{\"configVersion\":{\"desired\":\"rendered-worker-test\"}}}")
+	logger.Infof("MCN '%v' patched successfully.", nodeUnderTest.Name)
+
+	// Cleanup by updating the MCN desired config back to the original value.
+	logger.Infof("Cleaning up patched MCN's desired config value.")
+	ExecCmdOnNode(oc, nodeUnderTest, "chroot", "/rootfs", "oc", "patch", "machineconfignodes", nodeUnderTest.Name, "--type=merge", "-p", fmt.Sprintf("{\"spec\":{\"configVersion\":{\"desired\":\"%v\"}}}", nodeDesiredConfig))
+	logger.Infof("MCN successfully cleaned up.")
+}
+
 // `ValidateMCNPropertiesCustomMCP` checks that MCN properties match the corresponding node properties
 func ValidateMCNPropertiesCustomMCP(oc *exutil.CLI, clientSet *machineconfigclient.Clientset) {
 	// Grab a random node from each default pool

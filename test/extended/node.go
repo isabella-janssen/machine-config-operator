@@ -231,9 +231,9 @@ func mcdForNode(client kubernetes.Interface, node *corev1.Node) (*corev1.Pod, er
 	return &mcdList.Items[0], nil
 }
 
-// execCmdOnNode finds a node's mcd, and oc rsh's into it to execute a command on the node
+// ExecCmdOnNode finds a node's mcd, and oc rsh's into it to execute a command on the node
 // all commands should use /rootfs as root
-func execCmdOnNode(oc *exutil.CLI, node corev1.Node, subArgs ...string) (*exec.Cmd, error) {
+func ExecCmdOnNode(oc *exutil.CLI, node corev1.Node, subArgs ...string) (*exec.Cmd, error) {
 	// Check for an oc binary in $PATH.
 	path, err := exec.LookPath("oc")
 	if err != nil {
@@ -262,7 +262,7 @@ func execCmdOnNode(oc *exutil.CLI, node corev1.Node, subArgs ...string) (*exec.C
 // any errors are returned to the caller for inspection. This allows one to
 // execute a command that is expected to fail; e.g., stat /nonexistant/file.
 func ExecCmdOnNodeWithError(oc *exutil.CLI, node corev1.Node, subArgs ...string) (string, error) {
-	cmd, err := execCmdOnNode(oc, node, subArgs...)
+	cmd, err := ExecCmdOnNode(oc, node, subArgs...)
 	if err != nil {
 		return "", err
 	}
