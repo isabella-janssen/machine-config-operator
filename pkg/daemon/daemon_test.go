@@ -35,6 +35,22 @@ import (
 	"github.com/openshift/machine-config-operator/test/helpers"
 )
 
+type mockNodeWriter struct {
+	annotations map[string]string
+}
+
+func (m *mockNodeWriter) Run(_ <-chan struct{})                                          {}
+func (m *mockNodeWriter) SetDone(_ *stateAndConfigs) error                              { return nil }
+func (m *mockNodeWriter) SetWorking() error                                             { return nil }
+func (m *mockNodeWriter) SetUnreconcilable(_ error) error                               { return nil }
+func (m *mockNodeWriter) SetDegraded(_ error) error                                     { return nil }
+func (m *mockNodeWriter) SetDesiredDrainer(_ string) error                              { return nil }
+func (m *mockNodeWriter) Eventf(_, _, _ string, _ ...interface{})                       {}
+func (m *mockNodeWriter) SetAnnotations(annos map[string]string) (*corev1.Node, error) {
+	m.annotations = annos
+	return &corev1.Node{}, nil
+}
+
 var pathtests = []struct {
 	path    string
 	isValid bool
@@ -540,6 +556,100 @@ func TestPrepUpdateFromClusterOnDiskDrift(t *testing.T) {
 			dn.currentImagePath = currentImagePath
 			ufc, err := dn.prepUpdateFromCluster()
 			test.verify(t, ufc, err)
+		})
+	}
+}
+
+func TestGetStateAndConfigsBootstrapRecovery(t *testing.T) {
+	t.Parallel()
+
+	bootstrapMCName := "rendered-master-bootstrap-abc"
+	inClusterMCName := "rendered-master-xyz"
+	nodeName := "node_name_test"
+
+	masterNodeSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{"node-role.kubernetes.io/master": ""},
+	}
+
+	tests := []struct {
+		name        string
+		mcpName     string
+		mcpConfig   string
+		nodeLabels  map[string]string
+		expectErr   string
+		expectMC    string
+		expectAnnos bool
+	}{
+		{
+			name:        "recovers via pool rendered config when bootstrap MC is not found",
+			mcpName:     ctrlcommon.MachineConfigPoolMaster,
+			mcpConfig:   inClusterMCName,
+			nodeLabels:  map[string]string{"node-role.kubernetes.io/master": ""},
+			expectMC:    inClusterMCName,
+			expectAnnos: true,
+		},
+		{
+			name:       "errors when node matches no pool",
+			mcpName:    ctrlcommon.MachineConfigPoolMaster,
+			mcpConfig:  inClusterMCName,
+			nodeLabels: map[string]string{"node-role.kubernetes.io/worker": ""},
+			expectErr:  "not found",
+		},
+		{
+			name:       "errors when pool has no rendered config",
+			mcpName:    ctrlcommon.MachineConfigPoolMaster,
+			mcpConfig:  "",
+			nodeLabels: map[string]string{"node-role.kubernetes.io/master": ""},
+			expectErr:  "has no rendered config yet",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			annotationsFile := filepath.Join(t.TempDir(), "node-annotations")
+			require.NoError(t, os.WriteFile(annotationsFile, []byte("{}"), 0644))
+
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   nodeName,
+					Labels: test.nodeLabels,
+					Annotations: map[string]string{
+						constants.CurrentMachineConfigAnnotationKey:     bootstrapMCName,
+						constants.DesiredMachineConfigAnnotationKey:     bootstrapMCName,
+						constants.MachineConfigDaemonStateAnnotationKey: constants.MachineConfigDaemonStateDone,
+						constants.CurrentImageAnnotationKey:             "",
+						constants.DesiredImageAnnotationKey:             "",
+					},
+				},
+			}
+
+			mcp := helpers.NewMachineConfigPool(test.mcpName, nil, masterNodeSelector, test.mcpConfig)
+			mc := helpers.NewMachineConfig(inClusterMCName, nil, "", nil)
+
+			f := newFixture(t)
+			f.objects = append(f.objects, mcp, mc)
+			nw := &mockNodeWriter{}
+			dn := f.newController()
+			dn.node = node
+			dn.nodeWriter = nw
+			dn.initialNodeAnnotationsFilePath = annotationsFile
+
+			state, err := dn.getStateAndConfigs()
+			if test.expectErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, state)
+			assert.Equal(t, test.expectMC, state.currentConfig.Name)
+			assert.Equal(t, test.expectMC, state.desiredConfig.Name)
+			if test.expectAnnos {
+				assert.Equal(t, test.expectMC, nw.annotations[constants.CurrentMachineConfigAnnotationKey])
+				assert.Equal(t, test.expectMC, nw.annotations[constants.DesiredMachineConfigAnnotationKey])
+			}
 		})
 	}
 }
