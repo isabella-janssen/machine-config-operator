@@ -15,6 +15,7 @@ import (
 	extpriv "github.com/openshift/machine-config-operator/test/extended-priv"
 	exutil "github.com/openshift/machine-config-operator/test/extended-priv/util"
 	logger "github.com/openshift/machine-config-operator/test/extended-priv/util/logext"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -681,4 +682,110 @@ func ValidateMCNConditionTransitionsOnRebootlessUpdateMaster(oc *exutil.CLI, cli
 	// When an update is complete, all conditions other than `Updated` must be false
 	logger.Infof("Checking all conditions other than 'Updated' are False.")
 	o.Expect(ConfirmUpdatedMCNStatus(clientSet, updatingNode.Name)).Should(o.BeTrue(), "Error, all conditions must be 'False' when Updated=True.")
+}
+
+// `ValidateMCNConditionOnNodeDegrade` checks that Conditions properly update on a node failure (MCP degrade)
+func ValidateMCNConditionOnNodeDegrade(oc *exutil.CLI, fixture string, isSno bool) {
+	// Create client set for test
+	clientSet, clientErr := machineconfigclient.NewForConfig(oc.KubeFramework().ClientConfig())
+	o.Expect(clientErr).NotTo(o.HaveOccurred(), "Error creating client set for test.")
+
+	// In SNO, master pool will degrade
+	poolName := "worker"
+	mcName := "91-worker-testfile-invalid"
+	if isSno {
+		poolName = "master"
+		mcName = "91-master-testfile-invalid"
+	}
+
+	var degradedNodeMCN *mcfgv1.MachineConfigNode
+	// Cleanup MC and fix node degradation on failure or test completion
+	defer func() {
+		// Delete the applied MC
+		deleteMCErr := oc.Run("delete").Args("machineconfig", mcName).Execute()
+		o.Expect(deleteMCErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Could not delete MachineConfig '%v'.", mcName))
+
+		// Recover the degraded MCP
+		recoverErr := RecoverFromDegraded(oc, poolName)
+		o.Expect(recoverErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Could not recover MCP '%v' from degraded state.", poolName))
+
+		// If the test reached checking the MCN ensure the NodeDegraded condition is properly restored
+		if degradedNodeMCN != nil {
+			conditionMet, err := waitForMCNConditionStatus(clientSet, degradedNodeMCN.Name, mcfgv1.MachineConfigNodeNodeDegraded, metav1.ConditionFalse, 30*time.Second, 1*time.Second)
+			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occured while waiting for NodeDegraded=False: %v", err))
+			o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect NodeDegraded=False.")
+		}
+	}()
+
+	// Apply invalid MC
+	mcErr := oc.Run("apply").Args("-f", fixture).Execute()
+	o.Expect(mcErr).NotTo(o.HaveOccurred(), "Could not apply MachineConfig.")
+
+	// Wait for MCP to be in a degraded state with one degraded machine
+	degradedErr := WaitForMCPConditionStatus(oc, poolName, "Degraded", corev1.ConditionTrue, 8*time.Minute, 3*time.Second)
+	o.Expect(degradedErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Error waiting for '%v' MCP to be in a degraded state.", poolName))
+	mcp, err := clientSet.MachineconfigurationV1().MachineConfigPools().Get(context.TODO(), poolName, metav1.GetOptions{})
+	o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error getting '%v' MCP.", poolName))
+	o.Expect(mcp.Status.DegradedMachineCount).To(o.BeNumerically("==", 1), fmt.Sprintf("Degraded machine count is not 1. It is %v.", mcp.Status.DegradedMachineCount))
+
+	// Get degraded node
+	degradedNode, degradedNodeErr := GetDegradedNode(oc, poolName)
+	o.Expect(degradedNodeErr).NotTo(o.HaveOccurred(), "Could not get degraded node.")
+
+	unknownCondition := mcfgv1.MachineConfigNodeUpdateFilesAndOS
+	if exutil.IsFeatureGateEnabled(oc.AdminConfigClient(), "ImageModeStatusReporting") {
+		unknownCondition = mcfgv1.MachineConfigNodeUpdateFiles
+	}
+
+	// Validate MCN of degraded node
+	// 	get and log MCN conditions for debugging purposes
+	degradedNodeMCN, degradedErr = clientSet.MachineconfigurationV1().MachineConfigNodes().Get(context.TODO(), degradedNode.Name, metav1.GetOptions{})
+	o.Expect(degradedErr).NotTo(o.HaveOccurred(), fmt.Sprintf("Error getting MCN of degraded node '%v'.", degradedNode.Name))
+	nodeDegradedCondition := getMCNCondition(degradedNodeMCN, mcfgv1.MachineConfigNodeNodeDegraded)
+	o.Expect(nodeDegradedCondition).NotTo(o.BeNil(), "Condition 'NodeDegraded' does not exist.")
+	logger.Infof("`NodeDegraded` condition status is `%v` with the message `%v`", nodeDegradedCondition.Status, nodeDegradedCondition.Message)
+	fileCondition := getMCNCondition(degradedNodeMCN, unknownCondition)
+	o.Expect(fileCondition).NotTo(o.BeNil(), "Condition '%v' does not exist.", unknownCondition)
+	logger.Infof("`%v` condition status is `%v` with the message `%v`", unknownCondition, fileCondition.Status, fileCondition.Message)
+	executedCondition := getMCNCondition(degradedNodeMCN, mcfgv1.MachineConfigNodeUpdateExecuted)
+	o.Expect(executedCondition).NotTo(o.BeNil(), "Condition 'UpdateExecuted' does not exist.")
+	logger.Infof("`UpdateExecuted` condition status is `%v` with the message `%v`", executedCondition.Status, executedCondition.Message)
+	// 	validate the conditions are as expected
+	logger.Infof("Validating that `NodeDegraded` condition in '%v' MCN has a status of 'True'.", degradedNodeMCN.Name)
+	o.Expect(nodeDegradedCondition.Status).Should(o.Equal(metav1.ConditionTrue), "Condition 'NodeDegraded' does not have the expected status of 'True'.")
+	o.Expect(nodeDegradedCondition.Message).Should(o.ContainSubstring(fmt.Sprintf("Node %s upgrade failure.", degradedNodeMCN.Name)), "Condition 'NodeDegraded' does not have the expected message.")
+	o.Expect(nodeDegradedCondition.Message).Should(o.ContainSubstring("/home/core: file exists"), "Condition 'NodeDegraded' does not have the expected message details.")
+	logger.Infof("Validating that `UpdateExecuted` condition in '%v' MCN has a status of 'Unknown'.", degradedNodeMCN.Name)
+	o.Expect(executedCondition.Status).Should(o.Equal(metav1.ConditionUnknown), "Condition 'UpdateExecuted' does not have the expected status of 'Unknown'.")
+	logger.Infof("Validating that `%v` condition in '%v' MCN has a status of 'Unknown'.", unknownCondition, degradedNodeMCN.Name)
+	o.Expect(fileCondition.Status).Should(o.Equal(metav1.ConditionUnknown), "Condition '%v' does not have the expected status of 'Unknown'.", unknownCondition)
+}
+
+// `RecoverFromDegraded` gets the degraded node in the desired MCP, forces the node to recover by updating its desired
+// config to be its current config, and waits for the MCP to return to an Update=True state
+func RecoverFromDegraded(oc *exutil.CLI, mcpName string) error {
+	logger.Infof("Recovering %s pool from degraded state", mcpName)
+
+	// Get nodes from degraded MCP & update the desired config of the degraded node to force a recovery update
+	nodes, nodeErr := GetNodesByRole(oc, mcpName)
+	o.Expect(nodeErr).NotTo(o.HaveOccurred())
+	o.Expect(nodes).ShouldNot(o.BeEmpty())
+	for _, node := range nodes {
+		logger.Infof("Restoring desired config for node: %s", node.Name)
+		if checkMCDState(node, "Done") {
+			logger.Infof("Node %s is updated and does not need to be recovered", node.Name)
+		} else {
+			err := restoreDesiredConfig(oc, node)
+			if err != nil {
+				return fmt.Errorf("error restoring desired config in node %s. Error: %s", node.Name, err)
+			}
+		}
+	}
+
+	// Wait for MCP to not be in degraded status
+	mcpErr := WaitForMCPConditionStatus(oc, mcpName, "Degraded", "False", 4*time.Minute, 5*time.Second)
+	o.Expect(mcpErr).NotTo(o.HaveOccurred(), fmt.Sprintf("could not recover %v MCP from the degraded status.", mcpName))
+	mcpErr = WaitForMCPConditionStatus(oc, mcpName, "Updated", "True", 7*time.Minute, 5*time.Second)
+	o.Expect(mcpErr).NotTo(o.HaveOccurred(), fmt.Sprintf("%v MCP could not reach an updated state.", mcpName))
+	return nil
 }

@@ -120,9 +120,9 @@ func SkipOnHypershift(ctx context.Context, configClient clientconfigv1.Interface
 	}
 }
 
-// `SkipWhenFeatureGateEnabled` skips a test if the desired feature gate provided as a parameter is
-// enabled in the test cluster.
-func SkipWhenFeatureGateEnabled(configClient configv1client.Interface, featureGate osconfigv1.FeatureGateName) {
+// `IsFeatureGateEnabled` checks if the desired feature gate provided as a parameter is enabled in
+// the test cluster. It returns true if the feature gate is enabled and false otherwise.
+func IsFeatureGateEnabled(configClient configv1client.Interface, featureGate osconfigv1.FeatureGateName) bool {
 	// Get the FeatureGates resource
 	fgs, err := configClient.ConfigV1().FeatureGates().Get(context.TODO(), "cluster", metav1.GetOptions{})
 	o.Expect(err).NotTo(o.HaveOccurred(), "Error getting clsuter FeatureGates.")
@@ -137,8 +137,13 @@ func SkipWhenFeatureGateEnabled(configClient configv1client.Interface, featureGa
 			}
 		}
 	}
+	return fgEnabled
+}
 
-	if fgEnabled {
+// `SkipWhenFeatureGateEnabled` skips a test if the desired feature gate provided as a parameter is
+// enabled in the test cluster.
+func SkipWhenFeatureGateEnabled(configClient configv1client.Interface, featureGate osconfigv1.FeatureGateName) {
+	if IsFeatureGateEnabled(configClient, featureGate) {
 		e2eskipper.Skipf("Skipping this test since the `%v` FeatureGate is enabled.", featureGate)
 	}
 }

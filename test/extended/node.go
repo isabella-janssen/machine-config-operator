@@ -3,6 +3,7 @@ package extended
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os/exec"
@@ -189,6 +190,20 @@ func GetUpdatingNode(oc *exutil.CLI, mcpName, originalConfigVersion string) core
 	return updatingNode
 }
 
+// `restoreDesiredConfig` updates the value of a node's desiredConfig annotation to be equal to the value of its currentConfig (desiredConfig=currentConfig)
+func restoreDesiredConfig(oc *exutil.CLI, node corev1.Node) error {
+	// Get current config
+	currentConfig := node.Annotations["machineconfiguration.openshift.io/currentConfig"]
+	if currentConfig == "" {
+		return fmt.Errorf("currentConfig annotation is empty for node %s", node.Name)
+	}
+
+	// Update desired config to be equal to current config
+	logger.Infof("Node: %s is restoring desiredConfig value to match currentConfig value: %s", node.Name, currentConfig)
+	configErr := oc.Run("patch").Args(fmt.Sprintf("node/%v", node.Name), "--patch", fmt.Sprintf(`{"metadata":{"annotations":{"machineconfiguration.openshift.io/desiredConfig":"%v"}}}`, currentConfig), "--type=merge").Execute()
+	return configErr
+}
+
 // `WaitForNodeCurrentConfig` waits up to 5 minutes for a input node to have a current
 // config equal to the `config` parameter
 func WaitForNodeCurrentConfig(oc *exutil.CLI, nodeName, config string) {
@@ -269,4 +284,24 @@ func ExecCmdOnNodeWithError(oc *exutil.CLI, node corev1.Node, subArgs ...string)
 
 	out, err := cmd.CombinedOutput()
 	return string(out), err
+}
+
+// `GetDegradedNode` gets a degraded node from a specified MCP
+func GetDegradedNode(oc *exutil.CLI, mcpName string) (corev1.Node, error) {
+	// Get nodes in desired pool
+	nodes, nodeErr := GetNodesByRole(oc, mcpName)
+	if nodeErr != nil {
+		return corev1.Node{}, nodeErr
+	} else if len(nodes) == 0 {
+		return corev1.Node{}, fmt.Errorf("no nodes found in MCP '%v", mcpName)
+	}
+
+	// Get degraded node
+	for _, node := range nodes {
+		if checkMCDState(node, "Degraded") {
+			return node, nil
+		}
+	}
+
+	return corev1.Node{}, errors.New("no degraded node found")
 }

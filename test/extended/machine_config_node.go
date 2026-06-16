@@ -8,6 +8,7 @@ import (
 	g "github.com/onsi/ginkgo/v2"
 	o "github.com/onsi/gomega"
 	machineconfigclient "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
+	extpriv "github.com/openshift/machine-config-operator/test/extended-priv"
 	exutil "github.com/openshift/machine-config-operator/test/extended-priv/util"
 	logger "github.com/openshift/machine-config-operator/test/extended-priv/util/logext"
 )
@@ -17,13 +18,14 @@ import (
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] Should properly block MCN updates by impersonation of the MCD SA [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/parallel] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should have MCN properties matching associated node properties for nodes in custom MCPs [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly transition through MCN conditions on rebootless node update [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial] //GOOD
-// [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly update the MCN from the associated MCD [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial]
+// [sig-mco][OCPFeatureGate:MachineConfigNodes] [Serial]Should properly update the MCN from the associated MCD [apigroup:machineconfiguration.openshift.io] [Suite:openshift/conformance/serial] //GOOD
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Suite:openshift/machine-config-operator/disruptive][Disruptive]Should properly report MCN conditions on node degrade [apigroup:machineconfiguration.openshift.io] [Serial]
 // [sig-mco][OCPFeatureGate:MachineConfigNodes] [Suite:openshift/machine-config-operator/disruptive][Disruptive][Slow]Should properly create and remove MCN on node creation and deletion [apigroup:machineconfiguration.openshift.io] [Serial]
 
 // These tests verify MachineConfigNodes feature gate functionality.
 var _ = g.Describe("[sig-mco][OCPFeatureGate:MachineConfigNodes]", func() {
 	defer g.GinkgoRecover()
+	// TODO: create mapping like for image mde tests
 	var (
 		// MCOMachineConfigPoolBaseDir    = exutil.FixturePath("testdata", "machine_config", "machineconfigpool")
 		// MCOMachineConfigurationBaseDir = exutil.FixturePath("testdata", "machine_config", "machineconfigurations")
@@ -98,14 +100,14 @@ var _ = g.Describe("[sig-mco][OCPFeatureGate:MachineConfigNodes]", func() {
 		ValidateMCNScopeHappyPathTest(oc)
 	})
 
-	// // This test is `Disruptive` because it degrades a node.
-	// g.It("[Suite:openshift/machine-config-operator/disruptive][Disruptive]Should properly report MCN conditions on node degrade [apigroup:machineconfiguration.openshift.io]", func() {
-	// 	if IsSingleNode(oc) { //handle SNO clusters
-	// 		ValidateMCNConditionOnNodeDegrade(oc, invalidMasterMCFixture, true)
-	// 	} else { //handle standard, non-SNO, clusters
-	// 		ValidateMCNConditionOnNodeDegrade(oc, invalidWorkerMCFixture, false)
-	// 	}
-	// })
+	// This test is `Disruptive` because it degrades a node.
+	g.It("[[Suite:openshift/machine-config-operator/disruptive][Disruptive]Should properly report MCN conditions on node degrade [apigroup:machineconfiguration.openshift.io] [Serial]", func() {
+		if isSNO, _ := extpriv.IsSNOSafe(oc); isSNO { //handle SNO clusters
+			ValidateMCNConditionOnNodeDegrade(oc, invalidMasterMCFixture, true)
+		} else { //handle standard, non-SNO, clusters
+			ValidateMCNConditionOnNodeDegrade(oc, invalidWorkerMCFixture, false)
+		}
+	})
 
 	// // This test is `Disruptive` because it creates and removes a node. It is also considered `Slow` because it takes longer than 5 min to run.
 	// g.It("[Suite:openshift/machine-config-operator/disruptive][Disruptive][Slow]Should properly create and remove MCN on node creation and deletion [apigroup:machineconfiguration.openshift.io]", func() {
