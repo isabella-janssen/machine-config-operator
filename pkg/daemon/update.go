@@ -1217,6 +1217,10 @@ func (dn *Daemon) update(oldConfig, newConfig *mcfgv1.MachineConfig, skipCertifi
 		return err
 	}
 
+	if err := applyCryptoPolicy(diffFileSet); err != nil {
+		return err
+	}
+
 	// only update passwd if it has changed (do not nullify)
 	// we do not need to include SetPasswordHash in this, since only updateSSHKeys has issues on firstboot.
 	if diff.passwd {
@@ -2626,6 +2630,45 @@ func (dn *Daemon) updateKubeConfigPermission() error {
 		}
 	} else {
 		return fmt.Errorf("cannot stat %s: %w", kubeConfigPath, err)
+	}
+	return nil
+}
+
+func applyCryptoPolicy(diffFileSet []string) error {
+	needsUpdate := false
+	for _, path := range diffFileSet {
+		if path == "/etc/crypto-policies/config" || strings.HasPrefix(path, "/etc/crypto-policies/policies/modules/") {
+			needsUpdate = true
+			break
+		}
+	}
+	if !needsUpdate {
+		return nil
+	}
+
+	// TODO(MCO-2241): Determine whether the FIPS guard belongs here in the daemon
+	// or earlier in the template controller. Also need to decide whether a
+	// FIPS conflict should degrade the node/pool or hard-fail the update.
+	if err := processFips(func(nodeFIPS bool) error {
+		if !nodeFIPS {
+			return nil
+		}
+		desiredBytes, err := os.ReadFile("/etc/crypto-policies/config")
+		if err != nil {
+			return fmt.Errorf("failed to read /etc/crypto-policies/config: %w", err)
+		}
+		desired := strings.TrimSpace(string(desiredBytes))
+		if desired != "FIPS" {
+			return fmt.Errorf("refusing to change crypto-policy to %q: FIPS mode is enabled", desired)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	klog.Infof("Applying crypto-policy via update-crypto-policies")
+	if err := runCmdSync("update-crypto-policies"); err != nil {
+		return fmt.Errorf("failed to apply crypto-policy: %w", err)
 	}
 	return nil
 }

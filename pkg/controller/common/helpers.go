@@ -15,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-
 	"sort"
 	"strings"
 	"text/template"
@@ -726,7 +725,6 @@ func decompressPayload(r io.Reader) ([]byte, error) {
 // Units have one exception: dropins are concat'ed
 
 func removeIgnDuplicateFilesUnitsUsers(ignConfig ign2types.Config) (ign2types.Config, error) {
-
 	files := ignConfig.Storage.Files
 	units := ignConfig.Systemd.Units
 	users := ignConfig.Passwd.Users
@@ -1202,7 +1200,6 @@ func (n namespacedEventRecorder) AnnotatedEventf(object runtime.Object, annotati
 func DoARebuild(pool *mcfgv1.MachineConfigPool) bool {
 	_, ok := pool.Labels[RebuildPoolLabel]
 	return ok
-
 }
 
 // isSubdirectory checks if targetPath is a subdirectory of dirPath.
@@ -1274,6 +1271,28 @@ func GetSecurityProfileCiphers(profile *configv1.TLSSecurityProfile) (string, []
 
 	// need to remap all Ciphers to their respective IANA names used by Go
 	return string(profileSpec.MinTLSVersion), crypto.OpenSSLToIANACipherSuites(profileSpec.Ciphers)
+}
+
+// GetCryptoPolicyFromTLSProfile maps an OpenShift TLS security profile to a
+// Fedora crypto-policy name and optional sub-policy module content.
+func GetCryptoPolicyFromTLSProfile(profile *configv1.TLSSecurityProfile) (string, string) {
+	profileType := configv1.TLSProfileIntermediateType
+	if profile != nil {
+		profileType = profile.Type
+	}
+
+	switch profileType {
+	case configv1.TLSProfileModernType:
+		return "FUTURE:TLS13ONLY", "protocol@TLS = TLS1.3"
+	case configv1.TLSProfileOldType:
+		// TODO(MCO-2241): map Old to LEGACY once validated
+		return "DEFAULT", ""
+	case configv1.TLSProfileCustomType:
+		// TODO(MCO-2241): translate custom cipher selections to sub-policy modifiers
+		return "DEFAULT", ""
+	default:
+		return "DEFAULT", ""
+	}
 }
 
 // Converts tlsMinVersion and tlscipherSuites flags to a tlsConfig object that is used
