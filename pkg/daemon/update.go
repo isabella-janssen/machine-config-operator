@@ -748,7 +748,6 @@ func calculatePostConfigChangeAction(diff *machineConfigDiff, diffFileSet []stri
 
 // calculatePostConfigChangeNodeDisruptionAction takes action based on the cluster's Node disruption policies.
 func (dn *Daemon) calculatePostConfigChangeNodeDisruptionAction(diff *machineConfigDiff, diffFileSet, diffUnitSet []string) ([]opv1.NodeDisruptionPolicyStatusAction, error) {
-
 	var mcop *opv1.MachineConfiguration
 	var pollErr error
 	// Wait for mcop.Status.NodeDisruptionPolicyStatus to populate, otherwise error out. This shouldn't take very long
@@ -819,7 +818,6 @@ func (dn *Daemon) calculatePostConfigChangeNodeDisruptionAction(diff *machineCon
 	}
 
 	return nodeDisruptionActions, nil
-
 }
 
 // Finalizes the revert process by enabling a special systemd unit prior to
@@ -1217,10 +1215,6 @@ func (dn *Daemon) update(oldConfig, newConfig *mcfgv1.MachineConfig, skipCertifi
 		return err
 	}
 
-	if err := applyCryptoPolicy(diffFileSet); err != nil {
-		return err
-	}
-
 	// only update passwd if it has changed (do not nullify)
 	// we do not need to include SetPasswordHash in this, since only updateSSHKeys has issues on firstboot.
 	if diff.passwd {
@@ -1313,6 +1307,11 @@ func (dn *Daemon) update(oldConfig, newConfig *mcfgv1.MachineConfig, skipCertifi
 	// Ideally we would want to update kernelArguments only via MachineConfigs.
 	// We are keeping this to maintain compatibility and OKD requirement.
 	if err := UpdateTuningArgs(KernelTuningFile, CmdLineFile); err != nil {
+		return err
+	}
+
+	// update crypto policy
+	if err := applyCryptoPolicy(diffFileSet); err != nil {
 		return err
 	}
 
@@ -1779,7 +1778,6 @@ func (dn *Daemon) getCurrentlyInstalledPackages() (sets.Set[string], error) {
 // generateExtensionsArgs generates extension arguments for rpm-ostree, based on the target config
 // and currently installed extension packages.
 func generateExtensionsArgs(installedSet sets.Set[string], newConfig *mcfgv1.MachineConfig) []string {
-
 	// Get packages that should be installed based on new config
 	supportedExtensions := ctrlcommon.SupportedExtensions()
 	requiredSet := sets.New[string]()
@@ -2474,7 +2472,6 @@ func (dn *Daemon) listSystemdUnits() (result map[string]systemddbus.UnitFile, er
 		result[unitName] = unitFile
 	}
 	return result, nil
-
 }
 
 // writeFiles writes the given files to disk.
@@ -2570,7 +2567,6 @@ func getUserPasswordHash(user string) (string, error) {
 		return shadowSlice[1], nil
 	}
 	return "", nil
-
 }
 
 // SetPasswordHash updates the password for each user in newUsers, skipping
@@ -2658,7 +2654,7 @@ func applyCryptoPolicy(diffFileSet []string) error {
 			return fmt.Errorf("failed to read /etc/crypto-policies/config: %w", err)
 		}
 		desired := strings.TrimSpace(string(desiredBytes))
-		if desired != "FIPS" {
+		if !strings.HasPrefix(desired, "FIPS") {
 			return fmt.Errorf("refusing to change crypto-policy to %q: FIPS mode is enabled", desired)
 		}
 		return nil
@@ -3276,9 +3272,8 @@ func (dn *CoreOSDaemon) applyLayeredOSChanges(mcDiff machineConfigDiff, oldConfi
 	// repo isn't there rpm-ostree will fail if there are layered packages.
 	// See https://redhat.atlassian.net/browse/OCPBUGS-2269
 	haveExtensions := len(oldConfig.Spec.Extensions) != 0 || len(newConfig.Spec.Extensions) != 0
-	haveKernelType :=
-		helpers.CanonicalizeKernelType(oldConfig.Spec.KernelType) != ctrlcommon.KernelTypeDefault ||
-			helpers.CanonicalizeKernelType(newConfig.Spec.KernelType) != ctrlcommon.KernelTypeDefault
+	haveKernelType := helpers.CanonicalizeKernelType(oldConfig.Spec.KernelType) != ctrlcommon.KernelTypeDefault ||
+		helpers.CanonicalizeKernelType(newConfig.Spec.KernelType) != ctrlcommon.KernelTypeDefault
 
 	var osExtensionsContentDir string
 	var err error
