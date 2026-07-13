@@ -2039,12 +2039,12 @@ func TestGetCryptoPolicyFromTLSProfile(t *testing.T) {
 			expectedSubMod: "",
 		},
 		{
-			name: "Modern maps to FUTURE:TLS13ONLY",
+			name: "Modern maps to FUTURE:OPENSHIFT",
 			profile: &configv1.TLSSecurityProfile{
 				Type:   configv1.TLSProfileModernType,
 				Modern: &configv1.ModernTLSProfile{},
 			},
-			expectedPolicy: "FUTURE:TLS13ONLY",
+			expectedPolicy: "FUTURE:OPENSHIFT",
 			expectedSubMod: "protocol@TLS = TLS1.3",
 		},
 		{
@@ -2057,7 +2057,95 @@ func TestGetCryptoPolicyFromTLSProfile(t *testing.T) {
 			expectedSubMod: "",
 		},
 		{
-			name: "Custom falls back to DEFAULT with TODO",
+			name: "Custom with Intermediate-equivalent ciphers and TLS 1.2",
+			profile: &configv1.TLSSecurityProfile{
+				Type: configv1.TLSProfileCustomType,
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers: []string{
+							"TLS_AES_128_GCM_SHA256",
+							"TLS_AES_256_GCM_SHA384",
+							"TLS_CHACHA20_POLY1305_SHA256",
+							"ECDHE-ECDSA-AES128-GCM-SHA256",
+							"ECDHE-RSA-AES128-GCM-SHA256",
+							"ECDHE-ECDSA-AES256-GCM-SHA384",
+							"ECDHE-RSA-AES256-GCM-SHA384",
+							"ECDHE-ECDSA-CHACHA20-POLY1305",
+							"ECDHE-RSA-CHACHA20-POLY1305",
+						},
+						MinTLSVersion: configv1.VersionTLS12,
+					},
+				},
+			},
+			expectedPolicy: "DEFAULT:OPENSHIFT",
+			expectedSubMod: "cipher@TLS = AES-128-GCM AES-256-GCM CHACHA20-POLY1305\nmac@TLS = AEAD\nprotocol@TLS = TLS1.2 TLS1.3",
+		},
+		{
+			name: "Custom with TLS 1.3 only ciphers",
+			profile: &configv1.TLSSecurityProfile{
+				Type: configv1.TLSProfileCustomType,
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers: []string{
+							"TLS_AES_256_GCM_SHA384",
+							"TLS_CHACHA20_POLY1305_SHA256",
+						},
+						MinTLSVersion: configv1.VersionTLS13,
+					},
+				},
+			},
+			expectedPolicy: "DEFAULT:OPENSHIFT",
+			expectedSubMod: "cipher@TLS = AES-256-GCM CHACHA20-POLY1305\nmac@TLS = AEAD\nprotocol@TLS = TLS1.3",
+		},
+		{
+			name: "Custom with groups specified",
+			profile: &configv1.TLSSecurityProfile{
+				Type: configv1.TLSProfileCustomType,
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers: []string{
+							"TLS_AES_256_GCM_SHA384",
+						},
+						MinTLSVersion: configv1.VersionTLS13,
+						Groups: []configv1.TLSGroup{
+							configv1.TLSGroupX25519MLKEM768,
+							configv1.TLSGroupX25519,
+							configv1.TLSGroupSecP256r1,
+						},
+					},
+				},
+			},
+			expectedPolicy: "DEFAULT:OPENSHIFT",
+			expectedSubMod: "cipher@TLS = AES-256-GCM\nmac@TLS = AEAD\nprotocol@TLS = TLS1.3\ngroup = MLKEM768-X25519 X25519 SECP256R1",
+		},
+		{
+			name: "Custom with CBC ciphers includes non-AEAD MACs",
+			profile: &configv1.TLSSecurityProfile{
+				Type: configv1.TLSProfileCustomType,
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers: []string{
+							"ECDHE-RSA-AES256-GCM-SHA384",
+							"ECDHE-RSA-AES128-SHA256",
+						},
+						MinTLSVersion: configv1.VersionTLS12,
+					},
+				},
+			},
+			expectedPolicy: "DEFAULT:OPENSHIFT",
+			expectedSubMod: "cipher@TLS = AES-128-CBC AES-256-GCM\nmac@TLS = AEAD SHA256\nprotocol@TLS = TLS1.2 TLS1.3",
+		},
+		{
+			name: "Custom with nil spec falls back to DEFAULT",
+			profile: &configv1.TLSSecurityProfile{
+				Type:   configv1.TLSProfileCustomType,
+				Custom: nil,
+			},
+			expectedPolicy: "DEFAULT",
+			expectedSubMod: "",
+		},
+		{
+			name: "Custom with no ciphers still generates protocol directive",
 			profile: &configv1.TLSSecurityProfile{
 				Type: configv1.TLSProfileCustomType,
 				Custom: &configv1.CustomTLSProfile{
@@ -2066,8 +2154,8 @@ func TestGetCryptoPolicyFromTLSProfile(t *testing.T) {
 					},
 				},
 			},
-			expectedPolicy: "DEFAULT",
-			expectedSubMod: "",
+			expectedPolicy: "DEFAULT:OPENSHIFT",
+			expectedSubMod: "protocol@TLS = TLS1.2 TLS1.3",
 		},
 	}
 

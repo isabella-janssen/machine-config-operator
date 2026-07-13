@@ -1273,6 +1273,128 @@ func GetSecurityProfileCiphers(profile *configv1.TLSSecurityProfile) (string, []
 	return string(profileSpec.MinTLSVersion), crypto.OpenSSLToIANACipherSuites(profileSpec.Ciphers)
 }
 
+// cipherComponents holds the Fedora crypto-policy component names that an
+// OpenSSL cipher suite decomposes into.
+type cipherComponents struct {
+	cipher string // e.g. "AES-256-GCM"
+	mac    string // e.g. "AEAD", "SHA256"
+}
+
+// opensslCipherInfo maps OpenSSL cipher suite names to their decomposed
+// Fedora crypto-policy components. The source of truth for which OpenSSL
+// cipher names exist is library-go's openSSLToIANACiphersMap in
+// github.com/openshift/library-go/pkg/crypto/crypto.go — this table must
+// stay in sync with it.
+var opensslCipherInfo = map[string]cipherComponents{
+	// TLS 1.3
+	"TLS_AES_128_GCM_SHA256":       {cipher: "AES-128-GCM", mac: "AEAD"},
+	"TLS_AES_256_GCM_SHA384":       {cipher: "AES-256-GCM", mac: "AEAD"},
+	"TLS_CHACHA20_POLY1305_SHA256": {cipher: "CHACHA20-POLY1305", mac: "AEAD"},
+	// TLS 1.2 ECDHE GCM
+	"ECDHE-ECDSA-AES128-GCM-SHA256": {cipher: "AES-128-GCM", mac: "AEAD"},
+	"ECDHE-RSA-AES128-GCM-SHA256":   {cipher: "AES-128-GCM", mac: "AEAD"},
+	"ECDHE-ECDSA-AES256-GCM-SHA384": {cipher: "AES-256-GCM", mac: "AEAD"},
+	"ECDHE-RSA-AES256-GCM-SHA384":   {cipher: "AES-256-GCM", mac: "AEAD"},
+	// TLS 1.2 ECDHE ChaCha20
+	"ECDHE-ECDSA-CHACHA20-POLY1305": {cipher: "CHACHA20-POLY1305", mac: "AEAD"},
+	"ECDHE-RSA-CHACHA20-POLY1305":   {cipher: "CHACHA20-POLY1305", mac: "AEAD"},
+	// TLS 1.2 ECDHE CBC
+	"ECDHE-ECDSA-AES128-SHA256": {cipher: "AES-128-CBC", mac: "SHA256"},
+	"ECDHE-RSA-AES128-SHA256":   {cipher: "AES-128-CBC", mac: "SHA256"},
+	"ECDHE-ECDSA-AES128-SHA":    {cipher: "AES-128-CBC", mac: "SHA1"},
+	"ECDHE-RSA-AES128-SHA":      {cipher: "AES-128-CBC", mac: "SHA1"},
+	"ECDHE-ECDSA-AES256-SHA384": {cipher: "AES-256-CBC", mac: "SHA384"},
+	"ECDHE-RSA-AES256-SHA384":   {cipher: "AES-256-CBC", mac: "SHA384"},
+	"ECDHE-ECDSA-AES256-SHA":    {cipher: "AES-256-CBC", mac: "SHA1"},
+	"ECDHE-RSA-AES256-SHA":      {cipher: "AES-256-CBC", mac: "SHA1"},
+	// TLS 1.2 RSA key exchange
+	"AES128-GCM-SHA256": {cipher: "AES-128-GCM", mac: "AEAD"},
+	"AES256-GCM-SHA384": {cipher: "AES-256-GCM", mac: "AEAD"},
+	"AES128-SHA256":     {cipher: "AES-128-CBC", mac: "SHA256"},
+	"AES256-SHA256":     {cipher: "AES-256-CBC", mac: "SHA256"},
+	"AES128-SHA":        {cipher: "AES-128-CBC", mac: "SHA1"},
+	"AES256-SHA":        {cipher: "AES-256-CBC", mac: "SHA1"},
+	// Legacy
+	"DES-CBC3-SHA": {cipher: "3DES-CBC", mac: "SHA1"},
+	// TODO(MCO-2241): ECDHE-RSA-DES-CBC3-SHA is in library-go's openSSLToIANACiphersMap
+	// but not in any predefined TLSProfile. Confirm whether it can appear in Custom profiles.
+	"ECDHE-RSA-DES-CBC3-SHA": {cipher: "3DES-CBC", mac: "SHA1"},
+}
+
+// minTLSVersionToProtocols maps a TLS version to the space-separated list of
+// all protocol versions at or above it, for use as a crypto-policy override.
+var minTLSVersionToProtocols = map[configv1.TLSProtocolVersion]string{
+	configv1.VersionTLS10: "TLS1.0 TLS1.1 TLS1.2 TLS1.3",
+	configv1.VersionTLS11: "TLS1.1 TLS1.2 TLS1.3",
+	configv1.VersionTLS12: "TLS1.2 TLS1.3",
+	configv1.VersionTLS13: "TLS1.3",
+}
+
+// tlsGroupToCryptoPolicy maps OpenShift TLSGroup enum values to Fedora
+// crypto-policy group names. The canonical names are in the .pol files at
+// https://gitlab.com/redhat-crypto/fedora-crypto-policies/-/tree/master/policies
+var tlsGroupToCryptoPolicy = map[configv1.TLSGroup]string{
+	configv1.TLSGroupX25519:             "X25519",
+	configv1.TLSGroupSecP256r1:          "SECP256R1",
+	configv1.TLSGroupSecP384r1:          "SECP384R1",
+	configv1.TLSGroupSecP521r1:          "SECP521R1",
+	configv1.TLSGroupX25519MLKEM768:     "MLKEM768-X25519",
+	configv1.TLSGroupSecP256r1MLKEM768:  "P256-MLKEM768",
+	configv1.TLSGroupSecP384r1MLKEM1024: "P384-MLKEM1024",
+}
+
+// buildCustomSubPolicy generates the content of a .pmod file from a custom
+// TLS profile spec. The output uses override syntax (no +/- suffix) so each
+// directive replaces the base policy's value entirely.
+func buildCustomSubPolicy(spec *configv1.TLSProfileSpec) string {
+	cipherSet := make(map[string]struct{})
+	macSet := make(map[string]struct{})
+
+	for _, c := range spec.Ciphers {
+		info, ok := opensslCipherInfo[c]
+		if !ok {
+			klog.Warningf("Unknown cipher %q in custom TLS profile, skipping crypto-policy mapping", c)
+			continue
+		}
+		cipherSet[info.cipher] = struct{}{}
+		macSet[info.mac] = struct{}{}
+	}
+
+	var lines []string
+
+	if len(cipherSet) > 0 {
+		lines = append(lines, "cipher@TLS = "+sortedKeys(cipherSet))
+	}
+	if len(macSet) > 0 {
+		lines = append(lines, "mac@TLS = "+sortedKeys(macSet))
+	}
+	if proto, ok := minTLSVersionToProtocols[spec.MinTLSVersion]; ok {
+		lines = append(lines, "protocol@TLS = "+proto)
+	}
+	if len(spec.Groups) > 0 {
+		var groups []string
+		for _, g := range spec.Groups {
+			if cpName, ok := tlsGroupToCryptoPolicy[g]; ok {
+				groups = append(groups, cpName)
+			}
+		}
+		if len(groups) > 0 {
+			lines = append(lines, "group = "+strings.Join(groups, " "))
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func sortedKeys(m map[string]struct{}) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, " ")
+}
+
 // GetCryptoPolicyFromTLSProfile maps an OpenShift TLS security profile to a
 // Fedora crypto-policy name and optional sub-policy module content.
 func GetCryptoPolicyFromTLSProfile(profile *configv1.TLSSecurityProfile) (string, string) {
@@ -1283,14 +1405,20 @@ func GetCryptoPolicyFromTLSProfile(profile *configv1.TLSSecurityProfile) (string
 
 	switch profileType {
 	case configv1.TLSProfileModernType:
-		return "FUTURE:TLS13ONLY", "protocol@TLS = TLS1.3"
+		return "FUTURE:OPENSHIFT", "protocol@TLS = TLS1.3"
 	case configv1.TLSProfileOldType:
 		// TODO(MCO-2241): map Old to LEGACY once validated
 		return "DEFAULT", ""
 	case configv1.TLSProfileCustomType:
-		// TODO(MCO-2241): translate custom cipher selections to sub-policy modifiers
+		if profile.Custom != nil {
+			content := buildCustomSubPolicy(&profile.Custom.TLSProfileSpec)
+			if content != "" {
+				return "DEFAULT:OPENSHIFT", content
+			}
+		}
 		return "DEFAULT", ""
 	default:
+		// TODO(MCO-2241): map Intermediate to LEGACY once validated
 		return "DEFAULT", ""
 	}
 }

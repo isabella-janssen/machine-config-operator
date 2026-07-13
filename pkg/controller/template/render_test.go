@@ -613,15 +613,15 @@ func TestCryptoPolicyTemplateRendering(t *testing.T) {
 			expectedOutput: "DEFAULT",
 		},
 		{
-			name:           "FUTURE:TLS13ONLY policy renders policy name",
-			cryptoPolicy:   "FUTURE:TLS13ONLY",
+			name:           "FUTURE:OPENSHIFT policy renders policy name",
+			cryptoPolicy:   "FUTURE:OPENSHIFT",
 			cryptoSubMod:   "protocol@TLS = TLS1.3",
 			template:       configTemplate,
-			expectedOutput: "FUTURE:TLS13ONLY",
+			expectedOutput: "FUTURE:OPENSHIFT",
 		},
 		{
 			name:           "sub-policy module renders when set",
-			cryptoPolicy:   "FUTURE:TLS13ONLY",
+			cryptoPolicy:   "FUTURE:OPENSHIFT",
 			cryptoSubMod:   "protocol@TLS = TLS1.3",
 			template:       subModTemplate,
 			expectedOutput: "protocol@TLS = TLS1.3",
@@ -632,6 +632,13 @@ func TestCryptoPolicyTemplateRendering(t *testing.T) {
 			cryptoSubMod:   "",
 			template:       subModTemplate,
 			expectedOutput: "",
+		},
+		{
+			name:         "multi-line sub-policy module renders for Custom profile",
+			cryptoPolicy: "DEFAULT:OPENSHIFT",
+			cryptoSubMod: "cipher@TLS = AES-128-GCM AES-256-GCM CHACHA20-POLY1305\nmac@TLS = AEAD\nprotocol@TLS = TLS1.2 TLS1.3",
+			template:     subModTemplate,
+			expectedOutput: "cipher@TLS = AES-128-GCM AES-256-GCM CHACHA20-POLY1305\nmac@TLS = AEAD\nprotocol@TLS = TLS1.2 TLS1.3",
 		},
 	}
 
