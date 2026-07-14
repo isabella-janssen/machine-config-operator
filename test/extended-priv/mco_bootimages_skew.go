@@ -16,8 +16,14 @@ const (
 	ocpVersionExceedsSkew   = "4.12.0"
 )
 
-var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive][Serial][Disruptive][OCPFeatureGate:BootImageSkewEnforcement]", func() {
+var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive][Serial][Disruptive][OCPFeatureGate:BootImageSkewEnforcement]", g.Label("NoTopology:SingleReplica"), func() {
 	defer g.GinkgoRecover()
+
+	// Registered before NewCLI so it runs before SetupProject's API calls.
+	// Prevents test failures when the API is unreachable after a SNO reboot.
+	g.BeforeEach(func() {
+		exutil.SkipIfClusterUnreachable(exutil.KubeConfigPath())
+	})
 
 	var (
 		oc                   = exutil.NewCLI("mco-bootimage", exutil.KubeConfigPath()).AsAdmin()
