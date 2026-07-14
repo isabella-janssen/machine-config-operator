@@ -3,5 +3,5 @@ mode: 0644
 path: "/etc/crypto-policies/policies/modules/OPENSHIFT.pmod"
 contents:
   inline: |
-    {{ .CryptoPolicySubMod }}
+{{indent 4 .CryptoPolicySubMod}}
 {{- end }}
