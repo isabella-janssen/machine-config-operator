@@ -539,3 +539,5 @@ func mcnAndNodeAnnotationMachineCountsMatch(machineConfigClient *machineconfigcl
 	}
 	return true, false
 }
+
+
