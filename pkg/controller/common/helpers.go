@@ -1299,26 +1299,26 @@ var opensslCipherInfo = map[string]cipherComponents{
 	"ECDHE-ECDSA-CHACHA20-POLY1305": {cipher: "CHACHA20-POLY1305", mac: "AEAD"},
 	"ECDHE-RSA-CHACHA20-POLY1305":   {cipher: "CHACHA20-POLY1305", mac: "AEAD"},
 	// TLS 1.2 ECDHE CBC
-	"ECDHE-ECDSA-AES128-SHA256": {cipher: "AES-128-CBC", mac: "SHA256"},
-	"ECDHE-RSA-AES128-SHA256":   {cipher: "AES-128-CBC", mac: "SHA256"},
-	"ECDHE-ECDSA-AES128-SHA":    {cipher: "AES-128-CBC", mac: "SHA1"},
-	"ECDHE-RSA-AES128-SHA":      {cipher: "AES-128-CBC", mac: "SHA1"},
-	"ECDHE-ECDSA-AES256-SHA384": {cipher: "AES-256-CBC", mac: "SHA384"},
-	"ECDHE-RSA-AES256-SHA384":   {cipher: "AES-256-CBC", mac: "SHA384"},
-	"ECDHE-ECDSA-AES256-SHA":    {cipher: "AES-256-CBC", mac: "SHA1"},
-	"ECDHE-RSA-AES256-SHA":      {cipher: "AES-256-CBC", mac: "SHA1"},
+	"ECDHE-ECDSA-AES128-SHA256": {cipher: "AES-128-CBC", mac: "HMAC-SHA2-256"},
+	"ECDHE-RSA-AES128-SHA256":   {cipher: "AES-128-CBC", mac: "HMAC-SHA2-256"},
+	"ECDHE-ECDSA-AES128-SHA":    {cipher: "AES-128-CBC", mac: "HMAC-SHA1"},
+	"ECDHE-RSA-AES128-SHA":      {cipher: "AES-128-CBC", mac: "HMAC-SHA1"},
+	"ECDHE-ECDSA-AES256-SHA384": {cipher: "AES-256-CBC", mac: "HMAC-SHA2-384"},
+	"ECDHE-RSA-AES256-SHA384":   {cipher: "AES-256-CBC", mac: "HMAC-SHA2-384"},
+	"ECDHE-ECDSA-AES256-SHA":    {cipher: "AES-256-CBC", mac: "HMAC-SHA1"},
+	"ECDHE-RSA-AES256-SHA":      {cipher: "AES-256-CBC", mac: "HMAC-SHA1"},
 	// TLS 1.2 RSA key exchange
 	"AES128-GCM-SHA256": {cipher: "AES-128-GCM", mac: "AEAD"},
 	"AES256-GCM-SHA384": {cipher: "AES-256-GCM", mac: "AEAD"},
-	"AES128-SHA256":     {cipher: "AES-128-CBC", mac: "SHA256"},
-	"AES256-SHA256":     {cipher: "AES-256-CBC", mac: "SHA256"},
-	"AES128-SHA":        {cipher: "AES-128-CBC", mac: "SHA1"},
-	"AES256-SHA":        {cipher: "AES-256-CBC", mac: "SHA1"},
+	"AES128-SHA256":     {cipher: "AES-128-CBC", mac: "HMAC-SHA2-256"},
+	"AES256-SHA256":     {cipher: "AES-256-CBC", mac: "HMAC-SHA2-256"},
+	"AES128-SHA":        {cipher: "AES-128-CBC", mac: "HMAC-SHA1"},
+	"AES256-SHA":        {cipher: "AES-256-CBC", mac: "HMAC-SHA1"},
 	// Legacy
-	"DES-CBC3-SHA": {cipher: "3DES-CBC", mac: "SHA1"},
+	"DES-CBC3-SHA": {cipher: "3DES-CBC", mac: "HMAC-SHA1"},
 	// TODO(MCO-2241): ECDHE-RSA-DES-CBC3-SHA is in library-go's openSSLToIANACiphersMap
 	// but not in any predefined TLSProfile. Confirm whether it can appear in Custom profiles.
-	"ECDHE-RSA-DES-CBC3-SHA": {cipher: "3DES-CBC", mac: "SHA1"},
+	"ECDHE-RSA-DES-CBC3-SHA": {cipher: "3DES-CBC", mac: "HMAC-SHA1"},
 }
 
 // minTLSVersionToProtocols maps a TLS version to the space-separated list of

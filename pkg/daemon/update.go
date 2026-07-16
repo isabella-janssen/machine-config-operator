@@ -2642,9 +2642,6 @@ func applyCryptoPolicy(diffFileSet []string) error {
 		return nil
 	}
 
-	// TODO(MCO-2241): Determine whether the FIPS guard belongs here in the daemon
-	// or earlier in the template controller. Also need to decide whether a
-	// FIPS conflict should degrade the node/pool or hard-fail the update.
 	if err := processFips(func(nodeFIPS bool) error {
 		if !nodeFIPS {
 			return nil
