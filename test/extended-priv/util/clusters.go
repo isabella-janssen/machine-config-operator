@@ -2,7 +2,9 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -108,34 +110,48 @@ func SkipOnSingleNodeTopology(oc *CLI) {
 	}
 }
 
-// SkipIfClusterUnreachableOrSNO skips the test if the cluster API is unreachable or
-// the cluster is using single-node topology. Unlike SkipOnSingleNodeTopology, this
-// function builds a Go client directly from the kubeconfig path and does not depend
-// on the CLI wrapper. This makes it safe to call BEFORE NewCLI's SetupProject
-// BeforeEach, which would otherwise fail on an unreachable API before the test's
-// own skip logic gets a chance to run.
-func SkipIfClusterUnreachableOrSNO(kubeconfigPath string) {
+// SkipIfClusterUnreachable skips the test if the cluster API is unreachable.
+// This function builds a Go client directly from the kubeconfig path and does
+// not depend on the CLI wrapper. This makes it safe to call BEFORE NewCLI's
+// SetupProject BeforeEach, which would otherwise fail on an unreachable API
+// before the test's own skip logic gets a chance to run.
+func SkipIfClusterUnreachable(kubeconfigPath string) {
 	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
-		e2eskipper.Skipf("Cannot determine cluster topology (config error): %v", err)
+		e2eskipper.Skipf("Cluster may be unreachable (config error): %v", err)
 		return
 	}
 	cfg.Timeout = 10 * time.Second
 
 	configClient, err := configv1client.NewForConfig(cfg)
 	if err != nil {
-		e2eskipper.Skipf("Cannot determine cluster topology (client error): %v", err)
+		e2eskipper.Skipf("Cluster may be unreachable (client error): %v", err)
 		return
 	}
 
-	infra, err := configClient.ConfigV1().Infrastructures().Get(
+	_, err = configClient.ConfigV1().Infrastructures().Get(
 		context.TODO(), "cluster", metav1.GetOptions{})
 	if err != nil {
-		e2eskipper.Skipf("Cannot determine cluster topology, cluster may be unreachable: %v", err)
-		return
+		if isConnectionError(err) {
+			e2eskipper.Skipf("Cluster may be unreachable: %v", err)
+			return
+		}
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to get cluster infrastructure: %v", err)
 	}
+}
 
-	if infra.Status.ControlPlaneTopology == configv1.SingleReplicaTopologyMode {
-		e2eskipper.Skipf("This test does not apply to single-node topologies")
+func isConnectionError(err error) bool {
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
 	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "connection refused") ||
+		strings.Contains(errMsg, "no such host") ||
+		strings.Contains(errMsg, "i/o timeout") ||
+		strings.Contains(errMsg, "connection reset")
 }

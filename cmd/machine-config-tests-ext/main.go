@@ -41,6 +41,16 @@ func applyLabelFilters(specs et.ExtensionTestSpecs) {
 			}
 		}
 	})
+
+	// Apply Topology label filters: tests with Topology:topologyname only run on that topology
+	specs.Walk(func(spec *et.ExtensionTestSpec) {
+		for label := range spec.Labels {
+			if strings.HasPrefix(label, "Topology:") {
+				topologyName := strings.TrimPrefix(label, "Topology:")
+				spec.Include(et.TopologyEquals(topologyName))
+			}
+		}
+	})
 }
 
 func main() {

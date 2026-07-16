@@ -19,13 +19,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive][Serial][Disruptive]", func() {
+var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive][Serial][Disruptive]", g.Label("Topology:ha"), func() {
 	defer g.GinkgoRecover()
 
 	// Registered before NewCLI so it runs before SetupProject's API calls.
 	// Prevents test failures when the API is unreachable after a SNO reboot.
 	g.BeforeEach(func() {
-		exutil.SkipIfClusterUnreachableOrSNO(exutil.KubeConfigPath())
+		exutil.SkipIfClusterUnreachable(exutil.KubeConfigPath())
 	})
 
 	var (
@@ -50,6 +50,9 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 	})
 
 	g.AfterEach(func(ctx context.Context) {
+		if machineClient == nil {
+			return
+		}
 		exutil.By("Performing cleanup")
 		logger.Infof("Cleaning up custom MCP %s", customMCPName)
 		// Cleanup: Delete custom MCP if it exists
