@@ -19,6 +19,12 @@ const (
 var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive][Serial][Disruptive][OCPFeatureGate:BootImageSkewEnforcement]", func() {
 	defer g.GinkgoRecover()
 
+	// Registered before NewCLI so it runs before SetupProject's API calls.
+	// Prevents test failures when the API is unreachable after a SNO reboot.
+	g.BeforeEach(func() {
+		exutil.SkipIfClusterUnreachableOrSNO(exutil.KubeConfigPath())
+	})
+
 	var (
 		oc                   = exutil.NewCLI("mco-bootimage", exutil.KubeConfigPath()).AsAdmin()
 		machineConfiguration *MachineConfiguration
@@ -27,8 +33,6 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 	)
 
 	g.BeforeEach(func() {
-		// Skip on single-node topologies
-		exutil.SkipOnSingleNodeTopology(oc)
 		machineConfiguration = GetMachineConfiguration(oc)
 		// Save initial state to restore after each test
 		originalSpec = machineConfiguration.GetSpecOrFail()

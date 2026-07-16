@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	o "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
+	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
 
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
@@ -101,6 +104,38 @@ func SkipIfCPMSHasUnsupportedOSStreamLabel(oc *CLI) {
 // SkipOnSingleNodeTopology skips the test if the cluster is using single-node topology
 func SkipOnSingleNodeTopology(oc *CLI) {
 	if IsSingleNodeTopology(oc) {
+		e2eskipper.Skipf("This test does not apply to single-node topologies")
+	}
+}
+
+// SkipIfClusterUnreachableOrSNO skips the test if the cluster API is unreachable or
+// the cluster is using single-node topology. Unlike SkipOnSingleNodeTopology, this
+// function builds a Go client directly from the kubeconfig path and does not depend
+// on the CLI wrapper. This makes it safe to call BEFORE NewCLI's SetupProject
+// BeforeEach, which would otherwise fail on an unreachable API before the test's
+// own skip logic gets a chance to run.
+func SkipIfClusterUnreachableOrSNO(kubeconfigPath string) {
+	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		e2eskipper.Skipf("Cannot determine cluster topology (config error): %v", err)
+		return
+	}
+	cfg.Timeout = 10 * time.Second
+
+	configClient, err := configv1client.NewForConfig(cfg)
+	if err != nil {
+		e2eskipper.Skipf("Cannot determine cluster topology (client error): %v", err)
+		return
+	}
+
+	infra, err := configClient.ConfigV1().Infrastructures().Get(
+		context.TODO(), "cluster", metav1.GetOptions{})
+	if err != nil {
+		e2eskipper.Skipf("Cannot determine cluster topology, cluster may be unreachable: %v", err)
+		return
+	}
+
+	if infra.Status.ControlPlaneTopology == configv1.SingleReplicaTopologyMode {
 		e2eskipper.Skipf("This test does not apply to single-node topologies")
 	}
 }

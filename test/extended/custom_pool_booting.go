@@ -22,6 +22,12 @@ import (
 var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive][Serial][Disruptive]", func() {
 	defer g.GinkgoRecover()
 
+	// Registered before NewCLI so it runs before SetupProject's API calls.
+	// Prevents test failures when the API is unreachable after a SNO reboot.
+	g.BeforeEach(func() {
+		exutil.SkipIfClusterUnreachableOrSNO(exutil.KubeConfigPath())
+	})
+
 	var (
 		oc                  = exutil.NewCLI("custom-pool-booting", exutil.KubeConfigPath()).AsAdmin()
 		customMCPName       = "infra"
@@ -35,9 +41,6 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 	g.BeforeEach(func() {
 		// Skip if worker scale-ups aren't possible
 		extpriv.SkipTestIfWorkersCannotBeScaled(oc)
-
-		// Skip on single-node topologies
-		exutil.SkipOnSingleNodeTopology(oc)
 
 		machineClient, err = machineclient.NewForConfig(oc.KubeFramework().ClientConfig())
 		o.Expect(err).NotTo(o.HaveOccurred())
