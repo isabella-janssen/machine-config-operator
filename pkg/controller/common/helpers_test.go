@@ -2048,13 +2048,16 @@ func TestGetCryptoPolicyFromTLSProfile(t *testing.T) {
 			expectedSubMod: "protocol@TLS = TLS1.3",
 		},
 		{
-			name: "Old falls back to DEFAULT with TODO",
+			name: "Old maps to LEGACY:OPENSHIFT with decomposed sub-policy",
 			profile: &configv1.TLSSecurityProfile{
 				Type: configv1.TLSProfileOldType,
 				Old:  &configv1.OldTLSProfile{},
 			},
-			expectedPolicy: "DEFAULT",
-			expectedSubMod: "",
+			expectedPolicy: "LEGACY:OPENSHIFT",
+			expectedSubMod: "cipher@TLS = 3DES-CBC AES-128-CBC AES-128-GCM AES-256-CBC AES-256-GCM CHACHA20-POLY1305\n" +
+				"mac@TLS = AEAD SHA1 SHA256 SHA384\n" +
+				"protocol@TLS = TLS1.0 TLS1.1 TLS1.2 TLS1.3\n" +
+				"group = MLKEM768-X25519 X25519 SECP256R1 SECP384R1",
 		},
 		{
 			name: "Custom with Intermediate-equivalent ciphers and TLS 1.2",

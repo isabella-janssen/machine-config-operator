@@ -1407,8 +1407,12 @@ func GetCryptoPolicyFromTLSProfile(profile *configv1.TLSSecurityProfile) (string
 	case configv1.TLSProfileModernType:
 		return "FUTURE:OPENSHIFT", "protocol@TLS = TLS1.3"
 	case configv1.TLSProfileOldType:
-		// TODO(MCO-2241): map Old to LEGACY once validated
-		return "DEFAULT", ""
+		spec := configv1.TLSProfiles[configv1.TLSProfileOldType]
+		content := buildCustomSubPolicy(spec)
+		if content != "" {
+			return "LEGACY:OPENSHIFT", content
+		}
+		return "LEGACY", ""
 	case configv1.TLSProfileCustomType:
 		if profile.Custom != nil {
 			content := buildCustomSubPolicy(&profile.Custom.TLSProfileSpec)
@@ -1418,7 +1422,6 @@ func GetCryptoPolicyFromTLSProfile(profile *configv1.TLSSecurityProfile) (string
 		}
 		return "DEFAULT", ""
 	default:
-		// TODO(MCO-2241): map Intermediate to LEGACY once validated
 		return "DEFAULT", ""
 	}
 }
