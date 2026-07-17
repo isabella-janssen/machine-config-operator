@@ -2630,6 +2630,9 @@ func (dn *Daemon) updateKubeConfigPermission() error {
 	return nil
 }
 
+// applyCryptoPolicy runs update-crypto-policies when the rendered MachineConfig
+// changes /etc/crypto-policies/config or any .pmod under policies/modules/.
+// On FIPS nodes it refuses to apply a non-FIPS policy.
 func applyCryptoPolicy(diffFileSet []string) error {
 	needsUpdate := false
 	for _, path := range diffFileSet {
@@ -2651,11 +2654,15 @@ func applyCryptoPolicy(diffFileSet []string) error {
 			return fmt.Errorf("failed to read /etc/crypto-policies/config: %w", err)
 		}
 		desired := strings.TrimSpace(string(desiredBytes))
-		if !strings.HasPrefix(desired, "FIPS") {
-			return fmt.Errorf("refusing to change crypto-policy to %q: FIPS mode is enabled", desired)
+		if strings.HasPrefix(desired, "FIPS") {
+			return nil
 		}
-		return nil
+		klog.Warningf("Skipping crypto-policy update: FIPS mode is enabled but desired policy is %q; FIPS crypto-policy takes precedence", desired)
+		return errSkipCryptoPolicy
 	}); err != nil {
+		if errors.Is(err, errSkipCryptoPolicy) {
+			return nil
+		}
 		return err
 	}
 
@@ -3063,6 +3070,8 @@ func runCmdSync(cmdName string, args ...string) error {
 
 	return nil
 }
+
+var errSkipCryptoPolicy = errors.New("skip crypto-policy update")
 
 var (
 	podmanSigstoreSupported      sync.Once

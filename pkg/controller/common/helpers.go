@@ -1282,7 +1282,7 @@ type cipherComponents struct {
 
 // opensslCipherInfo maps OpenSSL cipher suite names to their decomposed
 // Fedora crypto-policy components. The source of truth for which OpenSSL
-// cipher names exist is library-go's openSSLToIANACiphersMap in
+// cipher names exist is library-go's `openSSLToIANACiphers` map in
 // github.com/openshift/library-go/pkg/crypto/crypto.go — this table must
 // stay in sync with it.
 var opensslCipherInfo = map[string]cipherComponents{
@@ -1298,36 +1298,45 @@ var opensslCipherInfo = map[string]cipherComponents{
 	// TLS 1.2 ECDHE ChaCha20
 	"ECDHE-ECDSA-CHACHA20-POLY1305": {cipher: "CHACHA20-POLY1305", mac: "AEAD"},
 	"ECDHE-RSA-CHACHA20-POLY1305":   {cipher: "CHACHA20-POLY1305", mac: "AEAD"},
-	// TLS 1.2 ECDHE CBC
+	// TLS 1.2 ECDHE CBC (SHA256/SHA384 variants require TLS 1.2 PRF)
 	"ECDHE-ECDSA-AES128-SHA256": {cipher: "AES-128-CBC", mac: "HMAC-SHA2-256"},
 	"ECDHE-RSA-AES128-SHA256":   {cipher: "AES-128-CBC", mac: "HMAC-SHA2-256"},
-	"ECDHE-ECDSA-AES128-SHA":    {cipher: "AES-128-CBC", mac: "HMAC-SHA1"},
-	"ECDHE-RSA-AES128-SHA":      {cipher: "AES-128-CBC", mac: "HMAC-SHA1"},
-	"ECDHE-ECDSA-AES256-SHA384": {cipher: "AES-256-CBC", mac: "HMAC-SHA2-384"},
-	"ECDHE-RSA-AES256-SHA384":   {cipher: "AES-256-CBC", mac: "HMAC-SHA2-384"},
-	"ECDHE-ECDSA-AES256-SHA":    {cipher: "AES-256-CBC", mac: "HMAC-SHA1"},
-	"ECDHE-RSA-AES256-SHA":      {cipher: "AES-256-CBC", mac: "HMAC-SHA1"},
+	"ECDHE-ECDSA-AES256-SHA384": {cipher: "AES-256-CBC", mac: "HMAC-SHA2-384"}, // from ciphersUnsupportedByGo
+	"ECDHE-RSA-AES256-SHA384":   {cipher: "AES-256-CBC", mac: "HMAC-SHA2-384"}, // from ciphersUnsupportedByGo
+	// TLS 1.0 ECDHE CBC (predate TLS 1.2 but usable with it)
+	"ECDHE-ECDSA-AES128-SHA": {cipher: "AES-128-CBC", mac: "HMAC-SHA1"},
+	"ECDHE-RSA-AES128-SHA":   {cipher: "AES-128-CBC", mac: "HMAC-SHA1"},
+	"ECDHE-ECDSA-AES256-SHA": {cipher: "AES-256-CBC", mac: "HMAC-SHA1"},
+	"ECDHE-RSA-AES256-SHA":   {cipher: "AES-256-CBC", mac: "HMAC-SHA1"},
 	// TLS 1.2 RSA key exchange
 	"AES128-GCM-SHA256": {cipher: "AES-128-GCM", mac: "AEAD"},
 	"AES256-GCM-SHA384": {cipher: "AES-256-GCM", mac: "AEAD"},
 	"AES128-SHA256":     {cipher: "AES-128-CBC", mac: "HMAC-SHA2-256"},
-	"AES256-SHA256":     {cipher: "AES-256-CBC", mac: "HMAC-SHA2-256"},
-	"AES128-SHA":        {cipher: "AES-128-CBC", mac: "HMAC-SHA1"},
-	"AES256-SHA":        {cipher: "AES-256-CBC", mac: "HMAC-SHA1"},
-	// Legacy
-	"DES-CBC3-SHA": {cipher: "3DES-CBC", mac: "HMAC-SHA1"},
-	// TODO(MCO-2241): ECDHE-RSA-DES-CBC3-SHA is in library-go's openSSLToIANACiphersMap
-	// but not in any predefined TLSProfile. Confirm whether it can appear in Custom profiles.
+	"AES256-SHA256":     {cipher: "AES-256-CBC", mac: "HMAC-SHA2-256"}, // from ciphersUnsupportedByGo
+	// TLS 1.0 RSA key exchange (predate TLS 1.2 but usable with it)
+	"AES128-SHA": {cipher: "AES-128-CBC", mac: "HMAC-SHA1"},
+	"AES256-SHA": {cipher: "AES-256-CBC", mac: "HMAC-SHA1"},
+	// Legacy (3DES is removed from OpenSSL on RHCOS but harmless in the .pmod)
+	"DES-CBC3-SHA":           {cipher: "3DES-CBC", mac: "HMAC-SHA1"},
 	"ECDHE-RSA-DES-CBC3-SHA": {cipher: "3DES-CBC", mac: "HMAC-SHA1"},
 }
 
 // minTLSVersionToProtocols maps a TLS version to the space-separated list of
 // all protocol versions at or above it, for use as a crypto-policy override.
+// TLS 1.0 and 1.1 are clamped to TLS 1.2 because RHCOS cannot deliver them:
+// OpenSSL 3.x enforces @SECLEVEL=2 which forbids TLS < 1.2.
 var minTLSVersionToProtocols = map[configv1.TLSProtocolVersion]string{
-	configv1.VersionTLS10: "TLS1.0 TLS1.1 TLS1.2 TLS1.3",
-	configv1.VersionTLS11: "TLS1.1 TLS1.2 TLS1.3",
+	configv1.VersionTLS10: "TLS1.2 TLS1.3",
+	configv1.VersionTLS11: "TLS1.2 TLS1.3",
 	configv1.VersionTLS12: "TLS1.2 TLS1.3",
 	configv1.VersionTLS13: "TLS1.3",
+}
+
+// tlsVersionsClamped contains TLS versions that are requested but cannot be
+// delivered on RHCOS, used to emit a warning log.
+var tlsVersionsClamped = map[configv1.TLSProtocolVersion]bool{
+	configv1.VersionTLS10: true,
+	configv1.VersionTLS11: true,
 }
 
 // tlsGroupToCryptoPolicy maps OpenShift TLSGroup enum values to Fedora
@@ -1369,6 +1378,9 @@ func buildCustomSubPolicy(spec *configv1.TLSProfileSpec) string {
 		lines = append(lines, "mac@TLS = "+sortedKeys(macSet))
 	}
 	if proto, ok := minTLSVersionToProtocols[spec.MinTLSVersion]; ok {
+		if tlsVersionsClamped[spec.MinTLSVersion] {
+			klog.Warningf("TLS profile requests %s but RHCOS enforces TLS 1.2 minimum; clamping protocol@TLS to TLS1.2+", spec.MinTLSVersion)
+		}
 		lines = append(lines, "protocol@TLS = "+proto)
 	}
 	if len(spec.Groups) > 0 {
@@ -1405,7 +1417,12 @@ func GetCryptoPolicyFromTLSProfile(profile *configv1.TLSSecurityProfile) (string
 
 	switch profileType {
 	case configv1.TLSProfileModernType:
-		return "FUTURE:OPENSHIFT", "protocol@TLS = TLS1.3"
+		spec := configv1.TLSProfiles[configv1.TLSProfileModernType]
+		content := buildCustomSubPolicy(spec)
+		if content != "" {
+			return "DEFAULT:OPENSHIFT", content
+		}
+		return "DEFAULT", ""
 	case configv1.TLSProfileOldType:
 		spec := configv1.TLSProfiles[configv1.TLSProfileOldType]
 		content := buildCustomSubPolicy(spec)

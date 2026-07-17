@@ -2039,13 +2039,16 @@ func TestGetCryptoPolicyFromTLSProfile(t *testing.T) {
 			expectedSubMod: "",
 		},
 		{
-			name: "Modern maps to FUTURE:OPENSHIFT",
+			name: "Modern maps to DEFAULT:OPENSHIFT with decomposed sub-policy",
 			profile: &configv1.TLSSecurityProfile{
 				Type:   configv1.TLSProfileModernType,
 				Modern: &configv1.ModernTLSProfile{},
 			},
-			expectedPolicy: "FUTURE:OPENSHIFT",
-			expectedSubMod: "protocol@TLS = TLS1.3",
+			expectedPolicy: "DEFAULT:OPENSHIFT",
+			expectedSubMod: "cipher@TLS = AES-128-GCM AES-256-GCM CHACHA20-POLY1305\n" +
+				"mac@TLS = AEAD\n" +
+				"protocol@TLS = TLS1.3\n" +
+				"group = MLKEM768-X25519 X25519 SECP256R1 SECP384R1",
 		},
 		{
 			name: "Old maps to LEGACY:OPENSHIFT with decomposed sub-policy",
@@ -2056,7 +2059,7 @@ func TestGetCryptoPolicyFromTLSProfile(t *testing.T) {
 			expectedPolicy: "LEGACY:OPENSHIFT",
 			expectedSubMod: "cipher@TLS = 3DES-CBC AES-128-CBC AES-128-GCM AES-256-CBC AES-256-GCM CHACHA20-POLY1305\n" +
 				"mac@TLS = AEAD HMAC-SHA1 HMAC-SHA2-256 HMAC-SHA2-384\n" +
-				"protocol@TLS = TLS1.0 TLS1.1 TLS1.2 TLS1.3\n" +
+				"protocol@TLS = TLS1.2 TLS1.3\n" +
 				"group = MLKEM768-X25519 X25519 SECP256R1 SECP384R1",
 		},
 		{
