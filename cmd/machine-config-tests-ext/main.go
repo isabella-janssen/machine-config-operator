@@ -42,12 +42,12 @@ func applyLabelFilters(specs et.ExtensionTestSpecs) {
 		}
 	})
 
-	// Apply Topology label filters: tests with Topology:topologyname only run on that topology
+	// Apply NoTopology label filters: tests with NoTopology:topologyname are excluded from that topology
 	specs.Walk(func(spec *et.ExtensionTestSpec) {
 		for label := range spec.Labels {
-			if strings.HasPrefix(label, "Topology:") {
-				topologyName := strings.TrimPrefix(label, "Topology:")
-				spec.Include(et.TopologyEquals(topologyName))
+			if strings.HasPrefix(label, "NoTopology:") {
+				topologyName := strings.TrimPrefix(label, "NoTopology:")
+				spec.Exclude(et.TopologyEquals(topologyName))
 			}
 		}
 	})

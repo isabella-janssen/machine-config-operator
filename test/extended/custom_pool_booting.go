@@ -19,7 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive][Serial][Disruptive]", g.Label("Topology:ha"), func() {
+var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive][Serial][Disruptive]", g.Label("NoTopology:SingleReplica"), func() {
 	defer g.GinkgoRecover()
 
 	// Registered before NewCLI so it runs before SetupProject's API calls.
