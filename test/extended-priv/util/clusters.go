@@ -13,6 +13,7 @@ import (
 	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -137,6 +138,50 @@ func SkipIfClusterUnreachable(kubeconfigPath string) {
 			return
 		}
 		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to get cluster infrastructure: %v", err)
+	}
+}
+
+// SkipIfImageRegistryUnhealthy skips the test if the internal image registry
+// is not healthy. The image registry must be available for NewCLI's
+// SetupProject to provision dockercfg secrets in new namespaces. On SNO
+// clusters the registry shares the single node with all other workloads and
+// can remain flaky for extended periods after reboots.
+//
+// Like SkipIfClusterUnreachable, this function builds a client directly from
+// the kubeconfig path and is safe to call BEFORE NewCLI's SetupProject.
+func SkipIfImageRegistryUnhealthy(kubeconfigPath string) {
+	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		e2eskipper.Skipf("Cannot check image registry health (config error): %v", err)
+		return
+	}
+	cfg.Timeout = 10 * time.Second
+
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		e2eskipper.Skipf("Cannot check image registry health (client error): %v", err)
+		return
+	}
+
+	deploy, err := kubeClient.AppsV1().Deployments("openshift-image-registry").Get(
+		context.TODO(), "image-registry", metav1.GetOptions{})
+	if err != nil {
+		if isConnectionError(err) {
+			e2eskipper.Skipf("Cannot check image registry health: %v", err)
+			return
+		}
+		// If the deployment doesn't exist (e.g. ImageRegistry capability disabled), don't skip —
+		// the framework handles that case separately via shouldCheckSecret.
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to get image-registry deployment: %v", err)
+	}
+
+	if deploy.Status.AvailableReplicas == 0 {
+		e2eskipper.Skipf("Image registry has no available replicas (ready: %d/%d) — "+
+			"namespace setup would fail waiting for dockercfg secrets",
+			deploy.Status.ReadyReplicas, *deploy.Spec.Replicas)
 	}
 }
 
