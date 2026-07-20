@@ -379,32 +379,51 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 		}
 	}
 
-	// The final steps of the update happen quickly, so sometimes we can miss the final condition
-	// transitions. If we do, we will not error out, but record that the condition was missed.
-	logger.Infof("Waiting for Resumed=True")
+	// If the reboot/post-action condition is already back to False, the update completed and
+	// all conditions were reset before we could observe the intermediate states (Resumed,
+	// UpdateComplete, Uncordoned). Skip those checks — they would just timeout on False.
+	updateAlreadyCompleted := false
+	var postActionCondition mcfgv1.StateProgress
+	if isImageMode {
+		postActionCondition = mcfgv1.MachineConfigNodeUpdateRebooted
+	} else {
+		postActionCondition = mcfgv1.MachineConfigNodeUpdatePostActionComplete
+	}
+	postActionMCN, postActionErr := machineConfigClient.MachineconfigurationV1().MachineConfigNodes().Get(context.TODO(), updatingNodeName, metav1.GetOptions{})
+	if postActionErr == nil && checkMCNConditionStatus(postActionMCN, postActionCondition, metav1.ConditionFalse) {
+		updateAlreadyCompleted = true
+		logger.Infof("%v is already False — the update completed and conditions were reset. Skipping intermediate condition checks.", postActionCondition)
+	}
+
 	timeout := 45 * time.Second
-	if isSNO {
-		timeout = 3 * time.Minute
-	}
-	conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeResumed, metav1.ConditionTrue, timeout, 1*time.Second, false)
-	o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for Resumed=True: %v", err))
-	if !conditionMet {
-		logger.Infof("Warning, could not detect Resumed=True.")
-	}
-	// Only nodes that cordon and drain go through the "UpdateComplete" and "Uncordoned" stages, so
-	// skip these checks for standard, non-rebootless (non-image based), updates and in SNO clusters.
-	if isImageMode && !isSNO {
-		logger.Infof("Waiting for UpdateComplete=True")
-		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateComplete, metav1.ConditionTrue, 10*time.Second, 1*time.Second, false)
-		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for UpdateComplete=True: %v", err))
-		if !conditionMet {
-			logger.Infof("Warning, could not detect UpdateComplete=True.")
+	if !updateAlreadyCompleted {
+		// The final steps of the update happen quickly, so sometimes we can miss the final condition
+		// transitions. If we do, we will not error out, but record that the condition was missed.
+		logger.Infof("Waiting for Resumed=True")
+		timeout = 45 * time.Second
+		if isSNO {
+			timeout = 3 * time.Minute
 		}
-		logger.Infof("Waiting for Uncordoned=True")
-		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateUncordoned, metav1.ConditionTrue, 10*time.Second, 1*time.Second, false)
-		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for Uncordoned=True: %v", err))
+		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeResumed, metav1.ConditionTrue, timeout, 1*time.Second, false)
+		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for Resumed=True: %v", err))
 		if !conditionMet {
-			logger.Infof("Warning, could not detect Uncordoned=True.")
+			logger.Infof("Warning, could not detect Resumed=True.")
+		}
+		// Only nodes that cordon and drain go through the "UpdateComplete" and "Uncordoned" stages, so
+		// skip these checks for standard, non-rebootless (non-image based), updates and in SNO clusters.
+		if isImageMode && !isSNO {
+			logger.Infof("Waiting for UpdateComplete=True")
+			conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateComplete, metav1.ConditionTrue, 10*time.Second, 1*time.Second, false)
+			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for UpdateComplete=True: %v", err))
+			if !conditionMet {
+				logger.Infof("Warning, could not detect UpdateComplete=True.")
+			}
+			logger.Infof("Waiting for Uncordoned=True")
+			conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateUncordoned, metav1.ConditionTrue, 10*time.Second, 1*time.Second, false)
+			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for Uncordoned=True: %v", err))
+			if !conditionMet {
+				logger.Infof("Warning, could not detect Uncordoned=True.")
+			}
 		}
 	}
 
