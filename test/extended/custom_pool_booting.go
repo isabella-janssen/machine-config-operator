@@ -63,6 +63,10 @@ var _ = g.Describe("[sig-mco][Suite:openshift/machine-config-operator/disruptive
 			logger.Infof("Successfully deleted MCP %s", customMCPName)
 		}
 
+		if clonedMachineSet == nil {
+			return
+		}
+
 		// Cleanup: Scale down and delete the cloned machineset if it exists
 		clonedMachineSet, err := machineClient.MachineV1beta1().MachineSets(MAPINamespace).Get(ctx, clonedMachineSet.Name, metav1.GetOptions{})
 		if err != nil {
