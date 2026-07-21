@@ -163,6 +163,12 @@ func SkipIfImageRegistryUnhealthy(kubeconfigPath string) {
 		return
 	}
 
+	configClient, err := configv1client.NewForConfig(cfg)
+	if err != nil {
+		e2eskipper.Skipf("Cannot check image registry health (config client error): %v", err)
+		return
+	}
+
 	deploy, err := kubeClient.AppsV1().Deployments("openshift-image-registry").Get(
 		context.TODO(), "image-registry", metav1.GetOptions{})
 	if err != nil {
@@ -170,8 +176,6 @@ func SkipIfImageRegistryUnhealthy(kubeconfigPath string) {
 			e2eskipper.Skipf("Cannot check image registry health: %v", err)
 			return
 		}
-		// If the deployment doesn't exist (e.g. ImageRegistry capability disabled), don't skip —
-		// the framework handles that case separately via shouldCheckSecret.
 		if apierrors.IsNotFound(err) {
 			return
 		}
@@ -182,6 +186,31 @@ func SkipIfImageRegistryUnhealthy(kubeconfigPath string) {
 		e2eskipper.Skipf("Image registry has no available replicas (ready: %d/%d) — "+
 			"namespace setup would fail waiting for dockercfg secrets",
 			deploy.Status.ReadyReplicas, *deploy.Spec.Replicas)
+	}
+
+	// The deployment can report available replicas while the ClusterOperator
+	// reports degraded (e.g. chronic restart loops after SNO reboots).
+	co, err := configClient.ConfigV1().ClusterOperators().Get(
+		context.TODO(), "image-registry", metav1.GetOptions{})
+	if err == nil {
+		for _, cond := range co.Status.Conditions {
+			if cond.Type == configv1.OperatorDegraded && cond.Status == configv1.ConditionTrue {
+				e2eskipper.Skipf("Image registry ClusterOperator is degraded: %s", cond.Message)
+			}
+			if cond.Type == configv1.OperatorAvailable && cond.Status != configv1.ConditionTrue {
+				e2eskipper.Skipf("Image registry ClusterOperator is not available: %s", cond.Message)
+			}
+		}
+	}
+
+	// The openshift-controller-manager provisions dockercfg secrets. If it
+	// has no available replicas the secrets will never appear.
+	ocmDeploy, err := kubeClient.AppsV1().Deployments("openshift-controller-manager").Get(
+		context.TODO(), "controller-manager", metav1.GetOptions{})
+	if err == nil && ocmDeploy.Status.AvailableReplicas == 0 {
+		e2eskipper.Skipf("openshift-controller-manager has no available replicas (ready: %d/%d) — "+
+			"it provisions dockercfg secrets for new namespaces",
+			ocmDeploy.Status.ReadyReplicas, *ocmDeploy.Spec.Replicas)
 	}
 }
 
