@@ -2,19 +2,13 @@ package util
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net"
 	"strings"
-	"time"
 
 	o "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
-	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
@@ -112,32 +106,19 @@ func SkipOnSingleNodeTopology(oc *CLI) {
 }
 
 // SkipIfClusterUnreachable skips the test if the cluster API is unreachable.
-// This function builds a Go client directly from the kubeconfig path and does
-// not depend on the CLI wrapper. This makes it safe to call BEFORE NewCLI's
-// SetupProject BeforeEach, which would otherwise fail on an unreachable API
-// before the test's own skip logic gets a chance to run.
-func SkipIfClusterUnreachable(kubeconfigPath string) {
-	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+// The caller must register this in a BeforeEach BEFORE NewCLI so that the
+// skip fires before SetupProject's API calls. Use the var-splitting pattern:
+//
+//	var oc *CLI
+//	g.BeforeEach(func() { SkipIfClusterUnreachable(oc) })
+//	oc = NewCLI(...).AsAdmin()
+func SkipIfClusterUnreachable(oc *CLI) {
+	_, err := oc.AsAdmin().WithoutNamespace().Run("get").Args(
+		"infrastructure", "cluster",
+		"--request-timeout=10s",
+	).Output()
 	if err != nil {
-		e2eskipper.Skipf("Cluster may be unreachable (config error): %v", err)
-		return
-	}
-	cfg.Timeout = 10 * time.Second
-
-	configClient, err := configv1client.NewForConfig(cfg)
-	if err != nil {
-		e2eskipper.Skipf("Cluster may be unreachable (client error): %v", err)
-		return
-	}
-
-	_, err = configClient.ConfigV1().Infrastructures().Get(
-		context.TODO(), "cluster", metav1.GetOptions{})
-	if err != nil {
-		if isConnectionError(err) {
-			e2eskipper.Skipf("Cluster may be unreachable: %v", err)
-			return
-		}
-		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to get cluster infrastructure: %v", err)
+		e2eskipper.Skipf("Cluster may be unreachable: %v", err)
 	}
 }
 
@@ -147,85 +128,62 @@ func SkipIfClusterUnreachable(kubeconfigPath string) {
 // clusters the registry shares the single node with all other workloads and
 // can remain flaky for extended periods after reboots.
 //
-// Like SkipIfClusterUnreachable, this function builds a client directly from
-// the kubeconfig path and is safe to call BEFORE NewCLI's SetupProject.
-func SkipIfImageRegistryUnhealthy(kubeconfigPath string) {
-	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+// Like SkipIfClusterUnreachable, the caller must register this in a
+// BeforeEach BEFORE NewCLI so that the skip fires before SetupProject.
+func SkipIfImageRegistryUnhealthy(oc *CLI) {
+	admin := oc.AsAdmin().WithoutNamespace()
+
+	replicaStr, err := admin.Run("get").Args(
+		"deployment", "image-registry",
+		"-n", "openshift-image-registry",
+		"-o", "jsonpath={.status.availableReplicas}",
+		"--request-timeout=10s",
+	).Output()
 	if err != nil {
-		e2eskipper.Skipf("Cannot check image registry health (config error): %v", err)
+		e2eskipper.Skipf("Cannot check image registry health: %v", err)
 		return
 	}
-	cfg.Timeout = 10 * time.Second
-
-	kubeClient, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		e2eskipper.Skipf("Cannot check image registry health (client error): %v", err)
-		return
+	if replicaStr == "" || replicaStr == "0" {
+		e2eskipper.Skipf("Image registry has no available replicas — " +
+			"namespace setup would fail waiting for dockercfg secrets")
 	}
 
-	configClient, err := configv1client.NewForConfig(cfg)
-	if err != nil {
-		e2eskipper.Skipf("Cannot check image registry health (config client error): %v", err)
-		return
+	degraded, err := admin.Run("get").Args(
+		"clusteroperator", "image-registry",
+		"-o", `jsonpath={.status.conditions[?(@.type=="Degraded")].status}`,
+		"--request-timeout=10s",
+	).Output()
+	if err == nil && degraded == "True" {
+		msg, _ := admin.Run("get").Args(
+			"clusteroperator", "image-registry",
+			"-o", `jsonpath={.status.conditions[?(@.type=="Degraded")].message}`,
+			"--request-timeout=10s",
+		).Output()
+		e2eskipper.Skipf("Image registry ClusterOperator is degraded: %s", msg)
 	}
 
-	deploy, err := kubeClient.AppsV1().Deployments("openshift-image-registry").Get(
-		context.TODO(), "image-registry", metav1.GetOptions{})
-	if err != nil {
-		if isConnectionError(err) {
-			e2eskipper.Skipf("Cannot check image registry health: %v", err)
-			return
-		}
-		if apierrors.IsNotFound(err) {
-			return
-		}
-		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to get image-registry deployment: %v", err)
+	available, err := admin.Run("get").Args(
+		"clusteroperator", "image-registry",
+		"-o", `jsonpath={.status.conditions[?(@.type=="Available")].status}`,
+		"--request-timeout=10s",
+	).Output()
+	if err == nil && available != "True" {
+		msg, _ := admin.Run("get").Args(
+			"clusteroperator", "image-registry",
+			"-o", `jsonpath={.status.conditions[?(@.type=="Available")].message}`,
+			"--request-timeout=10s",
+		).Output()
+		e2eskipper.Skipf("Image registry ClusterOperator is not available: %s", msg)
 	}
 
-	if deploy.Status.AvailableReplicas == 0 {
-		e2eskipper.Skipf("Image registry has no available replicas (ready: %d/%d) — "+
-			"namespace setup would fail waiting for dockercfg secrets",
-			deploy.Status.ReadyReplicas, *deploy.Spec.Replicas)
+	ocmReplicaStr, err := admin.Run("get").Args(
+		"deployment", "controller-manager",
+		"-n", "openshift-controller-manager",
+		"-o", "jsonpath={.status.availableReplicas}",
+		"--request-timeout=10s",
+	).Output()
+	if err == nil && (ocmReplicaStr == "" || ocmReplicaStr == "0") {
+		e2eskipper.Skipf("openshift-controller-manager has no available replicas — " +
+			"it provisions dockercfg secrets for new namespaces")
 	}
-
-	// The deployment can report available replicas while the ClusterOperator
-	// reports degraded (e.g. chronic restart loops after SNO reboots).
-	co, err := configClient.ConfigV1().ClusterOperators().Get(
-		context.TODO(), "image-registry", metav1.GetOptions{})
-	if err == nil {
-		for _, cond := range co.Status.Conditions {
-			if cond.Type == configv1.OperatorDegraded && cond.Status == configv1.ConditionTrue {
-				e2eskipper.Skipf("Image registry ClusterOperator is degraded: %s", cond.Message)
-			}
-			if cond.Type == configv1.OperatorAvailable && cond.Status != configv1.ConditionTrue {
-				e2eskipper.Skipf("Image registry ClusterOperator is not available: %s", cond.Message)
-			}
-		}
-	}
-
-	// The openshift-controller-manager provisions dockercfg secrets. If it
-	// has no available replicas the secrets will never appear.
-	ocmDeploy, err := kubeClient.AppsV1().Deployments("openshift-controller-manager").Get(
-		context.TODO(), "controller-manager", metav1.GetOptions{})
-	if err == nil && ocmDeploy.Status.AvailableReplicas == 0 {
-		e2eskipper.Skipf("openshift-controller-manager has no available replicas (ready: %d/%d) — "+
-			"it provisions dockercfg secrets for new namespaces",
-			ocmDeploy.Status.ReadyReplicas, *ocmDeploy.Spec.Replicas)
-	}
-}
-
-func isConnectionError(err error) bool {
-	var netErr net.Error
-	if errors.As(err, &netErr) {
-		return true
-	}
-	var opErr *net.OpError
-	if errors.As(err, &opErr) {
-		return true
-	}
-	errMsg := err.Error()
-	return strings.Contains(errMsg, "connection refused") ||
-		strings.Contains(errMsg, "no such host") ||
-		strings.Contains(errMsg, "i/o timeout") ||
-		strings.Contains(errMsg, "connection reset")
 }

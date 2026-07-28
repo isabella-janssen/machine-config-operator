@@ -344,6 +344,10 @@ func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machinec
 	extpriv.ValidateMOSCIsGarbageCollected(mosc, mcp)
 	logger.Infof("OK!\n")
 
+	exutil.By("Waiting for MCP to return to Updated after MOSC removal")
+	WaitForMCPToBeReady(machineConfigClient, mcpAndMoscName, int32(len(mcpNodes)), "", 15*time.Minute)
+	logger.Infof("OK!\n")
+
 	if mcName != "" {
 		exutil.By("Removing the MC")
 		DeleteMCAndWaitForMCPUpdate(oc, machineConfigClient, mcName, mcpAndMoscName, true)
