@@ -304,8 +304,9 @@ func runImageModeMCNTestDefaultMCP(oc *exutil.CLI, machineConfigClient *machinec
 	}
 
 	exutil.By("Validate the test node has correct MCN properties")
-	err = ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
-	o.Expect(err).NotTo(o.HaveOccurred(), "Error validating MCN for node `%s`: %s", nodeToTestName, err)
+	o.Eventually(func() error {
+		return ValidateMCNForNode(oc, machineConfigClient, nodeToTestName, mcpAndMoscName)
+	}, 2*time.Minute, 5*time.Second).Should(o.Succeed(), "Error validating MCN for node `%s`", nodeToTestName)
 	logger.Infof("OK!\n")
 
 	// If an MC has been provided, apply it and validate the MCN conditions transition

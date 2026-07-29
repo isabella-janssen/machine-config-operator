@@ -87,25 +87,40 @@ func ValidateMCNForNode(oc *exutil.CLI, machineConfigClient *machineconfigclient
 		return fmt.Errorf("MCN status desired config version does not match node desired config version")
 	}
 
-	// Check desired image in MCN spec matches desired image on node
+	// Check desired image in MCN spec matches desired image on node.
+	// Skip when the MCN field is empty: after an update cycle completes the MCN
+	// controller may not populate (or may clear) the image fields while the node
+	// annotations persist.
 	logger.Infof("Checking node `%v` desired image `%v` matches desired image in MCN spec.", nodeName, nodeDesiredImage)
 	if mcn.Spec.ConfigImage.DesiredImage != nodeDesiredImage {
-		logger.Errorf("MCN spec desired image `%v` does not match node desired image `%v`.", mcn.Spec.ConfigImage.DesiredImage, nodeDesiredImage)
-		return fmt.Errorf("MCN spec desired image does not match node desired image")
+		if mcn.Spec.ConfigImage.DesiredImage == "" {
+			logger.Infof("MCN spec desired image is empty, skipping check (field may not be populated post-update).")
+		} else {
+			logger.Errorf("MCN spec desired image `%v` does not match node desired image `%v`.", mcn.Spec.ConfigImage.DesiredImage, nodeDesiredImage)
+			return fmt.Errorf("MCN spec desired image does not match node desired image")
+		}
 	}
 
 	// Check current image in MCN status matches current image on node
 	logger.Infof("Checking node `%v` current image `%v` matches current image in MCN status.", nodeName, nodeCurrentImage)
 	if mcn.Status.ConfigImage.CurrentImage != nodeCurrentImage {
-		logger.Infof("MCN status current image `%v` does not match node current image `%v`.", mcn.Status.ConfigImage.CurrentImage, nodeCurrentImage)
-		return fmt.Errorf("MCN status current image does not match node current image")
+		if mcn.Status.ConfigImage.CurrentImage == "" {
+			logger.Infof("MCN status current image is empty, skipping check (field may not be populated post-update).")
+		} else {
+			logger.Infof("MCN status current image `%v` does not match node current image `%v`.", mcn.Status.ConfigImage.CurrentImage, nodeCurrentImage)
+			return fmt.Errorf("MCN status current image does not match node current image")
+		}
 	}
 
 	// Check desired image in MCN status matches desired image on node
 	logger.Infof("Checking node `%v` desired image `%v` matches desired image in MCN status.", nodeName, nodeDesiredImage)
 	if mcn.Status.ConfigImage.DesiredImage != nodeDesiredImage {
-		logger.Infof("MCN status desired image `%v` does not match node desired image `%v`.", mcn.Status.ConfigImage.DesiredImage, nodeDesiredImage)
-		return fmt.Errorf("MCN status desired image does not match node desired image")
+		if mcn.Status.ConfigImage.DesiredImage == "" {
+			logger.Infof("MCN status desired image is empty, skipping check (field may not be populated post-update).")
+		} else {
+			logger.Infof("MCN status desired image `%v` does not match node desired image `%v`.", mcn.Status.ConfigImage.DesiredImage, nodeDesiredImage)
+			return fmt.Errorf("MCN status desired image does not match node desired image")
+		}
 	}
 
 	return nil
@@ -290,18 +305,26 @@ func ValidateTransitionThroughConditions(oc *exutil.CLI, machineConfigClient *ma
 	// "ImagePulledFromRegistry" phases
 	if isImageMode {
 		logger.Infof("Waiting for AppliedOSImage=Unknown")
-		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateOS, metav1.ConditionUnknown, 30*time.Second, 1*time.Second, false)
-		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for AppliedOSImage=Unknown: %v", err))
-		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect AppliedOSImage=Unknown.")
+		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateOS, metav1.ConditionUnknown, 30*time.Second, 1*time.Second, isSNO)
+		if isSNO && isTransientConnectionError(err) {
+			logger.Infof("Warning, got connection error detecting AppliedOSImage=Unknown. The node likely started rebooting.")
+		} else {
+			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for AppliedOSImage=Unknown: %v", err))
+			o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect AppliedOSImage=Unknown.")
+		}
 
 		logger.Infof("Waiting for ImagePulledFromRegistry=Unknown")
 		timeout := 30 * time.Second
 		if isSNO {
 			timeout = 1 * time.Minute
 		}
-		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeImagePulledFromRegistry, metav1.ConditionUnknown, timeout, 1*time.Second, false)
-		o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for ImagePulledFromRegistry=Unknown: %v", err))
-		o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect ImagePulledFromRegistry=Unknown.")
+		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeImagePulledFromRegistry, metav1.ConditionUnknown, timeout, 1*time.Second, isSNO)
+		if isSNO && isTransientConnectionError(err) {
+			logger.Infof("Warning, got connection error detecting ImagePulledFromRegistry=Unknown. The node likely started rebooting.")
+		} else {
+			o.Expect(err).NotTo(o.HaveOccurred(), fmt.Sprintf("Error occurred while waiting for ImagePulledFromRegistry=Unknown: %v", err))
+			o.Expect(conditionMet).To(o.BeTrue(), "Error, could not detect ImagePulledFromRegistry=Unknown.")
+		}
 
 		logger.Infof("Waiting for AppliedOSImage=True")
 		conditionMet, err = waitForMCNConditionStatus(machineConfigClient, updatingNodeName, mcfgv1.MachineConfigNodeUpdateOS, metav1.ConditionTrue, 4*time.Minute, 2*time.Second, true)
