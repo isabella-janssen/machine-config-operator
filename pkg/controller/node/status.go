@@ -142,7 +142,7 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 				// Handle the case when an error has occurred with a PinnedImageSet
 				degradedMachines = append(degradedMachines, ourNode)
 				// populate the degradedReasons from the MachineConfigNodePinnedImageSetsDegraded condition
-				degradedReasons = append(degradedReasons, fmt.Sprintf("Node %s references an invalid PinnedImageSet. See the node's MachineConfigNode resource for details.", ourNode.Name))
+				degradedReasons = append(degradedReasons, fmt.Sprintf("Node %s references a PinnedImageSet that cannot be successfully applied. PinnedImage is reporting: %q", ourNode.Name, cond.Message))
 				// break since the node cannot be considered updated in addition to degraded
 				break
 			}
