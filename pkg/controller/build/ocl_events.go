@@ -22,11 +22,11 @@ const (
 	EventBuildDeleted     = "BuildDeleted"
 
 	// Job events
-	EventJobCreated   = "JobCreated"
-	EventJobStarted   = "JobStarted"
-	EventJobCompleted = "JobCompleted"
-	EventJobFailed    = "JobFailed"
-	EventJobDeleted   = "JobDeleted"
+	EventJobCreated    = "JobCreated"
+	EventJobStarted    = "JobStarted"
+	EventJobCompleted  = "JobCompleted"
+	EventJobPodFailed  = "JobPodFailed"
+	EventJobDeleted    = "JobDeleted"
 
 	// Config events
 	EventConfigReconciled      = "ConfigReconciled"
@@ -122,10 +122,10 @@ func (r *OCLEventRecorder) RecordJobCompleted(mosb *mcfgv1.MachineOSBuild, job *
 		fmt.Sprintf("Build job completed: %s", job.Name))
 }
 
-// RecordJobFailed records when a build job fails
-func (r *OCLEventRecorder) RecordJobFailed(mosb *mcfgv1.MachineOSBuild, job *batchv1.Job) {
-	r.recorder.Event(mosb, corev1.EventTypeWarning, EventJobFailed,
-		fmt.Sprintf("Build job %q failed; see MachineOSBuild %q status conditions for details", job.Name, mosb.Name))
+// RecordJobPodFailed records when a build pod fails but the job is still retrying
+func (r *OCLEventRecorder) RecordJobPodFailed(mosb *mcfgv1.MachineOSBuild, job *batchv1.Job, maxRetries int32) {
+	r.recorder.Event(mosb, corev1.EventTypeWarning, EventJobPodFailed,
+		fmt.Sprintf("Build pod failed (attempt %d of %d); build job is retrying", job.Status.Failed, maxRetries+1))
 }
 
 // RecordJobDeleted records when a build job is deleted

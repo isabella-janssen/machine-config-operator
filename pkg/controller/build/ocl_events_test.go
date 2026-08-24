@@ -117,7 +117,7 @@ func TestJobEvents(t *testing.T) {
 		{"JobCreated", func(r *OCLEventRecorder) { r.RecordJobCreated(mosb, job) }, "Normal", EventJobCreated},
 		{"JobStarted", func(r *OCLEventRecorder) { r.RecordJobStarted(mosb, job) }, "Normal", EventJobStarted},
 		{"JobCompleted", func(r *OCLEventRecorder) { r.RecordJobCompleted(mosb, job) }, "Normal", EventJobCompleted},
-		{"JobFailed", func(r *OCLEventRecorder) { r.RecordJobFailed(mosb, job) }, "Warning", EventJobFailed},
+		{"JobPodFailed", func(r *OCLEventRecorder) { r.RecordJobPodFailed(mosb, job, 3) }, "Warning", EventJobPodFailed},
 		{"JobDeleted", func(r *OCLEventRecorder) { r.RecordJobDeleted(mosb, job.Name) }, "Normal", EventJobDeleted},
 	}
 

@@ -261,9 +261,9 @@ func (b *buildReconciler) UpdateJob(ctx context.Context, oldJob, curJob *batchv1
 				b.eventRecorder.RecordJobCompleted(mosb, curJob)
 			}
 
-			if curJob.Status.Failed > 0 && (oldJob.Status.Failed == 0) {
-				klog.Errorf("in curJob.Status.Failed > 0 && (oldJob.Status.Failed == 0)")
-				b.eventRecorder.RecordJobFailed(mosb, curJob)
+			if curJob.Status.Failed > oldJob.Status.Failed && curJob.Status.Failed <= constants.JobMaxRetries {
+				klog.Errorf("in curJob.Status.Failed > oldJob.Status.Failed && curJob.Status.Failed <= constants.JobMaxRetries")
+				b.eventRecorder.RecordJobPodFailed(mosb, curJob, constants.JobMaxRetries)
 			}
 
 			if curJob.Status.Active > 0 && (oldJob.Status.Active == 0) {
