@@ -342,6 +342,7 @@ func buildFailedConditionsFromJob(job *batchv1.Job) []metav1.Condition {
 			break
 		}
 	}
+	message = fmt.Sprintf("Job %q failed after %d attempt(s): %s", job.Name, job.Status.Failed, message)
 	conditions := apihelpers.MachineOSBuildFailedConditions()
 	for i := range conditions {
 		if conditions[i].Type == string(mcfgv1.MachineOSBuildFailed) {
