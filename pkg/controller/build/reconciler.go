@@ -252,50 +252,41 @@ func (b *buildReconciler) AddJob(ctx context.Context, job *batchv1.Job) error {
 
 // Executes whenever a build Job is updated
 func (b *buildReconciler) UpdateJob(ctx context.Context, oldJob, curJob *batchv1.Job) error {
-	klog.Errorf("in UpdateJob")
 	return b.timeObjectOperation(curJob, updatingVerb, func() error {
 		mosb, err := b.getMachineOSBuildForJob(curJob)
 		if err == nil && mosb != nil {
 			if curJob.Status.Succeeded > 0 && (oldJob.Status.Succeeded == 0) {
-				klog.Errorf("in curJob.Status.Succeeded > 0 && (oldJob.Status.Succeeded == 0)")
 				b.eventRecorder.RecordJobCompleted(mosb, curJob)
 			}
 
 			if curJob.Status.Failed > oldJob.Status.Failed && curJob.Status.Failed <= constants.JobMaxRetries {
-				klog.Errorf("in curJob.Status.Failed > oldJob.Status.Failed && curJob.Status.Failed <= constants.JobMaxRetries")
 				b.eventRecorder.RecordJobPodFailed(mosb, curJob, constants.JobMaxRetries)
 			}
 
 			if curJob.Status.Failed > constants.JobMaxRetries && oldJob.Status.Failed <= constants.JobMaxRetries {
-				klog.Errorf("in curJob.Status.Failed > constants.JobMaxRetries && oldJob.Status.Failed <= constants.JobMaxRetries")
 				b.eventRecorder.RecordJobFailed(mosb, curJob)
 			}
 
 			if curJob.Status.Active > 0 && (oldJob.Status.Active == 0) {
-				klog.Errorf("in curJob.Status.Active > 0 && (oldJob.Status.Active == 0)")
 				b.eventRecorder.RecordJobStarted(mosb, curJob)
 				b.eventRecorder.RecordBuildBuilding(mosb)
 			}
 
 			mosc, err := utils.GetMachineOSConfigForMachineOSBuild(mosb, b.utilListers())
 			if err == nil {
-				klog.Errorf("in err == nil")
 				poolName := mosc.Spec.MachineConfigPool.Name
 
 				if curJob.Status.Succeeded > 0 && (oldJob.Status.Succeeded == 0) {
-					klog.Errorf("in curJob.Status.Succeeded > 0 && (oldJob.Status.Succeeded == 0)")
 					RecordBuildJobState(poolName, StateSucceeded)
 					RecordImagePushCompleted(poolName)
 				}
 
 				if curJob.Status.Failed > 0 && (oldJob.Status.Failed == 0) {
-					klog.Errorf("in curJob.Status.Failed > 0 && (oldJob.Status.Failed == 0)")
 					RecordBuildJobState(poolName, StateFailed)
 					RecordImagePushFailed(poolName)
 				}
 
 				if curJob.Status.Failed > oldJob.Status.Failed && curJob.Status.Failed <= constants.JobMaxRetries {
-					klog.Errorf("in curJob.Status.Failed > oldJob.Status.Failed && curJob.Status.Failed <= constants.JobMaxRetries")
 					RecordBuildRetry(poolName)
 				}
 			}
@@ -871,9 +862,7 @@ func (b *buildReconciler) getMachineOSBuildStatusForBuilder(ctx context.Context,
 // the decision off to setStatusOnMachineOSBuildIfNeeded.
 func (b *buildReconciler) updateMachineOSBuildWithStatusIfNeeded(ctx context.Context, oldBuilder, curBuilder metav1.Object) error {
 	oldStatus, _, err := b.getMachineOSBuildStatusForBuilder(ctx, oldBuilder)
-	klog.Errorf("oldStatus: %v", oldStatus)
 	if err != nil {
-		klog.Errorf("got err for getMachineOSBuildStatusForBuilder for old")
 		// If we can't find the MachineOSConfig, MachineOSBuild, or any of the
 		// ephemeral build objects, it means that it was probably deleted. Instead
 		// of trying to reconcile the status, we'll return nil here to avoid
@@ -882,9 +871,7 @@ func (b *buildReconciler) updateMachineOSBuildWithStatusIfNeeded(ctx context.Con
 	}
 
 	curStatus, mosb, err := b.getMachineOSBuildStatusForBuilder(ctx, curBuilder)
-	klog.Errorf("curStatus: %v", curStatus)
 	if err != nil {
-		klog.Errorf("got err for getMachineOSBuildStatusForBuilder for cur")
 		// If we can't find the MachineOSConfig, MachineOSBuild, or any of the
 		// ephemeral build objects, it means that it was probably deleted. Instead
 		// of trying to reconcile the status, we'll return nil here to avoid
@@ -923,11 +910,9 @@ func (b *buildReconciler) updateMachineOSBuildWithStatusIfNeeded(ctx context.Con
 
 // Sets the status on the MachineOSBuild object after comparing the statuses according to very specific state transitions.
 func (b *buildReconciler) setStatusOnMachineOSBuildIfNeeded(ctx context.Context, mosb *mcfgv1.MachineOSBuild, oldStatus, curStatus mcfgv1.MachineOSBuildStatus) error {
-	klog.Errorf("in setStatusOnMachineOSBuildIfNeeded")
 	// Compare the old status and the current status to determine if an update is
 	// needed. This is handled according to very specific state transitions.
 	isUpdateNeeded, reason := isMachineOSBuildStatusUpdateNeeded(oldStatus, curStatus)
-	klog.Errorf("isUpdateNeeded: %v", isUpdateNeeded)
 	if !isUpdateNeeded {
 		if reason != "" {
 			klog.Infof("MachineOSBuild %q %s; skipping update because of invalid transition", mosb.Name, reason)

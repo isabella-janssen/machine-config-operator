@@ -4,7 +4,6 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/machine-config-operator/pkg/apihelpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 )
 
 // This is intended to provide a singular way to interrogate MachineConfigPool
@@ -116,9 +115,7 @@ func (b *MachineOSBuildState) IsInInitialState() bool {
 
 // Determines if an OS image build is in its terminal state where build success, build failure, or build interrupted condition is set.
 func (b *MachineOSBuildState) IsInTerminalState() bool {
-	test := b.GetTerminalState()
-	klog.Errorf("test: %v", test)
-	return test != ""
+	return b.GetTerminalState() != ""
 }
 
 // Determines if an OS image build is in a transient state where it is either prepared, pending, or running.
@@ -140,7 +137,6 @@ func (b *MachineOSBuildState) GetTransientState() mcfgv1.BuildProgress {
 // Gets the current terminal state, if any is set. Otherwise, returns an empty string.
 func (b *MachineOSBuildState) GetTerminalState() mcfgv1.BuildProgress {
 	for terminalState := range MachineOSBuildTerminalStates() {
-		klog.Errorf("terminalState: %s", terminalState)
 		if apihelpers.IsMachineOSBuildConditionTrue(b.Build.Status.Conditions, terminalState) {
 			return terminalState
 		}
@@ -169,13 +165,11 @@ func (b *MachineOSBuildState) SetBuildConditions(conditions []metav1.Condition) 
 	for _, condition := range conditions {
 		condition := condition
 		currentCondition := apihelpers.GetMachineOSBuildCondition(b.Build.Status, mcfgv1.BuildProgress(condition.Type))
-		klog.Errorf("SetBuildConditions currentCondition %v", currentCondition)
 		if currentCondition != nil && isConditionEqual(*currentCondition, condition) {
 			continue
 		}
 
 		mosbCondition := apihelpers.NewMachineOSBuildCondition(condition.Type, condition.Status, condition.Reason, condition.Message)
-		klog.Errorf("SetBuildConditions mosbCondition %v", mosbCondition)
 		apihelpers.SetMachineOSBuildCondition(&b.Build.Status, *mosbCondition)
 	}
 }
