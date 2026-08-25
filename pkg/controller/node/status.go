@@ -134,7 +134,7 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 		// When the ImageModeStatusReporting feature gate is enabled, determine if the machine is
 		// updated or degraded based on the MCN conditions.
 		if !imageModeReportingIsEnabled {
-			isUpdated, isDegraded, reasons := getMachineStateAndDegradeReasonFromMCN(mcn, ourNode)
+			isUpdated, isDegraded, reasons := getMachineStateAndDegradeReasonFromMCN(mcn, ourNode, pool, mosc, mosb, isLayeredPool)
 			if isDegraded {
 				degradedMachines = append(degradedMachines, ourNode)
 				degradedReasons = append(degradedReasons, reasons...)
@@ -404,7 +404,7 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 // getMachineStateAndDegradeReasonFromMCN loops through the MCN conditions of a node to determine
 // if it should be considered "Updated" or "Degraded" in the MCP status and collect the degrade
 // reasons, if applicable.
-func getMachineStateAndDegradeReasonFromMCN(mcn *mcfgv1.MachineConfigNode, node *corev1.Node) (isUpdated, isDegraded bool, degradedReasons []string) {
+func getMachineStateAndDegradeReasonFromMCN(mcn *mcfgv1.MachineConfigNode, node *corev1.Node, mcp *mcfgv1.MachineConfigPool, mosc *mcfgv1.MachineOSConfig, mosb *mcfgv1.MachineOSBuild, layered bool) (isUpdated, isDegraded bool, degradedReasons []string) {
 	// Loop through the MCN conditions to determine if the associated node is updating, updated, or degraded
 	for _, cond := range mcn.Status.Conditions {
 		// Handle the case when the node is degraded
@@ -426,7 +426,7 @@ func getMachineStateAndDegradeReasonFromMCN(mcn *mcfgv1.MachineConfigNode, node 
 		// 	  required to ensure no regressions occur in migrating to the MCN driven MCP
 		// 	  updates, since "Updated" in the MCN does not flip from "True" until a node
 		// 	  starts updating.
-		if mcfgv1.StateProgress(cond.Type) == mcfgv1.MachineConfigNodeUpdated && cond.Status == metav1.ConditionTrue && ctrlcommon.IsMachineUpdatedMCN(mcn, pool, mosc, mosb, isLayeredPool) {
+		if mcfgv1.StateProgress(cond.Type) == mcfgv1.MachineConfigNodeUpdated && cond.Status == metav1.ConditionTrue && ctrlcommon.IsMachineUpdatedMCN(mcn, mcp, mosc, mosb, layered) {
 			isUpdated = true
 		}
 	}
