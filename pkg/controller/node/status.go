@@ -133,7 +133,7 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 
 		// When the ImageModeStatusReporting feature gate is enabled, determine if the machine is
 		// updated or degraded based on the MCN conditions.
-		if !imageModeReportingIsEnabled {
+		if imageModeReportingIsEnabled {
 			isUpdated, isDegraded, reasons := getMachineStateAndDegradeReasonFromMCN(mcn, ourNode, pool, mosc, mosb, isLayeredPool)
 			if isDegraded {
 				degradedMachines = append(degradedMachines, ourNode)
