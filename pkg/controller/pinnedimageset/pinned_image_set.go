@@ -408,6 +408,10 @@ func (ctrl *Controller) syncPinnedImageSets(pool *mcfgv1.MachineConfigPool, imag
 		pinnedImageSetRefs = nil
 	}
 
+	if reflect.DeepEqual(pool.Spec.PinnedImageSets, pinnedImageSetRefs) {
+		return nil
+	}
+
 	newPool := pool.DeepCopy()
 	newPool.Spec.PinnedImageSets = pinnedImageSetRefs
 	_, err := ctrl.client.MachineconfigurationV1().MachineConfigPools().Update(context.TODO(), newPool, metav1.UpdateOptions{})
