@@ -53,10 +53,8 @@ func (ctrl *Controller) syncStatusOnly(pool *mcfgv1.MachineConfigPool) error {
 
 	newStatus := ctrl.calculateStatus(machineConfigStates, cc, freshPool, nodes, mosc, mosb)
 	if equality.Semantic.DeepEqual(freshPool.Status, newStatus) {
-		klog.Infof("syncStatusOnly pool %q: status unchanged, skipping update", freshPool.Name)
 		return nil
 	}
-	klog.Infof("syncStatusOnly pool %q: status changed, applying update", freshPool.Name)
 
 	newPool := freshPool.DeepCopy()
 	newPool.Status = newStatus
@@ -315,7 +313,6 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 	// Update degrade condition
 	var nodeDegraded bool
 	var nodeDegradedMessage string
-	klog.Infof("calculateStatus pool %q: degradedMachineCount=%d pinnedImageSetsDegraded=%v", pool.Name, degradedMachineCount, pinnedImageSetsDegraded)
 	for _, m := range degradedMachines {
 		klog.Infof("Degraded Machine: %v and Degraded Reason: %v", m.Name, m.Annotations[daemonconsts.MachineConfigDaemonReasonAnnotationKey])
 	}
@@ -338,7 +335,6 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 	// set Degraded. For now, the node_controller understand NodeDegraded & RenderDegraded & BuildDegraded = Degraded.
 	renderDegraded := apihelpers.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolRenderDegraded)
 	buildDegraded := apihelpers.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolImageBuildDegraded)
-	klog.Infof("calculateStatus pool %q: nodeDegraded=%v renderDegraded=%v buildDegraded=%v pinnedImageSetsDegraded=%v (pre-buildDegraded switch)", pool.Name, nodeDegraded, renderDegraded, buildDegraded, pinnedImageSetsDegraded)
 
 	// Clear BuildDegraded condition in several scenarios to prevent stale degraded state:
 	// 1. Active build (building or prepared) - new build started
@@ -379,7 +375,6 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 		}
 	}
 
-	klog.Infof("calculateStatus pool %q: nodeDegraded=%v renderDegraded=%v buildDegraded=%v pinnedImageSetsDegraded=%v (final Degraded evaluation)", pool.Name, nodeDegraded, renderDegraded, buildDegraded, pinnedImageSetsDegraded)
 	if nodeDegraded || renderDegraded || buildDegraded || pinnedImageSetsDegraded {
 		sdegraded := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolDegraded, corev1.ConditionTrue, "", "")
 		if nodeDegraded {
@@ -387,10 +382,8 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 		} else if buildDegraded {
 			sdegraded.Message = "Custom OS image build failed"
 		}
-		klog.Infof("calculateStatus pool %q: setting MachineConfigPoolDegraded=True (nodeDegraded=%v renderDegraded=%v buildDegraded=%v pinnedImageSetsDegraded=%v)", pool.Name, nodeDegraded, renderDegraded, buildDegraded, pinnedImageSetsDegraded)
 		apihelpers.SetMachineConfigPoolCondition(&status, *sdegraded)
 	} else {
-		klog.Infof("calculateStatus pool %q: setting MachineConfigPoolDegraded=False", pool.Name)
 		sdegraded := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolDegraded, corev1.ConditionFalse, "", "")
 		apihelpers.SetMachineConfigPoolCondition(&status, *sdegraded)
 	}
