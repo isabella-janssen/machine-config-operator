@@ -373,6 +373,12 @@ func (ctrl *Controller) syncAvailableStatus(pool *mcfgv1.MachineConfigPool) erro
 	if apihelpers.IsMachineConfigPoolConditionFalse(pool.Status.Conditions, mcfgv1.MachineConfigPoolPinnedImageSetsDegraded) {
 		return nil
 	}
+	// Don't clear PinnedImageSetsDegraded while node-level PIS failures are active.
+	// The node controller sets this condition when NodeDegraded=True; clearing it here
+	// would create a write conflict loop between the two controllers.
+	if apihelpers.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolNodeDegraded) {
+		return nil
+	}
 	sdegraded := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolPinnedImageSetsDegraded, corev1.ConditionFalse, "", "")
 	apihelpers.SetMachineConfigPoolCondition(&pool.Status, *sdegraded)
 	if _, err := ctrl.client.MachineconfigurationV1().MachineConfigPools().UpdateStatus(context.TODO(), pool, metav1.UpdateOptions{}); err != nil {
