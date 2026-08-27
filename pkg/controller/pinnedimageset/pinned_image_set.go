@@ -363,10 +363,10 @@ func (ctrl *Controller) syncMachineConfigPool(key string) error {
 
 	if err := ctrl.syncPinnedImageSets(pool, imageSets); err != nil {
 		klog.Errorf("Error syncing pinned image sets: %v", err)
-		return ctrl.syncFailingStatus(pool, err)
+		return err
 	}
 
-	return ctrl.syncAvailableStatus(pool)
+	return nil
 }
 
 func (ctrl *Controller) syncAvailableStatus(pool *mcfgv1.MachineConfigPool) error {

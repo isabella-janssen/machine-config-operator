@@ -321,13 +321,22 @@ func (ctrl *Controller) calculateStatus(mcns []*mcfgv1.MachineConfigNode, cconfi
 		sdegraded := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolNodeDegraded, corev1.ConditionTrue, fmt.Sprintf("%d nodes are reporting degraded status on sync", len(degradedMachines)), strings.Join(degradedReasons, ", "))
 		nodeDegradedMessage = sdegraded.Message
 		apihelpers.SetMachineConfigPoolCondition(&status, *sdegraded)
-		if pinnedImageSetsDegraded {
-			pisDegraded := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolPinnedImageSetsDegraded, corev1.ConditionTrue, "one or more pinned image set is reporting degraded", strings.Join(degradedReasons, ", "))
-			apihelpers.SetMachineConfigPoolCondition(&status, *pisDegraded)
-		}
 	} else {
 		sdegraded := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolNodeDegraded, corev1.ConditionFalse, "", "")
 		apihelpers.SetMachineConfigPoolCondition(&status, *sdegraded)
+	}
+
+	// The node controller is the sole owner of PinnedImageSetsDegraded when ImageModeStatusReporting
+	// is enabled. Setting it unconditionally (True or False) ensures stale True values are cleared
+	// when PIS failures resolve, without depending on the PIS controller to clear it.
+	if imageModeReportingIsEnabled {
+		if pinnedImageSetsDegraded {
+			pisDegraded := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolPinnedImageSetsDegraded, corev1.ConditionTrue, "one or more pinned image set is reporting degraded", strings.Join(degradedReasons, ", "))
+			apihelpers.SetMachineConfigPoolCondition(&status, *pisDegraded)
+		} else {
+			pisClear := apihelpers.NewMachineConfigPoolCondition(mcfgv1.MachineConfigPoolPinnedImageSetsDegraded, corev1.ConditionFalse, "", "")
+			apihelpers.SetMachineConfigPoolCondition(&status, *pisClear)
+		}
 	}
 
 	// here we now set the MCP Degraded field, the node_controller is the one making the call right now
