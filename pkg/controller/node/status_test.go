@@ -1309,6 +1309,148 @@ func TestCalculateStatus(t *testing.T) {
 				}
 			},
 		},
+		{
+			// Regression test for mco-2572: a pool where all machines are updated should be
+			// considered Updated even if one node is NotReady or unavailable.
+			name: "all nodes updated, 1 node not ready — pool should be Updated",
+			nodes: []*corev1.Node{
+				helpers.NewNodeWithReady("node-0", machineConfigV1, machineConfigV1, corev1.ConditionFalse),
+				helpers.NewNodeWithReady("node-1", machineConfigV1, machineConfigV1, corev1.ConditionTrue),
+				helpers.NewNodeWithReady("node-2", machineConfigV1, machineConfigV1, corev1.ConditionTrue),
+			},
+			currentConfig: machineConfigV1,
+			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
+				if got, want := status.MachineCount, int32(3); got != want {
+					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
+				}
+				if got, want := status.UpdatedMachineCount, int32(3); got != want {
+					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
+				}
+				if got, want := status.ReadyMachineCount, int32(2); got != want {
+					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
+				}
+				if got, want := status.UnavailableMachineCount, int32(1); got != want {
+					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
+				}
+				if got, want := status.DegradedMachineCount, int32(0); got != want {
+					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
+				}
+
+				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
+				if condupdated == nil {
+					t.Fatal("updated condition not found")
+				}
+				if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
+					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
+				}
+
+				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
+				if condupdating == nil {
+					t.Fatal("updating condition not found")
+				}
+				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
+					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
+				}
+
+				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
+				if conddegraded == nil {
+					t.Fatal("degraded condition not found")
+				}
+				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
+					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
+				}
+			},
+		},
+		{
+			// When not all machines are updated, the pool should not be Updated even if one
+			// node is also NotReady — the not-updated count drives the result.
+			name: "1 node not ready and not updated, 1 node updated — pool should not be Updated",
+			nodes: []*corev1.Node{
+				helpers.NewNodeWithReady("node-0", machineConfigV0, machineConfigV0, corev1.ConditionFalse),
+				helpers.NewNodeWithReady("node-1", machineConfigV1, machineConfigV1, corev1.ConditionTrue),
+			},
+			currentConfig: machineConfigV1,
+			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
+				if got, want := status.MachineCount, int32(2); got != want {
+					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
+				}
+				if got, want := status.UpdatedMachineCount, int32(1); got != want {
+					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
+				}
+				if got, want := status.DegradedMachineCount, int32(0); got != want {
+					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
+				}
+
+				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
+				if condupdated == nil {
+					t.Fatal("updated condition not found")
+				}
+				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
+					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
+				}
+
+				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
+				if condupdating == nil {
+					t.Fatal("updating condition not found")
+				}
+				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
+					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
+				}
+
+				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
+				if conddegraded == nil {
+					t.Fatal("degraded condition not found")
+				}
+				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
+					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
+				}
+			},
+		},
+		{
+			// A NotReady-but-updated node combined with a degraded node should leave the pool
+			// not Updated and Degraded — the degraded node prevents full convergence.
+			name: "1 node not ready (updated), 1 node degraded — pool should not be Updated and should be Degraded",
+			nodes: []*corev1.Node{
+				helpers.NewNodeWithReady("node-0", machineConfigV1, machineConfigV1, corev1.ConditionFalse),
+				newNodeWithReadyAndDaemonState("node-1", machineConfigV0, machineConfigV1, corev1.ConditionTrue, daemonconsts.MachineConfigDaemonStateDegraded),
+			},
+			currentConfig: machineConfigV1,
+			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
+				if got, want := status.MachineCount, int32(2); got != want {
+					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
+				}
+				if got, want := status.UpdatedMachineCount, int32(1); got != want {
+					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
+				}
+				if got, want := status.DegradedMachineCount, int32(1); got != want {
+					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
+				}
+
+				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
+				if condupdated == nil {
+					t.Fatal("updated condition not found")
+				}
+				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
+					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
+				}
+
+				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
+				if condupdating == nil {
+					t.Fatal("updating condition not found")
+				}
+				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
+					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
+				}
+
+				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
+				if conddegraded == nil {
+					t.Fatal("degraded condition not found")
+				}
+				if got, want := conddegraded.Status, corev1.ConditionTrue; got != want {
+					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
+				}
+			},
+		},
 	}
 	for idx, test := range tests {
 		idx := idx
@@ -2209,6 +2351,61 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 				t.Fatal("updating condition not found")
 			}
 
+			if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
+				t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
+			}
+		},
+	}, {
+		// Regression test for mco-2572: with ImageModeStatusReporting enabled, a pool where
+		// all MCNs report Updated=True should be considered Updated even if one node is NotReady.
+		name: "all nodes updated (via MCN), 1 node not ready — pool should be Updated",
+		nodes: []*corev1.Node{
+			helpers.NewNodeWithReadyAndDaemonStateAndImageAnnos("node-0", machineConfigV1, machineConfigV1, "registry.host.com/org/repo@sha256:12345", "registry.host.com/org/repo@sha256:12345", daemonconsts.MachineConfigDaemonStateDone, corev1.ConditionFalse),
+			helpers.NewNodeWithReadyAndDaemonStateAndImageAnnos("node-1", machineConfigV1, machineConfigV1, "registry.host.com/org/repo@sha256:12345", "registry.host.com/org/repo@sha256:12345", daemonconsts.MachineConfigDaemonStateDone, corev1.ConditionTrue),
+			helpers.NewNodeWithReadyAndDaemonStateAndImageAnnos("node-2", machineConfigV1, machineConfigV1, "registry.host.com/org/repo@sha256:12345", "registry.host.com/org/repo@sha256:12345", daemonconsts.MachineConfigDaemonStateDone, corev1.ConditionTrue),
+		},
+		mcns: []*mcfgv1.MachineConfigNode{
+			helpers.NewMachineConfigNode("node-0", "worker", machineConfigV1, "registry.host.com/org/repo@sha256:12345", true, false),
+			helpers.NewMachineConfigNode("node-1", "worker", machineConfigV1, "registry.host.com/org/repo@sha256:12345", true, false),
+			helpers.NewMachineConfigNode("node-2", "worker", machineConfigV1, "registry.host.com/org/repo@sha256:12345", true, false),
+		},
+		currentConfig: machineConfigV1,
+		overrideMosb:  true,
+		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithDigestedImagePushspec("registry.host.com/org/repo@sha256:12345").WithSuccessfulBuild().MachineOSBuild(),
+		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
+			if got, want := status.MachineCount, int32(3); got != want {
+				t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
+			}
+			if got, want := status.UpdatedMachineCount, int32(3); got != want {
+				t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
+			}
+			if got, want := status.ReadyMachineCount, int32(2); got != want {
+				t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
+			}
+			if got, want := status.UnavailableMachineCount, int32(1); got != want {
+				t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
+			}
+
+			condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
+			if condupdated == nil {
+				t.Fatal("updated condition not found")
+			}
+			if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
+				t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
+			}
+
+			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
+			if condupdating == nil {
+				t.Fatal("updating condition not found")
+			}
+			if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
+				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
+			}
+
+			conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
+			if conddegraded == nil {
+				t.Fatal("degraded condition not found")
+			}
 			if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
 				t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
 			}
