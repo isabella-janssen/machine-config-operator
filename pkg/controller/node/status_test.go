@@ -19,6 +19,67 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ptr returns a pointer to v. Used to populate optional fields in expectedPoolStatus.
+func ptr[T any](v T) *T { return &v }
+
+// expectedPoolStatus holds the expected values for assertPoolStatus. Fields that
+// are nil / zero/"" are skipped.
+type expectedPoolStatus struct {
+	machineCount            *int32
+	updatedMachineCount     *int32
+	readyMachineCount       *int32
+	unavailableMachineCount *int32
+	degradedMachineCount    *int32
+	updated                 corev1.ConditionStatus // "" = don't check
+	updating                corev1.ConditionStatus // "" = don't check
+	degraded                corev1.ConditionStatus // "" = don't check
+	updatingMsg             string                 // "" = don't check
+	osImageStreamName       *string                // nil = don't check
+}
+
+func assertPoolStatus(t *testing.T, status mcfgv1.MachineConfigPoolStatus, want expectedPoolStatus) {
+	t.Helper()
+	if want.machineCount != nil {
+		assert.Equal(t, *want.machineCount, status.MachineCount, "MachineCount")
+	}
+	if want.updatedMachineCount != nil {
+		assert.Equal(t, *want.updatedMachineCount, status.UpdatedMachineCount, "UpdatedMachineCount")
+	}
+	if want.readyMachineCount != nil {
+		assert.Equal(t, *want.readyMachineCount, status.ReadyMachineCount, "ReadyMachineCount")
+	}
+	if want.unavailableMachineCount != nil {
+		assert.Equal(t, *want.unavailableMachineCount, status.UnavailableMachineCount, "UnavailableMachineCount")
+	}
+	if want.degradedMachineCount != nil {
+		assert.Equal(t, *want.degradedMachineCount, status.DegradedMachineCount, "DegradedMachineCount")
+	}
+	if want.updated != "" {
+		cond := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
+		if assert.NotNil(t, cond, "Updated condition not found") {
+			assert.Equal(t, want.updated, cond.Status, "Updated condition")
+		}
+	}
+	if want.updating != "" {
+		cond := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
+		if assert.NotNil(t, cond, "Updating condition not found") {
+			assert.Equal(t, want.updating, cond.Status, "Updating condition")
+			if want.updatingMsg != "" {
+				assert.Equal(t, want.updatingMsg, cond.Message, "Updating condition message")
+			}
+		}
+	}
+	if want.degraded != "" {
+		cond := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
+		if assert.NotNil(t, cond, "Degraded condition not found") {
+			assert.Equal(t, want.degraded, cond.Status, "Degraded condition")
+		}
+	}
+	if want.osImageStreamName != nil {
+		assert.Equal(t, *want.osImageStreamName, status.OSImageStream.Name, "OSImageStream.Name")
+	}
+}
+
 func TestIsNodeReady(t *testing.T) {
 	nodeList := &corev1.NodeList{
 		Items: []corev1.Node{
@@ -295,52 +356,16 @@ func TestCalculateStatus(t *testing.T) {
 			},
 			currentConfig: machineConfigV1,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UpdatedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.ReadyMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UnavailableMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.DegradedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(0)),
+					readyMachineCount:       ptr(int32(0)),
+					unavailableMachineCount: ptr(int32(0)),
+					degradedMachineCount:    ptr(int32(0)),
+					updated:                 corev1.ConditionFalse,
+					updating:                corev1.ConditionTrue,
+					degraded:                corev1.ConditionFalse,
+				})
 			},
 		},
 		{
@@ -352,52 +377,16 @@ func TestCalculateStatus(t *testing.T) {
 			},
 			currentConfig: machineConfigV1,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UpdatedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.ReadyMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UnavailableMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.DegradedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(0)),
+					readyMachineCount:       ptr(int32(0)),
+					unavailableMachineCount: ptr(int32(1)),
+					degradedMachineCount:    ptr(int32(0)),
+					updated:                 corev1.ConditionFalse,
+					updating:                corev1.ConditionTrue,
+					degraded:                corev1.ConditionFalse,
+				})
 			},
 		},
 		{
@@ -410,49 +399,16 @@ func TestCalculateStatus(t *testing.T) {
 			currentConfig: machineConfigV1,
 			paused:        true,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UpdatedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.ReadyMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UnavailableMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.DegradedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(0)),
+					readyMachineCount:       ptr(int32(0)),
+					unavailableMachineCount: ptr(int32(1)),
+					degradedMachineCount:    ptr(int32(0)),
+					updated:                 corev1.ConditionFalse,
+					updating:                corev1.ConditionFalse,
+					degraded:                corev1.ConditionFalse,
+				})
 			},
 		},
 		{
@@ -467,14 +423,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          nil,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is paused; waiting for a new OS image build to start (mosc: mosc-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionTrue,
+					updatingMsg: "Pool is paused; waiting for a new OS image build to start (mosc: mosc-1)",
+				})
 			},
 		},
 		{
@@ -489,14 +441,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithBuildInitialState().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is paused; OS image build has been created but not yet started (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionTrue,
+					updatingMsg: "Pool is paused; OS image build has been created but not yet started (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -511,14 +459,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithBuildPrepared().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is paused; OS image build has been prepared but will not rollout (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionTrue,
+					updatingMsg: "Pool is paused; OS image build has been prepared but will not rollout (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -533,14 +477,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithBuildInProgress().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is paused; OS image build in progress (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionTrue,
+					updatingMsg: "Pool is paused; OS image build in progress (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -555,14 +495,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithFailedBuild().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is paused; OS image build failed (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionFalse,
+					updatingMsg: "Pool is paused; OS image build failed (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -577,14 +513,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithInterruptedBuild().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is paused; OS image build was interrupted (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionFalse,
+					updatingMsg: "Pool is paused; OS image build was interrupted (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -599,14 +531,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithSuccessfulBuild().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is paused; OS image build completed successfully (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionFalse,
+					updatingMsg: "Pool is paused; OS image build completed successfully (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -620,14 +548,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          nil,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is waiting for a new OS image build to start (mosc: mosc-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionTrue,
+					updatingMsg: "Pool is waiting for a new OS image build to start (mosc: mosc-1)",
+				})
 			},
 		},
 		{
@@ -641,14 +565,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithBuildPrepared().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is waiting for OS image build to start (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionTrue,
+					updatingMsg: "Pool is waiting for OS image build to start (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -662,14 +582,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithBuildInProgress().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is waiting for OS image build to complete (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionTrue,
+					updatingMsg: "Pool is waiting for OS image build to complete (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -683,14 +599,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithFailedBuild().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool update stopped due to OS image build failure (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionFalse,
+					updatingMsg: "Pool update stopped due to OS image build failure (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -704,14 +616,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithInterruptedBuild().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool update stopped due to OS image build being interrupted (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionFalse,
+					updatingMsg: "Pool update stopped due to OS image build being interrupted (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -725,14 +633,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithBuildInitialState().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is waiting for OS image build to start (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionTrue,
+					updatingMsg: "Pool is waiting for OS image build to start (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -746,14 +650,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithSuccessfulBuild().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-				assert.Equal(t, "Pool is waiting for nodes to apply OS image (mosb: mosb-1)", condupdating.Message)
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:    corev1.ConditionTrue,
+					updatingMsg: "Pool is waiting for nodes to apply OS image (mosb: mosb-1)",
+				})
 			},
 		},
 		{
@@ -767,20 +667,10 @@ func TestCalculateStatus(t *testing.T) {
 			overrideMosb:  true,
 			mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithDigestedImagePushspec("registry.host.com/org/repo@sha256:12345").WithSuccessfulBuild().MachineOSBuild(),
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updated:  corev1.ConditionTrue,
+					updating: corev1.ConditionFalse,
+				})
 			},
 		},
 		{
@@ -792,52 +682,16 @@ func TestCalculateStatus(t *testing.T) {
 			},
 			currentConfig: machineConfigV1,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UpdatedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.ReadyMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UnavailableMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.DegradedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(0)),
+					readyMachineCount:       ptr(int32(0)),
+					unavailableMachineCount: ptr(int32(1)),
+					degradedMachineCount:    ptr(int32(0)),
+					updated:                 corev1.ConditionFalse,
+					updating:                corev1.ConditionTrue,
+					degraded:                corev1.ConditionFalse,
+				})
 			},
 		},
 		{
@@ -849,52 +703,16 @@ func TestCalculateStatus(t *testing.T) {
 			},
 			currentConfig: machineConfigV1,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UpdatedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.ReadyMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UnavailableMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.DegradedMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("updating condition not found")
-				}
-
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := conddegraded.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(0)),
+					readyMachineCount:       ptr(int32(0)),
+					unavailableMachineCount: ptr(int32(1)),
+					degradedMachineCount:    ptr(int32(1)),
+					updated:                 corev1.ConditionFalse,
+					updating:                corev1.ConditionTrue,
+					degraded:                corev1.ConditionTrue,
+				})
 			},
 		},
 		{
@@ -906,52 +724,16 @@ func TestCalculateStatus(t *testing.T) {
 			},
 			currentConfig: machineConfigV1,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UpdatedMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.ReadyMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UnavailableMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.DegradedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(1)),
+					readyMachineCount:       ptr(int32(0)),
+					unavailableMachineCount: ptr(int32(1)),
+					degradedMachineCount:    ptr(int32(0)),
+					updated:                 corev1.ConditionFalse,
+					updating:                corev1.ConditionTrue,
+					degraded:                corev1.ConditionFalse,
+				})
 			},
 		},
 		{
@@ -963,52 +745,16 @@ func TestCalculateStatus(t *testing.T) {
 			},
 			currentConfig: machineConfigV1,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UpdatedMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.ReadyMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UnavailableMachineCount, int32(2); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.DegradedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(1)),
+					readyMachineCount:       ptr(int32(1)),
+					unavailableMachineCount: ptr(int32(2)),
+					degradedMachineCount:    ptr(int32(0)),
+					updated:                 corev1.ConditionFalse,
+					updating:                corev1.ConditionTrue,
+					degraded:                corev1.ConditionFalse,
+				})
 			},
 		},
 		{
@@ -1020,52 +766,16 @@ func TestCalculateStatus(t *testing.T) {
 			},
 			currentConfig: machineConfigV1,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UpdatedMachineCount, int32(3); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.ReadyMachineCount, int32(3); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UnavailableMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.DegradedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-
-				if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(3)),
+					readyMachineCount:       ptr(int32(3)),
+					unavailableMachineCount: ptr(int32(0)),
+					degradedMachineCount:    ptr(int32(0)),
+					updated:                 corev1.ConditionTrue,
+					updating:                corev1.ConditionFalse,
+					degraded:                corev1.ConditionFalse,
+				})
 			},
 		},
 		{
@@ -1077,44 +787,15 @@ func TestCalculateStatus(t *testing.T) {
 			},
 			currentConfig: machineConfigV0,
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UpdatedMachineCount, int32(3); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.ReadyMachineCount, int32(3); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-
-				if got, want := status.UnavailableMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-
-				if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				// When OSImageStream CR does not exist, status.OSImageStream should be empty
-				if got, want := status.OSImageStream.Name, ""; got != want {
-					t.Fatalf("mismatch OSImageStream.Name: got %q want: %q - OSImageStream should be empty when CR does not exist", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(3)),
+					readyMachineCount:       ptr(int32(3)),
+					unavailableMachineCount: ptr(int32(0)),
+					updated:                 corev1.ConditionTrue,
+					updating:                corev1.ConditionFalse,
+					osImageStreamName:       ptr(""),
+				})
 			},
 		},
 		{
@@ -1132,27 +813,11 @@ func TestCalculateStatus(t *testing.T) {
 				{Type: mcfgv1.MachineConfigPoolDegraded, Status: corev1.ConditionFalse},
 			},
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				// Verify pool is fully updated
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
-
-				// OSImageStream status should be populated with the matching stream
-				if got, want := status.OSImageStream.Name, "rhel-9"; got != want {
-					t.Fatalf("mismatch OSImageStream.Name: got %q want: %q", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updated:           corev1.ConditionTrue,
+					degraded:          corev1.ConditionFalse,
+					osImageStreamName: ptr("rhel-9"),
+				})
 			},
 		},
 		{
@@ -1170,19 +835,10 @@ func TestCalculateStatus(t *testing.T) {
 				{Type: mcfgv1.MachineConfigPoolDegraded, Status: corev1.ConditionFalse},
 			},
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				// Verify pool is fully updated
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				// OSImageStream status should be empty (override scenario)
-				if got, want := status.OSImageStream.Name, ""; got != want {
-					t.Fatalf("mismatch OSImageStream.Name: got %q want: %q - should be empty for override scenario", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updated:           corev1.ConditionTrue,
+					osImageStreamName: ptr(""),
+				})
 			},
 		},
 		{
@@ -1196,27 +852,11 @@ func TestCalculateStatus(t *testing.T) {
 			needsOSImageStreamSetup: true,
 			// No initialConditions - let calculateStatus set them based on node states
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				// Verify pool is updating
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				// OSImageStream status should be empty when pool is updating
-				if got, want := status.OSImageStream.Name, ""; got != want {
-					t.Fatalf("mismatch OSImageStream.Name: got %q want: %q - should be empty when updating", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updating:          corev1.ConditionTrue,
+					updated:           corev1.ConditionFalse,
+					osImageStreamName: ptr(""),
+				})
 			},
 		},
 		{
@@ -1234,19 +874,10 @@ func TestCalculateStatus(t *testing.T) {
 				{Type: mcfgv1.MachineConfigPoolDegraded, Status: corev1.ConditionTrue},
 			},
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				// Verify pool is degraded
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-				if got, want := conddegraded.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
-
-				// OSImageStream status should be empty when pool is degraded
-				if got, want := status.OSImageStream.Name, ""; got != want {
-					t.Fatalf("mismatch OSImageStream.Name: got %q want: %q - should be empty when degraded", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					degraded:          corev1.ConditionTrue,
+					osImageStreamName: ptr(""),
+				})
 			},
 		},
 		{
@@ -1264,19 +895,71 @@ func TestCalculateStatus(t *testing.T) {
 				{Type: mcfgv1.MachineConfigPoolDegraded, Status: corev1.ConditionFalse},
 			},
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				// Verify pool is fully updated
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				// OSImageStream status should be empty when osImageURL is empty
-				if got, want := status.OSImageStream.Name, ""; got != want {
-					t.Fatalf("mismatch OSImageStream.Name: got %q want: %q - should be empty when osImageURL is empty", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updated:           corev1.ConditionTrue,
+					osImageStreamName: ptr(""),
+				})
+			},
+		},
+		{
+			// Regression test for mco-2572: a pool where all machines are updated should be
+			// considered Updated even if one node is NotReady or unavailable.
+			name: "all nodes updated, 1 node not ready — pool should be Updated",
+			nodes: []*corev1.Node{
+				helpers.NewNodeWithReady("node-0", machineConfigV1, machineConfigV1, corev1.ConditionFalse),
+				helpers.NewNodeWithReady("node-1", machineConfigV1, machineConfigV1, corev1.ConditionTrue),
+				helpers.NewNodeWithReady("node-2", machineConfigV1, machineConfigV1, corev1.ConditionTrue),
+			},
+			currentConfig: machineConfigV1,
+			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:            ptr(int32(3)),
+					updatedMachineCount:     ptr(int32(3)),
+					readyMachineCount:       ptr(int32(2)),
+					unavailableMachineCount: ptr(int32(1)),
+					degradedMachineCount:    ptr(int32(0)),
+					updated:                 corev1.ConditionTrue,
+					updating:                corev1.ConditionFalse,
+					degraded:                corev1.ConditionFalse,
+				})
+			},
+		},
+		{
+			// When not all machines are updated, the pool should not be Updated even if one
+			// node is also NotReady — the not-updated count drives the result.
+			name: "1 node not ready and not updated, 1 node updated — pool should not be Updated",
+			nodes: []*corev1.Node{
+				helpers.NewNodeWithReady("node-0", machineConfigV0, machineConfigV0, corev1.ConditionFalse),
+				helpers.NewNodeWithReady("node-1", machineConfigV1, machineConfigV1, corev1.ConditionTrue),
+			},
+			currentConfig: machineConfigV1,
+			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:         ptr(int32(2)),
+					updatedMachineCount:  ptr(int32(1)),
+					degradedMachineCount: ptr(int32(0)),
+					updated:              corev1.ConditionFalse,
+					updating:             corev1.ConditionTrue,
+					degraded:             corev1.ConditionFalse,
+				})
+			},
+		},
+		{
+			name: "1 node not ready but updated, 1 node degraded; pool should not be Updated and should be Degraded",
+			nodes: []*corev1.Node{
+				helpers.NewNodeWithReady("node-0", machineConfigV1, machineConfigV1, corev1.ConditionFalse),
+				newNodeWithReadyAndDaemonState("node-1", machineConfigV0, machineConfigV1, corev1.ConditionTrue, daemonconsts.MachineConfigDaemonStateDegraded),
+			},
+			currentConfig: machineConfigV1,
+			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
+				assertPoolStatus(t, status, expectedPoolStatus{
+					machineCount:         ptr(int32(2)),
+					updatedMachineCount:  ptr(int32(1)),
+					degradedMachineCount: ptr(int32(1)),
+					updated:              corev1.ConditionFalse,
+					updating:             corev1.ConditionTrue,
+					degraded:             corev1.ConditionTrue,
+				})
 			},
 		},
 		{
@@ -1294,161 +977,10 @@ func TestCalculateStatus(t *testing.T) {
 				{Type: mcfgv1.MachineConfigPoolDegraded, Status: corev1.ConditionFalse},
 			},
 			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				// Verify pool is fully updated
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				// OSImageStream status should match the second stream (rhel-10)
-				if got, want := status.OSImageStream.Name, "rhel-10"; got != want {
-					t.Fatalf("mismatch OSImageStream.Name: got %q want: %q", got, want)
-				}
-			},
-		},
-		{
-			// Regression test for mco-2572: a pool where all machines are updated should be
-			// considered Updated even if one node is NotReady or unavailable.
-			name: "all nodes updated, 1 node not ready — pool should be Updated",
-			nodes: []*corev1.Node{
-				helpers.NewNodeWithReady("node-0", machineConfigV1, machineConfigV1, corev1.ConditionFalse),
-				helpers.NewNodeWithReady("node-1", machineConfigV1, machineConfigV1, corev1.ConditionTrue),
-				helpers.NewNodeWithReady("node-2", machineConfigV1, machineConfigV1, corev1.ConditionTrue),
-			},
-			currentConfig: machineConfigV1,
-			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(3); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-				if got, want := status.UpdatedMachineCount, int32(3); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-				if got, want := status.ReadyMachineCount, int32(2); got != want {
-					t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-				}
-				if got, want := status.UnavailableMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-				}
-				if got, want := status.DegradedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
-			},
-		},
-		{
-			// When not all machines are updated, the pool should not be Updated even if one
-			// node is also NotReady — the not-updated count drives the result.
-			name: "1 node not ready and not updated, 1 node updated — pool should not be Updated",
-			nodes: []*corev1.Node{
-				helpers.NewNodeWithReady("node-0", machineConfigV0, machineConfigV0, corev1.ConditionFalse),
-				helpers.NewNodeWithReady("node-1", machineConfigV1, machineConfigV1, corev1.ConditionTrue),
-			},
-			currentConfig: machineConfigV1,
-			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(2); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-				if got, want := status.UpdatedMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-				if got, want := status.DegradedMachineCount, int32(0); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-				if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
-			},
-		},
-		{
-			// A NotReady-but-updated node combined with a degraded node should leave the pool
-			// not Updated and Degraded — the degraded node prevents full convergence.
-			name: "1 node not ready (updated), 1 node degraded — pool should not be Updated and should be Degraded",
-			nodes: []*corev1.Node{
-				helpers.NewNodeWithReady("node-0", machineConfigV1, machineConfigV1, corev1.ConditionFalse),
-				newNodeWithReadyAndDaemonState("node-1", machineConfigV0, machineConfigV1, corev1.ConditionTrue, daemonconsts.MachineConfigDaemonStateDegraded),
-			},
-			currentConfig: machineConfigV1,
-			verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-				if got, want := status.MachineCount, int32(2); got != want {
-					t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-				}
-				if got, want := status.UpdatedMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-				}
-				if got, want := status.DegradedMachineCount, int32(1); got != want {
-					t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-				}
-
-				condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-				if condupdated == nil {
-					t.Fatal("updated condition not found")
-				}
-				if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-					t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-				}
-
-				condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-				if condupdating == nil {
-					t.Fatal("updating condition not found")
-				}
-				if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-				}
-
-				conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-				if conddegraded == nil {
-					t.Fatal("degraded condition not found")
-				}
-				if got, want := conddegraded.Status, corev1.ConditionTrue; got != want {
-					t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-				}
+				assertPoolStatus(t, status, expectedPoolStatus{
+					updated:           corev1.ConditionTrue,
+					osImageStreamName: ptr("rhel-10"),
+				})
 			},
 		},
 	}
@@ -1605,52 +1137,16 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		},
 		currentConfig: machineConfigV0,
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			if got, want := status.MachineCount, int32(3); got != want {
-				t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UpdatedMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.ReadyMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UnavailableMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.DegradedMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-			}
-
-			condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-			if condupdated == nil {
-				t.Fatal("updated condition not found")
-			}
-
-			if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-			}
-
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-
-			conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-			if conddegraded == nil {
-				t.Fatal("degraded condition not found")
-			}
-
-			if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-			}
+			assertPoolStatus(t, status, expectedPoolStatus{
+				machineCount:            ptr(int32(3)),
+				updatedMachineCount:     ptr(int32(0)),
+				readyMachineCount:       ptr(int32(0)),
+				unavailableMachineCount: ptr(int32(0)),
+				degradedMachineCount:    ptr(int32(0)),
+				updated:                 corev1.ConditionFalse,
+				updating:                corev1.ConditionTrue,
+				degraded:                corev1.ConditionFalse,
+			})
 		},
 	}, {
 		name: "0 nodes updated, 1 node updating, 0 nodes degraded",
@@ -1666,52 +1162,16 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		},
 		currentConfig: machineConfigV0,
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			if got, want := status.MachineCount, int32(3); got != want {
-				t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UpdatedMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.ReadyMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UnavailableMachineCount, int32(1); got != want {
-				t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.DegradedMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-			}
-
-			condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-			if condupdated == nil {
-				t.Fatal("updated condition not found")
-			}
-
-			if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-			}
-
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-
-			conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-			if conddegraded == nil {
-				t.Fatal("degraded condition not found")
-			}
-
-			if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-			}
+			assertPoolStatus(t, status, expectedPoolStatus{
+				machineCount:            ptr(int32(3)),
+				updatedMachineCount:     ptr(int32(0)),
+				readyMachineCount:       ptr(int32(0)),
+				unavailableMachineCount: ptr(int32(1)),
+				degradedMachineCount:    ptr(int32(0)),
+				updated:                 corev1.ConditionFalse,
+				updating:                corev1.ConditionTrue,
+				degraded:                corev1.ConditionFalse,
+			})
 		},
 	}, {
 		name: "0 nodes updates, 0 nodes updating, 0 nodes degraded, pool paused",
@@ -1728,57 +1188,21 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		currentConfig: machineConfigV0,
 		paused:        true,
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			if got, want := status.MachineCount, int32(3); got != want {
-				t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UpdatedMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.ReadyMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UnavailableMachineCount, int32(1); got != want {
-				t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.DegradedMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-			}
-
-			condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-			if condupdated == nil {
-				t.Fatal("updated condition not found")
-			}
-
-			if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-			}
-
-			// The default MachineOSBuild created by the test driver (below) has no build
-			// conditions set, so it is in its "initial state". A paused pool with a MOSC/MOSB
-			// pair whose build is in its initial state is still considered "Updating" so
-			// operators can see that a build has been created but has not started yet.
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is paused; OS image build has been created but not yet started (mosb: mosb-1)", condupdating.Message)
-
-			conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-			if conddegraded == nil {
-				t.Fatal("degraded condition not found")
-			}
-
-			if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-			}
+			assertPoolStatus(t, status, expectedPoolStatus{
+				machineCount:            ptr(int32(3)),
+				updatedMachineCount:     ptr(int32(0)),
+				readyMachineCount:       ptr(int32(0)),
+				unavailableMachineCount: ptr(int32(1)),
+				degradedMachineCount:    ptr(int32(0)),
+				updated:                 corev1.ConditionFalse,
+				// The default MachineOSBuild created by the test driver (below) has no build
+				// conditions set, so it is in its "initial state". A paused pool with a MOSC/MOSB
+				// pair whose build is in its initial state is still considered "Updating" so
+				// operators can see that a build has been created but has not started yet.
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is paused; OS image build has been created but not yet started (mosb: mosb-1)",
+				degraded:    corev1.ConditionFalse,
+			})
 		},
 	}, {
 		name: "pool paused, mosc exists but no mosb, waiting for build to start",
@@ -1797,14 +1221,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          nil,
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is paused; waiting for a new OS image build to start (mosc: mosc-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is paused; waiting for a new OS image build to start (mosc: mosc-1)",
+			})
 		},
 	}, {
 		name: "pool paused, mosb exists but is in initial state",
@@ -1823,14 +1243,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithBuildInitialState().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is paused; OS image build has been created but not yet started (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is paused; OS image build has been created but not yet started (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool paused, build prepared",
@@ -1849,14 +1265,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithBuildPrepared().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is paused; OS image build has been prepared but will not rollout (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is paused; OS image build has been prepared but will not rollout (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool paused, build in progress",
@@ -1875,14 +1287,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithBuildInProgress().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is paused; OS image build in progress (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is paused; OS image build in progress (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool paused, build failed",
@@ -1901,14 +1309,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithFailedBuild().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is paused; OS image build failed (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionFalse,
+				updatingMsg: "Pool is paused; OS image build failed (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool paused, build interrupted",
@@ -1927,14 +1331,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithInterruptedBuild().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is paused; OS image build was interrupted (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionFalse,
+				updatingMsg: "Pool is paused; OS image build was interrupted (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool paused, build succeeded",
@@ -1953,14 +1353,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithSuccessfulBuild().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is paused; OS image build completed successfully (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionFalse,
+				updatingMsg: "Pool is paused; OS image build completed successfully (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool not paused, mosc exists but no mosb, waiting for build to start",
@@ -1978,14 +1374,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          nil,
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is waiting for a new OS image build to start (mosc: mosc-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is waiting for a new OS image build to start (mosc: mosc-1)",
+			})
 		},
 	}, {
 		name: "pool not paused, build in initial state",
@@ -2003,14 +1395,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithBuildInitialState().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is waiting for OS image build to start (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is waiting for OS image build to start (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool not paused, build prepared",
@@ -2028,14 +1416,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithBuildPrepared().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is waiting for OS image build to start (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is waiting for OS image build to start (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool not paused, build in progress",
@@ -2053,14 +1437,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithBuildInProgress().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is waiting for OS image build to complete (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is waiting for OS image build to complete (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool not paused, build failed",
@@ -2078,14 +1458,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithFailedBuild().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool update stopped due to OS image build failure (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionFalse,
+				updatingMsg: "Pool update stopped due to OS image build failure (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool not paused, build interrupted",
@@ -2103,14 +1479,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithInterruptedBuild().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool update stopped due to OS image build being interrupted (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionFalse,
+				updatingMsg: "Pool update stopped due to OS image build being interrupted (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool not paused, build succeeded, nodes still applying",
@@ -2128,14 +1500,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV0).WithSuccessfulBuild().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-			assert.Equal(t, "Pool is waiting for nodes to apply OS image (mosb: mosb-1)", condupdating.Message)
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updating:    corev1.ConditionTrue,
+				updatingMsg: "Pool is waiting for nodes to apply OS image (mosb: mosb-1)",
+			})
 		},
 	}, {
 		name: "pool not paused, build succeeded, all nodes updated",
@@ -2153,20 +1521,10 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithDigestedImagePushspec("registry.host.com/org/repo@sha256:12345").WithSuccessfulBuild().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-			if condupdated == nil {
-				t.Fatal("updated condition not found")
-			}
-			if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-			}
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
+			assertPoolStatus(t, status, expectedPoolStatus{
+				updated:  corev1.ConditionTrue,
+				updating: corev1.ConditionFalse,
+			})
 		},
 	}, {
 		name: "0 nodes updated, 1 node updating, 1 node degraded",
@@ -2182,52 +1540,16 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		},
 		currentConfig: machineConfigV0,
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			if got, want := status.MachineCount, int32(3); got != want {
-				t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UpdatedMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.ReadyMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UnavailableMachineCount, int32(1); got != want {
-				t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.DegradedMachineCount, int32(1); got != want {
-				t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-			}
-
-			condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-			if condupdated == nil {
-				t.Fatal("updated condition not found")
-			}
-
-			if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-			}
-
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-
-			conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-			if conddegraded == nil {
-				t.Fatal("degraded condition not found")
-			}
-
-			if got, want := conddegraded.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-			}
+			assertPoolStatus(t, status, expectedPoolStatus{
+				machineCount:            ptr(int32(3)),
+				updatedMachineCount:     ptr(int32(0)),
+				readyMachineCount:       ptr(int32(0)),
+				unavailableMachineCount: ptr(int32(1)),
+				degradedMachineCount:    ptr(int32(1)),
+				updated:                 corev1.ConditionFalse,
+				updating:                corev1.ConditionTrue,
+				degraded:                corev1.ConditionTrue,
+			})
 		},
 	}, {
 		name: "3 nodes updated, 0 nodes updating, 0 nodes degraded",
@@ -2245,52 +1567,16 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithDigestedImagePushspec("registry.host.com/org/repo@sha256:12345").WithSuccessfulBuild().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			if got, want := status.MachineCount, int32(3); got != want {
-				t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UpdatedMachineCount, int32(3); got != want {
-				t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.ReadyMachineCount, int32(3); got != want {
-				t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UnavailableMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.DegradedMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-			}
-
-			condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-			if condupdated == nil {
-				t.Fatal("updated condition not found")
-			}
-
-			if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-			}
-
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-
-			if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-
-			conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-			if conddegraded == nil {
-				t.Fatal("degraded condition not found")
-			}
-
-			if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-			}
+			assertPoolStatus(t, status, expectedPoolStatus{
+				machineCount:            ptr(int32(3)),
+				updatedMachineCount:     ptr(int32(3)),
+				readyMachineCount:       ptr(int32(3)),
+				unavailableMachineCount: ptr(int32(0)),
+				degradedMachineCount:    ptr(int32(0)),
+				updated:                 corev1.ConditionTrue,
+				updating:                corev1.ConditionFalse,
+				degraded:                corev1.ConditionFalse,
+			})
 		},
 	}, {
 		name: "1 node updated, 2 nodes updating, 0 nodes degraded",
@@ -2312,48 +1598,15 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		},
 		currentConfig: machineConfigV1,
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			if got, want := status.MachineCount, int32(3); got != want {
-				t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.UpdatedMachineCount, int32(1); got != want {
-				t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.ReadyMachineCount, int32(1); got != want {
-				t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-			}
-
-			if got, want := status.DegradedMachineCount, int32(0); got != want {
-				t.Fatalf("mismatch DegradedMachineCount: got %d want: %d", got, want)
-			}
-
-			condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-			if condupdated == nil {
-				t.Fatal("updated condition not found")
-			}
-
-			if got, want := condupdated.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-			}
-
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-
-			if got, want := condupdating.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-
-			conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-			if conddegraded == nil {
-				t.Fatal("updating condition not found")
-			}
-
-			if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-			}
+			assertPoolStatus(t, status, expectedPoolStatus{
+				machineCount:        ptr(int32(3)),
+				updatedMachineCount: ptr(int32(1)),
+				readyMachineCount:   ptr(int32(1)),
+				degradedMachineCount: ptr(int32(0)),
+				updated:             corev1.ConditionFalse,
+				updating:            corev1.ConditionTrue,
+				degraded:            corev1.ConditionFalse,
+			})
 		},
 	}, {
 		// Regression test for mco-2572: with ImageModeStatusReporting enabled, a pool where
@@ -2373,42 +1626,15 @@ func TestCalculateStatusWithImageModeReporting(t *testing.T) {
 		overrideMosb:  true,
 		mosb:          helpers.NewMachineOSBuildBuilder("mosb-1").WithDesiredConfig(machineConfigV1).WithDigestedImagePushspec("registry.host.com/org/repo@sha256:12345").WithSuccessfulBuild().MachineOSBuild(),
 		verify: func(status mcfgv1.MachineConfigPoolStatus, t *testing.T) {
-			if got, want := status.MachineCount, int32(3); got != want {
-				t.Fatalf("mismatch MachineCount: got %d want: %d", got, want)
-			}
-			if got, want := status.UpdatedMachineCount, int32(3); got != want {
-				t.Fatalf("mismatch UpdatedMachineCount: got %d want: %d", got, want)
-			}
-			if got, want := status.ReadyMachineCount, int32(2); got != want {
-				t.Fatalf("mismatch ReadyMachineCount: got %d want: %d", got, want)
-			}
-			if got, want := status.UnavailableMachineCount, int32(1); got != want {
-				t.Fatalf("mismatch UnavailableMachineCount: got %d want: %d", got, want)
-			}
-
-			condupdated := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdated)
-			if condupdated == nil {
-				t.Fatal("updated condition not found")
-			}
-			if got, want := condupdated.Status, corev1.ConditionTrue; got != want {
-				t.Fatalf("mismatch condupdated.Status: got %s want: %s", got, want)
-			}
-
-			condupdating := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolUpdating)
-			if condupdating == nil {
-				t.Fatal("updating condition not found")
-			}
-			if got, want := condupdating.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch condupdating.Status: got %s want: %s", got, want)
-			}
-
-			conddegraded := apihelpers.GetMachineConfigPoolCondition(status, mcfgv1.MachineConfigPoolDegraded)
-			if conddegraded == nil {
-				t.Fatal("degraded condition not found")
-			}
-			if got, want := conddegraded.Status, corev1.ConditionFalse; got != want {
-				t.Fatalf("mismatch conddegraded.Status: got %s want: %s", got, want)
-			}
+			assertPoolStatus(t, status, expectedPoolStatus{
+				machineCount:            ptr(int32(3)),
+				updatedMachineCount:     ptr(int32(3)),
+				readyMachineCount:       ptr(int32(2)),
+				unavailableMachineCount: ptr(int32(1)),
+				updated:                 corev1.ConditionTrue,
+				updating:                corev1.ConditionFalse,
+				degraded:                corev1.ConditionFalse,
+			})
 		},
 	}}
 
