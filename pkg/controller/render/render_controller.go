@@ -1080,7 +1080,13 @@ func (ctrl *Controller) validateNoOSStreamDowngrade(pool *mcfgv1.MachineConfigPo
 		return nil
 	}
 
+	imageStream, imageStreamErr := ctrl.osImageStreamLister.Get(ctrlcommon.ClusterInstanceNameOSImageStream)
+
 	requestedStream := ctrl.getOSImageStreamNameForPool(pool)
+	if requestedStream == "" && imageStreamErr == nil {
+		requestedStream = imageStream.Status.DefaultStream
+	}
+
 	currentStream := pool.Status.OSImageStream.Name
 
 	if currentStream == "" && ctrlcommon.IsCustomPool(pool) {
@@ -1089,10 +1095,8 @@ func (ctrl *Controller) validateNoOSStreamDowngrade(pool *mcfgv1.MachineConfigPo
 		}
 	}
 
-	if currentStream == "" {
-		if imageStream, err := ctrl.osImageStreamLister.Get(ctrlcommon.ClusterInstanceNameOSImageStream); err == nil {
-			currentStream = imageStream.Status.DefaultStream
-		}
+	if currentStream == "" && imageStreamErr == nil {
+		currentStream = imageStream.Status.DefaultStream
 	}
 
 	if requestedStream == osimagestream.StreamNameRHEL9 && osimagestream.IsRHEL10Stream(currentStream) {

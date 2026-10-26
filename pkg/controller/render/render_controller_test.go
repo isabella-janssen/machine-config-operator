@@ -1329,26 +1329,6 @@ func TestValidateNoOSStreamDowngrade(t *testing.T) {
 			wantErrContains: "cannot be downgraded",
 		},
 		{
-			name: "unknown custom stream transtion is not blocked",
-			pool: func() *mcfgv1.MachineConfigPool {
-				p := helpers.NewMachineConfigPool("worker", helpers.WorkerSelector, nil, "")
-				p.Spec.OSImageStream.Name = "custom"
-				p.Status.OSImageStream.Name = "rhel-10"
-				return p
-			}(),
-			wantErr: false,
-		},
-		{
-			name: "unknown custom stream as current does not block transition to rhel-9",
-			pool: func() *mcfgv1.MachineConfigPool {
-				p := helpers.NewMachineConfigPool("worker", helpers.WorkerSelector, nil, "")
-				p.Spec.OSImageStream.Name = "rhel-9"
-				p.Status.OSImageStream.Name = "custom"
-				return p
-			}(),
-			wantErr: false,
-		},
-		{
 			name: "centos-10 to rhel-9 is blocked",
 			pool: func() *mcfgv1.MachineConfigPool {
 				p := helpers.NewMachineConfigPool("worker", helpers.WorkerSelector, nil, "")
@@ -1356,6 +1336,23 @@ func TestValidateNoOSStreamDowngrade(t *testing.T) {
 				p.Status.OSImageStream.Name = "centos-10"
 				return p
 			}(),
+			wantErr:         true,
+			wantErrContains: "cannot be downgraded",
+		},
+		{
+			name: "removing explicit rhel-10 spec on cluster defaulting to rhel-9 is blocked",
+			pool: func() *mcfgv1.MachineConfigPool {
+				p := helpers.NewMachineConfigPool("worker", helpers.WorkerSelector, nil, "")
+				// spec.osImageStream.name removed — getOSImageStreamNameForPool returns ""
+				p.Status.OSImageStream.Name = "rhel-10"
+				return p
+			}(),
+			osImageStream: &mcfgv1.OSImageStream{
+				ObjectMeta: metav1.ObjectMeta{Name: ctrlcommon.ClusterInstanceNameOSImageStream},
+				Status: mcfgv1.OSImageStreamStatus{
+					DefaultStream: "rhel-9",
+				},
+			},
 			wantErr:         true,
 			wantErrContains: "cannot be downgraded",
 		},
