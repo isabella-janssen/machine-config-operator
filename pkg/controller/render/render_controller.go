@@ -1066,15 +1066,19 @@ func validateNoRuncOnRHEL10FromOSImageURL(ctx context.Context, pool *mcfgv1.Mach
 // major OS version is lower than the major version the pool is currently running.
 // Downgrading OS streams (e.g. rhel-10 → rhel-9) is unsupported.
 //
+// This is a backstop for the VAP-level downgrade check, which cannot inspect the worker
+// pool's status for custom pools. It also catches downgrades triggered by a change to
+// OSImageStream.spec.defaultStream rather than to the pool's own spec (no MCP patch
+// means no VAP trigger).
+//
 // The current stream is resolved via this fallback chain:
 //  1. pool.Status.OSImageStream.Name — set by the node status controller when the pool
 //     is fully settled on a named stream.
 //  2. workerPool.Status.OSImageStream.Name — for custom pools whose own status is empty
 //     (inheriting the worker pool's running stream).
-//  3. imageStream.Status.DefaultStream — for new pools whose status (and worker status)
-//     has not yet been populated.
 //
-// If the current stream still cannot be determined the check is skipped.
+// If the current stream still cannot be determined the check is skipped; new-pool
+// creation with a downgrade stream is blocked at admission by the VAP.
 func (ctrl *Controller) validateNoOSStreamDowngrade(pool *mcfgv1.MachineConfigPool) error {
 	if !osimagestream.IsFeatureEnabled(ctrl.fgHandler) || ctrl.osImageStreamLister == nil {
 		return nil
@@ -1093,10 +1097,6 @@ func (ctrl *Controller) validateNoOSStreamDowngrade(pool *mcfgv1.MachineConfigPo
 		if workerPool, err := ctrl.mcpLister.Get(ctrlcommon.MachineConfigPoolWorker); err == nil {
 			currentStream = workerPool.Status.OSImageStream.Name
 		}
-	}
-
-	if currentStream == "" && imageStreamErr == nil {
-		currentStream = imageStream.Status.DefaultStream
 	}
 
 	if requestedStream == osimagestream.StreamNameRHEL9 && osimagestream.IsRHEL10Stream(currentStream) {

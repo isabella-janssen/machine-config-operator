@@ -1247,17 +1247,6 @@ func TestRunBootstrapBlocksRuncOnRHEL10(t *testing.T) {
 }
 
 func TestValidateNoOSStreamDowngrade(t *testing.T) {
-	clusterOSImageStream := &mcfgv1.OSImageStream{
-		ObjectMeta: metav1.ObjectMeta{Name: ctrlcommon.ClusterInstanceNameOSImageStream},
-		Status: mcfgv1.OSImageStreamStatus{
-			DefaultStream: "rhel-10",
-			AvailableStreams: []mcfgv1.OSImageStreamSet{
-				{Name: "rhel-9", OSImage: "quay.io/fake/rhel9@sha256:aaa"},
-				{Name: "rhel-10", OSImage: "quay.io/fake/rhel10@sha256:bbb"},
-			},
-		},
-	}
-
 	tests := []struct {
 		name            string
 		pool            *mcfgv1.MachineConfigPool
@@ -1309,22 +1298,6 @@ func TestValidateNoOSStreamDowngrade(t *testing.T) {
 				p.Status.OSImageStream.Name = "rhel-10"
 				return p
 			}(),
-			wantErr:         true,
-			wantErrContains: "cannot be downgraded",
-		},
-		{
-			name: "new pool falls back to OSImageStream DefaultStream",
-			pool: func() *mcfgv1.MachineConfigPool {
-				p := helpers.NewMachineConfigPool("infra", helpers.InfraSelector, nil, "")
-				p.Spec.OSImageStream.Name = "rhel-9"
-				return p
-			}(),
-			workerPool: func() *mcfgv1.MachineConfigPool {
-				p := helpers.NewMachineConfigPool("worker", helpers.WorkerSelector, nil, "")
-				// worker status empty means it's default
-				return p
-			}(),
-			osImageStream:   clusterOSImageStream,
 			wantErr:         true,
 			wantErrContains: "cannot be downgraded",
 		},
