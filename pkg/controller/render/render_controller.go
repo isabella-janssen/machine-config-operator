@@ -1067,9 +1067,9 @@ func validateNoRuncOnRHEL10FromOSImageURL(ctx context.Context, pool *mcfgv1.Mach
 // Downgrading OS streams (e.g. rhel-10 → rhel-9) is unsupported.
 //
 // This is a backstop for the VAP-level downgrade check, which cannot inspect the worker
-// pool's status for custom pools. It also catches downgrades triggered by a change to
-// OSImageStream.spec.defaultStream rather than to the pool's own spec (no MCP patch
-// means no VAP trigger).
+// pool's status for custom pools. It also serves as defense-in-depth for downgrades
+// triggered by a change to OSImageStream.spec.defaultStream (the primary gate being the
+// osimagestream VAP).
 //
 // The current stream is resolved via this fallback chain:
 //  1. pool.Status.OSImageStream.Name — set by the node status controller when the pool
