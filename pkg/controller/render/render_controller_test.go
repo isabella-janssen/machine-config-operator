@@ -1302,6 +1302,40 @@ func TestValidateNoOSStreamDowngrade(t *testing.T) {
 			wantErrContains: "cannot be downgraded",
 		},
 		{
+			name: "custom pool uses worker spec when worker status is empty (mid-update)",
+			pool: func() *mcfgv1.MachineConfigPool {
+				p := helpers.NewMachineConfigPool("infra", helpers.InfraSelector, nil, "")
+				p.Spec.OSImageStream.Name = "rhel-9"
+				return p
+			}(),
+			workerPool: func() *mcfgv1.MachineConfigPool {
+				p := helpers.NewMachineConfigPool("worker", helpers.WorkerSelector, nil, "")
+				p.Spec.OSImageStream.Name = "rhel-10"
+				// status is empty — simulates worker mid-update where status is cleared
+				return p
+			}(),
+			wantErr:         true,
+			wantErrContains: "cannot be downgraded",
+		},
+		{
+			name: "custom pool uses cluster defaultStream when worker has no spec and no status (mid-update)",
+			pool: func() *mcfgv1.MachineConfigPool {
+				p := helpers.NewMachineConfigPool("infra", helpers.InfraSelector, nil, "")
+				p.Spec.OSImageStream.Name = "rhel-9"
+				return p
+			}(),
+			workerPool: helpers.NewMachineConfigPool("worker", helpers.WorkerSelector, nil, ""),
+			// worker has no explicit spec and no status — inherits cluster default
+			osImageStream: &mcfgv1.OSImageStream{
+				ObjectMeta: metav1.ObjectMeta{Name: ctrlcommon.ClusterInstanceNameOSImageStream},
+				Status: mcfgv1.OSImageStreamStatus{
+					DefaultStream: "rhel-10",
+				},
+			},
+			wantErr:         true,
+			wantErrContains: "cannot be downgraded",
+		},
+		{
 			name: "centos-10 to rhel-9 is blocked",
 			pool: func() *mcfgv1.MachineConfigPool {
 				p := helpers.NewMachineConfigPool("worker", helpers.WorkerSelector, nil, "")
