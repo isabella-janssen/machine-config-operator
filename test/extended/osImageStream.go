@@ -165,8 +165,8 @@ func getControlPlaneMachineSetIfExists(machineClient *machineclient.Clientset) (
 
 // validateMCPOSStreamDowngradeBlocked verifies that the MachineConfigPool VAP rejects
 // attempts to downgrade the OS stream from rhel-10 to rhel-9, covering both:
-//   - expression 4: CREATE or UPDATE with no prior spec on a rhel-10 default cluster
-//   - expression 2: UPDATE from an explicit rhel-10 spec to rhel-9
+//   - UPDATE with no prior spec on a rhel-10 default cluster
+//   - UPDATE from an explicit rhel-10 spec to rhel-9
 func validateMCPOSStreamDowngradeBlocked(oc *exutil.CLI) {
 	origStream, _ := oc.Run("get").Args("mcp", "worker", "-o", "jsonpath={.spec.osImageStream.name}").Output()
 	defer func() {
@@ -179,14 +179,14 @@ func validateMCPOSStreamDowngradeBlocked(oc *exutil.CLI) {
 		}
 	}()
 
-	exutil.By("VAP expression 4: patch worker MCP to rhel-9 with no prior spec on rhel-10 default cluster — expect rejection")
+	exutil.By("Patch worker MCP to rhel-9 with no prior spec on rhel-10 default cluster — expect VAP rejection")
 	err := oc.Run("patch").Args("mcp", "worker", "--type=merge",
 		"-p", `{"spec":{"osImageStream":{"name":"rhel-9"}}}`).Execute()
 	o.Expect(err).To(o.HaveOccurred(), "Expected VAP to reject setting MCP to rhel-9 when DefaultStream is rhel-10")
 	exitErr, ok := err.(*exutil.ExitError)
 	o.Expect(ok).To(o.BeTrue(), "expected *exutil.ExitError from admission rejection, got %T: %v", err, err)
 	o.Expect(exitErr.StdErr).To(o.ContainSubstring("rhel-9 is not supported when the cluster default stream is rhel-10"),
-		"Expected VAP expression 4 rejection message")
+		"Expected VAP rejection message")
 	logger.Infof("OK!\n")
 
 	exutil.By("Set worker MCP to rhel-10 explicitly — expect acceptance")
@@ -195,28 +195,28 @@ func validateMCPOSStreamDowngradeBlocked(oc *exutil.CLI) {
 		"Expected setting MCP to explicit rhel-10 to succeed")
 	logger.Infof("OK!\n")
 
-	exutil.By("VAP expression 2: patch worker MCP from explicit rhel-10 to rhel-9 — expect rejection")
+	exutil.By("Patch worker MCP from explicit rhel-10 to rhel-9 — expect VAP rejection")
 	err = oc.Run("patch").Args("mcp", "worker", "--type=merge",
 		"-p", `{"spec":{"osImageStream":{"name":"rhel-9"}}}`).Execute()
 	o.Expect(err).To(o.HaveOccurred(), "Expected VAP to reject downgrading MCP from explicit rhel-10 to rhel-9")
 	exitErr, ok = err.(*exutil.ExitError)
 	o.Expect(ok).To(o.BeTrue(), "expected *exutil.ExitError from admission rejection, got %T: %v", err, err)
 	o.Expect(exitErr.StdErr).To(o.ContainSubstring("downgrade is not supported"),
-		"Expected VAP expression 2 rejection message")
+		"Expected VAP rejection message")
 	logger.Infof("OK!\n")
 
 }
 
 // validateCustomMCPRHEL9CreationBlocked verifies that creating a custom MCP with rhel-9
-// is rejected at admission on a rhel-10 default cluster (VAP expression 4, CREATE path).
+// is rejected at admission on a rhel-10 default cluster.
 func validateCustomMCPRHEL9CreationBlocked(oc *exutil.CLI) {
-	exutil.By("Create custom MCP with rhel-9 stream — expect VAP expression 4 rejection on CREATE")
+	exutil.By("Create custom MCP with rhel-9 stream — expect VAP rejection")
 	_, err := extpriv.CreateCustomMCPWithStream(oc, "test-rhel9-downgrade", extpriv.OSImageStreamRHEL9, 0)
 	o.Expect(err).To(o.HaveOccurred(), "Expected VAP to reject creating a rhel-9 MCP when DefaultStream is rhel-10")
 	exitErr, ok := err.(*exutil.ExitError)
 	o.Expect(ok).To(o.BeTrue(), "expected *exutil.ExitError from admission rejection, got %T: %v", err, err)
 	o.Expect(exitErr.StdErr).To(o.ContainSubstring("rhel-9 is not supported when the cluster default stream is rhel-10"),
-		"Expected VAP expression 4 rejection message")
+		"Expected VAP rejection message")
 	logger.Infof("OK!\n")
 }
 
