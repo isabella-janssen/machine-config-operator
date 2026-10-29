@@ -177,6 +177,7 @@ func validateMCPOSStreamDowngradeBlocked(oc *exutil.CLI) {
 			_ = oc.Run("patch").Args("mcp", "worker", "--type=merge",
 				"-p", `{"spec":{"osImageStream":{"name":"`+origStream+`"}}}`).Execute()
 		}
+		_ = extpriv.NewMachineConfigPool(oc, "worker").WaitForUpdatedStatus()
 	}()
 
 	exutil.By("Patch worker MCP to rhel-9 with no prior spec on rhel-10 default cluster — expect VAP rejection")
@@ -210,6 +211,10 @@ func validateMCPOSStreamDowngradeBlocked(oc *exutil.CLI) {
 // validateCustomMCPRHEL9CreationBlocked verifies that creating a custom MCP with rhel-9
 // is rejected at admission on a rhel-10 default cluster.
 func validateCustomMCPRHEL9CreationBlocked(oc *exutil.CLI) {
+	defer func() {
+		_ = oc.Run("delete").Args("mcp", "test-rhel9-downgrade", "--ignore-not-found").Execute()
+	}()
+
 	exutil.By("Create custom MCP with rhel-9 stream — expect VAP rejection")
 	_, err := extpriv.CreateCustomMCPWithStream(oc, "test-rhel9-downgrade", extpriv.OSImageStreamRHEL9, 0)
 	o.Expect(err).To(o.HaveOccurred(), "Expected VAP to reject creating a rhel-9 MCP when DefaultStream is rhel-10")
@@ -224,6 +229,17 @@ func validateCustomMCPRHEL9CreationBlocked(oc *exutil.CLI) {
 // rejects attempts to change spec.defaultStream from rhel-10 (or centos-10) to rhel-9,
 // covering TC11 in the manual test plan.
 func validateOSImageStreamDefaultStreamDowngradeBlocked(oc *exutil.CLI) {
+	origDefault, _ := oc.Run("get").Args("osimagestream", "cluster", "-o", "jsonpath={.spec.defaultStream}").Output()
+	defer func() {
+		if origDefault != "" {
+			_ = oc.Run("patch").Args("osimagestream", "cluster", "--type=merge",
+				"-p", `{"spec":{"defaultStream":"`+origDefault+`"}}`).Execute()
+		} else {
+			_ = oc.Run("patch").Args("osimagestream", "cluster", "--type=json",
+				"-p", `[{"op":"remove","path":"/spec/defaultStream"}]`).Execute()
+		}
+	}()
+
 	exutil.By("Patch OSImageStream cluster spec.defaultStream from rhel-10 to rhel-9 — expect VAP rejection")
 	err := oc.Run("patch").Args("osimagestream", "cluster", "--type=merge",
 		"-p", `{"spec":{"defaultStream":"rhel-9"}}`).Execute()
