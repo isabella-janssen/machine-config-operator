@@ -1079,6 +1079,8 @@ func validateNoRuncOnRHEL10FromOSImageURL(ctx context.Context, pool *mcfgv1.Mach
 //  3. workerPool.Spec.OSImageStream.Name — for custom pools when the worker status is
 //     cleared mid-update; the spec reflects the worker's target stream throughout the
 //     update window, closing the gap where status is transiently empty.
+//  4. imageStream.Status.DefaultStream — when the worker also has no explicit spec and
+//     inherits the cluster default; mirrors how requestedStream is resolved.
 //
 // If the current stream still cannot be determined the check is skipped; new-pool
 // creation with a downgrade stream is blocked at admission by the VAP.
@@ -1101,6 +1103,9 @@ func (ctrl *Controller) validateNoOSStreamDowngrade(pool *mcfgv1.MachineConfigPo
 			currentStream = workerPool.Status.OSImageStream.Name
 			if currentStream == "" {
 				currentStream = ctrl.getOSImageStreamNameForPool(workerPool)
+			}
+			if currentStream == "" && imageStreamErr == nil {
+				currentStream = imageStream.Status.DefaultStream
 			}
 		}
 	}
